@@ -1,24 +1,33 @@
 package pl.tfhub.api.test;
 
+import jakarta.persistence.criteria.CriteriaBuilder;
+import jakarta.persistence.criteria.CriteriaQuery;
+import jakarta.persistence.criteria.Expression;
+import jakarta.persistence.criteria.Path;
+import jakarta.persistence.criteria.Predicate;
+import jakarta.persistence.criteria.Root;
 import org.hibernate.exception.ConstraintViolationException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.test.util.ReflectionTestUtils;
 import pl.tfhub.api.test.dto.CreateTestRequest;
+import pl.tfhub.api.test.dto.TestSearchRequest;
 import pl.tfhub.api.test.dto.TestResponse;
 
 import java.sql.SQLException;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -119,6 +128,75 @@ class TestServiceTests {
 		when(testRepository.findById(404L)).thenReturn(java.util.Optional.empty());
 
 		assertThrows(TestNotFoundException.class, () -> testService.getTest(404L));
+	}
+
+	@Test
+	void searchesWithEveryCriterionCombinedUsingAndAndMapsResponses() {
+		AthleticTest test = new AthleticTest("Sprint 40m", "s", TestCategory.TIME, false);
+		ReflectionTestUtils.setField(test, "id", 42L);
+		TestSearchRequest request = new TestSearchRequest("  SPRint ", "s", TestCategory.TIME, true, false);
+		when(testRepository.findAll(any(org.springframework.data.jpa.domain.Specification.class)))
+				.thenReturn(List.of(test));
+
+		List<TestResponse> responses = testService.searchTests(request);
+
+		assertEquals(List.of(new TestResponse(42L, "Sprint 40m", "s", TestCategory.TIME, false, true)), responses);
+		ArgumentCaptor<org.springframework.data.jpa.domain.Specification<AthleticTest>> captor =
+				ArgumentCaptor.forClass(org.springframework.data.jpa.domain.Specification.class);
+		verify(testRepository).findAll(captor.capture());
+
+		Root<AthleticTest> root = org.mockito.Mockito.mock(Root.class);
+		CriteriaQuery<?> query = org.mockito.Mockito.mock(CriteriaQuery.class);
+		CriteriaBuilder criteriaBuilder = org.mockito.Mockito.mock(CriteriaBuilder.class);
+		Path<String> name = org.mockito.Mockito.mock(Path.class);
+		Path<Object> unit = org.mockito.Mockito.mock(Path.class);
+		Path<Object> category = org.mockito.Mockito.mock(Path.class);
+		Path<Object> higherIsBetter = org.mockito.Mockito.mock(Path.class);
+		Path<Object> active = org.mockito.Mockito.mock(Path.class);
+		Predicate namePredicate = org.mockito.Mockito.mock(Predicate.class);
+		Predicate unitPredicate = org.mockito.Mockito.mock(Predicate.class);
+		Predicate categoryPredicate = org.mockito.Mockito.mock(Predicate.class);
+		Predicate higherPredicate = org.mockito.Mockito.mock(Predicate.class);
+		Predicate activePredicate = org.mockito.Mockito.mock(Predicate.class);
+		Predicate combinedPredicate = org.mockito.Mockito.mock(Predicate.class);
+		when(root.<String>get("name")).thenReturn(name);
+		when(root.get("unit")).thenReturn(unit);
+		when(root.get("category")).thenReturn(category);
+		when(root.get("higherIsBetter")).thenReturn(higherIsBetter);
+		when(root.get("active")).thenReturn(active);
+		Expression<String> lowerName = org.mockito.Mockito.mock(Expression.class);
+		when(criteriaBuilder.lower(name)).thenReturn(lowerName);
+		when(criteriaBuilder.like(lowerName, "%sprint%")).thenReturn(namePredicate);
+		when(criteriaBuilder.equal(unit, "s")).thenReturn(unitPredicate);
+		when(criteriaBuilder.equal(category, TestCategory.TIME)).thenReturn(categoryPredicate);
+		when(criteriaBuilder.equal(higherIsBetter, true)).thenReturn(higherPredicate);
+		when(criteriaBuilder.equal(active, false)).thenReturn(activePredicate);
+		when(criteriaBuilder.and(namePredicate, unitPredicate, categoryPredicate, higherPredicate, activePredicate))
+				.thenReturn(combinedPredicate);
+
+		assertEquals(combinedPredicate, captor.getValue().toPredicate(root, query, criteriaBuilder));
+		verify(criteriaBuilder).and(namePredicate, unitPredicate, categoryPredicate, higherPredicate, activePredicate);
+	}
+
+	@Test
+	void ignoresNullAndWhitespaceOnlyNameCriteria() {
+		assertEquals(new TestSearchRequest(null, null, null, null, null),
+				new TestSearchRequest(" \t ", null, null, null, null));
+		when(testRepository.findAll(any(org.springframework.data.jpa.domain.Specification.class))).thenReturn(List.of());
+		testService.searchTests(new TestSearchRequest(" \t ", null, null, null, null));
+
+		ArgumentCaptor<org.springframework.data.jpa.domain.Specification<AthleticTest>> captor =
+				ArgumentCaptor.forClass(org.springframework.data.jpa.domain.Specification.class);
+		verify(testRepository).findAll(captor.capture());
+
+		Root<AthleticTest> root = org.mockito.Mockito.mock(Root.class);
+		CriteriaQuery<?> query = org.mockito.Mockito.mock(CriteriaQuery.class);
+		CriteriaBuilder criteriaBuilder = org.mockito.Mockito.mock(CriteriaBuilder.class);
+		Predicate all = org.mockito.Mockito.mock(Predicate.class);
+		when(criteriaBuilder.and()).thenReturn(all);
+
+		assertEquals(all, captor.getValue().toPredicate(root, query, criteriaBuilder));
+		verifyNoMoreInteractions(root);
 	}
 
 	private void assertCreated(String name, String unit, TestCategory category, boolean higherIsBetter) {

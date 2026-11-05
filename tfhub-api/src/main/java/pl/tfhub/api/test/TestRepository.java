@@ -1,10 +1,11 @@
 package pl.tfhub.api.test;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
-public interface TestRepository extends JpaRepository<AthleticTest, Long> {
+public interface TestRepository extends JpaRepository<AthleticTest, Long>, JpaSpecificationExecutor<AthleticTest> {
 
 	@Query(value = """
 			SELECT EXISTS (

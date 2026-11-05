@@ -7,7 +7,10 @@ import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import pl.tfhub.api.test.dto.CreateTestRequest;
+import pl.tfhub.api.test.dto.TestSearchRequest;
 import pl.tfhub.api.test.dto.TestResponse;
+
+import java.util.List;
 
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -179,8 +182,99 @@ class TestControllerTests {
 				.andExpect(status().isBadRequest());
 	}
 
+	@Test
+	void searchesByNameAndReturnsResponseDtos() throws Exception {
+		TestSearchRequest request = new TestSearchRequest("sprint", null, null, null, null);
+		when(testService.searchTests(request)).thenReturn(List.of(
+				new TestResponse(12L, "Sprint 40m", "s", TestCategory.TIME, false, true)));
+
+		mockMvc.perform(post("/api/tests/search")
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("""
+								{"name":"  sprint  "}
+								"""))
+				.andExpect(status().isOk())
+				.andExpect(content().json("""
+						[{"id":12,"name":"Sprint 40m","unit":"s","category":"TIME",
+						"higherIsBetter":false,"active":true}]
+						""", true))
+				.andExpect(jsonPath("$[0].class").doesNotExist());
+
+		verify(testService).searchTests(request);
+	}
+
+	@Test
+	void acceptsEveryOptionalSearchCriterionIncludingFalseValues() throws Exception {
+		TestSearchRequest request =
+				new TestSearchRequest(null, "m", TestCategory.DISTANCE, false, false);
+		when(testService.searchTests(request)).thenReturn(List.of(
+				new TestResponse(13L, "Long jump", "m", TestCategory.DISTANCE, false, false)));
+
+		mockMvc.perform(post("/api/tests/search")
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("""
+								{"unit":"m","category":"DISTANCE","higherIsBetter":false,"active":false}
+								"""))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$[0].unit").value("m"))
+				.andExpect(jsonPath("$[0].category").value("DISTANCE"))
+				.andExpect(jsonPath("$[0].higherIsBetter").value(false))
+				.andExpect(jsonPath("$[0].active").value(false));
+
+		verify(testService).searchTests(request);
+	}
+
+	@Test
+	void emptySearchReturnsAllTestsIncludingInactiveAndNoMatchesReturnsEmptyArray() throws Exception {
+		TestSearchRequest emptyRequest = new TestSearchRequest(null, null, null, null, null);
+		when(testService.searchTests(emptyRequest)).thenReturn(List.of(
+				new TestResponse(12L, "Sprint", "s", TestCategory.TIME, false, true),
+				new TestResponse(13L, "Long jump", "m", TestCategory.DISTANCE, true, false)));
+
+		mockMvc.perform(post("/api/tests/search")
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("{}"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.length()").value(2))
+				.andExpect(jsonPath("$[1].active").value(false));
+
+		TestSearchRequest noMatchRequest = new TestSearchRequest("missing", null, null, null, null);
+		when(testService.searchTests(noMatchRequest)).thenReturn(List.of());
+		mockMvc.perform(post("/api/tests/search")
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("""
+								{"name":"missing"}
+								"""))
+				.andExpect(status().isOk())
+				.andExpect(content().json("[]", true));
+	}
+
+	@Test
+	void rejectsInvalidSearchUnitCategoryAndMalformedJson() throws Exception {
+		assertSearchBadRequest("""
+				{"unit":"km"}
+				""");
+		assertSearchBadRequest("""
+				{"category":"OTHER"}
+				""");
+		assertSearchBadRequest("""
+				{"higherIsBetter":"true"}
+				""");
+		assertSearchBadRequest("""
+				{"active":1}
+				""");
+		assertSearchBadRequest("{\"name\":");
+	}
+
 	private void assertBadRequest(String body) throws Exception {
 		mockMvc.perform(post("/api/tests")
+						.contentType(MediaType.APPLICATION_JSON)
+						.content(body))
+				.andExpect(status().isBadRequest());
+	}
+
+	private void assertSearchBadRequest(String body) throws Exception {
+		mockMvc.perform(post("/api/tests/search")
 						.contentType(MediaType.APPLICATION_JSON)
 						.content(body))
 				.andExpect(status().isBadRequest());

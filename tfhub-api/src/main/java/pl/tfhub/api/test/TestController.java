@@ -9,9 +9,11 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import pl.tfhub.api.test.dto.CreateTestRequest;
+import pl.tfhub.api.test.dto.TestSearchRequest;
 import pl.tfhub.api.test.dto.TestResponse;
 
 import java.net.URI;
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/tests")
@@ -35,5 +37,10 @@ public class TestController {
 			throw new InvalidTestIdException();
 		}
 		return testService.getTest(id);
+	}
+
+	@PostMapping("/search")
+	public List<TestResponse> searchTests(@Valid @RequestBody TestSearchRequest request) {
+		return testService.searchTests(request);
 	}
 }
