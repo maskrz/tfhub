@@ -39,6 +39,13 @@ public class TestService {
 		}
 	}
 
+	@Transactional(readOnly = true)
+	public TestResponse getTest(long id) {
+		AthleticTest test = testRepository.findById(id)
+				.orElseThrow(() -> new TestNotFoundException(id));
+		return TestResponse.from(test);
+	}
+
 	private boolean isDuplicateTestConstraint(Throwable exception) {
 		Throwable cause = exception;
 		while (cause != null) {

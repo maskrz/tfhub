@@ -11,6 +11,8 @@ import pl.tfhub.api.athlete.AthleteAlreadyExistsException;
 import pl.tfhub.api.athlete.AthleteNotFoundException;
 import pl.tfhub.api.athlete.InvalidAthleteIdException;
 import pl.tfhub.api.test.TestAlreadyExistsException;
+import pl.tfhub.api.test.InvalidTestIdException;
+import pl.tfhub.api.test.TestNotFoundException;
 
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -51,6 +53,21 @@ public class ApiExceptionHandler {
 	public ProblemDetail handleDuplicateTest(TestAlreadyExistsException exception) {
 		ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, exception.getMessage());
 		problem.setTitle("Test already exists");
+		return problem;
+	}
+
+	@ExceptionHandler(TestNotFoundException.class)
+	public ProblemDetail handleTestNotFound(TestNotFoundException exception) {
+		ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, exception.getMessage());
+		problem.setTitle("Test not found");
+		return problem;
+	}
+
+	@ExceptionHandler(InvalidTestIdException.class)
+	public ProblemDetail handleInvalidTestId() {
+		ProblemDetail problem = ProblemDetail.forStatusAndDetail(
+				HttpStatus.BAD_REQUEST, "Test ID must be a positive integer");
+		problem.setTitle("Invalid test ID");
 		return problem;
 	}
 

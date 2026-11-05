@@ -2,6 +2,8 @@ package pl.tfhub.api.test;
 
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -25,5 +27,13 @@ public class TestController {
 	public ResponseEntity<TestResponse> createTest(@Valid @RequestBody CreateTestRequest request) {
 		TestResponse test = testService.createTest(request);
 		return ResponseEntity.created(URI.create("/api/tests/" + test.id())).body(test);
+	}
+
+	@GetMapping("/{id}")
+	public TestResponse getTest(@PathVariable Long id) {
+		if (id <= 0) {
+			throw new InvalidTestIdException();
+		}
+		return testService.getTest(id);
 	}
 }

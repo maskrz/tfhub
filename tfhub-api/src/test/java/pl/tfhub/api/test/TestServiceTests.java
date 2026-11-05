@@ -17,6 +17,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -82,6 +83,42 @@ class TestServiceTests {
 
 		assertThrows(DataIntegrityViolationException.class, () -> testService.createTest(
 				new CreateTestRequest("Sprint", "s", TestCategory.TIME, false)));
+	}
+
+	@Test
+	void retrievesActiveTestAndDoesNotModifyIt() {
+		AthleticTest test = new AthleticTest("Sprint", "s", TestCategory.TIME, false);
+		ReflectionTestUtils.setField(test, "id", 12L);
+		when(testRepository.findById(12L)).thenReturn(java.util.Optional.of(test));
+
+		TestResponse response = testService.getTest(12L);
+
+		assertEquals(new TestResponse(12L, "Sprint", "s", TestCategory.TIME, false, true), response);
+		verify(testRepository).findById(12L);
+		verifyNoMoreInteractions(testRepository);
+		assertEquals("Sprint", test.getName());
+		assertEquals("s", test.getUnit());
+		assertEquals(TestCategory.TIME, test.getCategory());
+		assertEquals(false, test.isHigherIsBetter());
+		assertEquals(true, test.isActive());
+	}
+
+	@Test
+	void retrievesInactiveTest() {
+		AthleticTest test = new AthleticTest("Long jump", "m", TestCategory.DISTANCE, true);
+		ReflectionTestUtils.setField(test, "id", 13L);
+		ReflectionTestUtils.setField(test, "active", false);
+		when(testRepository.findById(13L)).thenReturn(java.util.Optional.of(test));
+
+		assertEquals(new TestResponse(13L, "Long jump", "m", TestCategory.DISTANCE, true, false),
+				testService.getTest(13L));
+	}
+
+	@Test
+	void throwsNotFoundWhenTestDoesNotExist() {
+		when(testRepository.findById(404L)).thenReturn(java.util.Optional.empty());
+
+		assertThrows(TestNotFoundException.class, () -> testService.getTest(404L));
 	}
 
 	private void assertCreated(String name, String unit, TestCategory category, boolean higherIsBetter) {

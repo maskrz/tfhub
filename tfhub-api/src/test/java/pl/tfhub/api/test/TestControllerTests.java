@@ -12,6 +12,7 @@ import pl.tfhub.api.test.dto.TestResponse;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -124,6 +125,58 @@ class TestControllerTests {
 								"""))
 				.andExpect(status().isConflict())
 				.andExpect(jsonPath("$.title").value("Test already exists"));
+	}
+
+	@Test
+	void retrievesActiveTestAsResponseDto() throws Exception {
+		when(testService.getTest(12L))
+				.thenReturn(new TestResponse(12L, "Sprint 40m", "s", TestCategory.TIME, false, true));
+
+		mockMvc.perform(get("/api/tests/12"))
+				.andExpect(status().isOk())
+				.andExpect(content().json("""
+						{"id":12,"name":"Sprint 40m","unit":"s","category":"TIME",
+						"higherIsBetter":false,"active":true}
+						""", true))
+				.andExpect(jsonPath("$.class").doesNotExist());
+
+		verify(testService).getTest(12L);
+	}
+
+	@Test
+	void retrievesInactiveTestAsResponseDto() throws Exception {
+		when(testService.getTest(13L))
+				.thenReturn(new TestResponse(13L, "Long jump", "m", TestCategory.DISTANCE, true, false));
+
+		mockMvc.perform(get("/api/tests/13"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.id").value(13))
+				.andExpect(jsonPath("$.name").value("Long jump"))
+				.andExpect(jsonPath("$.unit").value("m"))
+				.andExpect(jsonPath("$.category").value("DISTANCE"))
+				.andExpect(jsonPath("$.higherIsBetter").value(true))
+				.andExpect(jsonPath("$.active").value(false));
+	}
+
+	@Test
+	void returnsNotFoundWhenTestDoesNotExist() throws Exception {
+		when(testService.getTest(404L)).thenThrow(new TestNotFoundException(404L));
+
+		mockMvc.perform(get("/api/tests/404"))
+				.andExpect(status().isNotFound())
+				.andExpect(jsonPath("$.title").value("Test not found"));
+	}
+
+	@Test
+	void rejectsInvalidTestIds() throws Exception {
+		mockMvc.perform(get("/api/tests/0"))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.title").value("Invalid test ID"));
+		mockMvc.perform(get("/api/tests/-1"))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.title").value("Invalid test ID"));
+		mockMvc.perform(get("/api/tests/not-a-number"))
+				.andExpect(status().isBadRequest());
 	}
 
 	private void assertBadRequest(String body) throws Exception {
