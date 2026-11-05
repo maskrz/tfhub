@@ -66,4 +66,11 @@ public class AthleticTest {
 	public boolean isActive() {
 		return active;
 	}
+
+	public void updateDefinition(String name, String unit, TestCategory category, boolean higherIsBetter) {
+		this.name = name;
+		this.unit = unit;
+		this.category = category;
+		this.higherIsBetter = higherIsBetter;
+	}
 }

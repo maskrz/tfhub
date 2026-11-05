@@ -12,6 +12,7 @@ import pl.tfhub.api.athlete.AthleteNotFoundException;
 import pl.tfhub.api.athlete.InvalidAthleteIdException;
 import pl.tfhub.api.test.TestAlreadyExistsException;
 import pl.tfhub.api.test.InvalidTestIdException;
+import pl.tfhub.api.test.TestHasResultsException;
 import pl.tfhub.api.test.TestNotFoundException;
 
 import java.util.Map;
@@ -53,6 +54,13 @@ public class ApiExceptionHandler {
 	public ProblemDetail handleDuplicateTest(TestAlreadyExistsException exception) {
 		ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, exception.getMessage());
 		problem.setTitle("Test already exists");
+		return problem;
+	}
+
+	@ExceptionHandler(TestHasResultsException.class)
+	public ProblemDetail handleTestHasResults(TestHasResultsException exception) {
+		ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, exception.getMessage());
+		problem.setTitle("Test configuration cannot be changed");
 		return problem;
 	}
 

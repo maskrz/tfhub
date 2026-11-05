@@ -40,7 +40,7 @@ Manages the catalogue of performance tests used to evaluate athletes.
 | UC-101 | Add Test | Create a new test definition. | Implemented |
 | UC-102 | Get Test | Retrieve one test by ID. | Implemented |
 | UC-103 | Search Tests | Search tests using optional criteria. | Implemented |
-| UC-104 | Update Test | Update a test's definition, such as its name or measurement settings. | Planned |
+| UC-104 | Update Test | Update a test's definition, such as its name or measurement settings. | Implemented |
 | UC-105 | Change Test Status | Activate or deactivate a test. | Planned |
 
 Detailed specifications:

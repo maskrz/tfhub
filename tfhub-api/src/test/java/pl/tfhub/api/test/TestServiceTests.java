@@ -18,6 +18,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 import pl.tfhub.api.test.dto.CreateTestRequest;
 import pl.tfhub.api.test.dto.TestSearchRequest;
 import pl.tfhub.api.test.dto.TestResponse;
+import pl.tfhub.api.test.dto.UpdateTestRequest;
 
 import java.sql.SQLException;
 import java.util.List;
@@ -131,6 +132,99 @@ class TestServiceTests {
 	}
 
 	@Test
+	void updatesAllDefinitionFieldsAndPreservesIdAndActiveStatus() {
+		AthleticTest test = new AthleticTest("Sprint", "s", TestCategory.TIME, false);
+		ReflectionTestUtils.setField(test, "id", 12L);
+		ReflectionTestUtils.setField(test, "active", false);
+		when(testRepository.findById(12L)).thenReturn(java.util.Optional.of(test));
+		when(testRepository.existsByNormalizedNameAndIdNot("Long jump", 12L)).thenReturn(false);
+		when(testRepository.existsResultsByTestId(12L)).thenReturn(false);
+		when(testRepository.saveAndFlush(test)).thenReturn(test);
+
+		TestResponse response = testService.updateTest(12L,
+				new UpdateTestRequest(" Long jump ", "m", TestCategory.DISTANCE, true));
+
+		assertEquals(new TestResponse(12L, "Long jump", "m", TestCategory.DISTANCE, true, false), response);
+		assertEquals(12L, test.getId());
+		assertEquals(false, test.isActive());
+		verify(testRepository).existsByNormalizedNameAndIdNot("Long jump", 12L);
+		verify(testRepository).existsResultsByTestId(12L);
+	}
+
+	@Test
+	void updatesOnlyNameAndAllowsKeepingAllOtherValuesForAnActiveTest() {
+		AthleticTest test = new AthleticTest("Sprint", "s", TestCategory.TIME, false);
+		ReflectionTestUtils.setField(test, "id", 12L);
+		when(testRepository.findById(12L)).thenReturn(java.util.Optional.of(test));
+		when(testRepository.existsByNormalizedNameAndIdNot("Updated sprint", 12L)).thenReturn(false);
+		when(testRepository.saveAndFlush(test)).thenReturn(test);
+
+		TestResponse response = testService.updateTest(12L,
+				new UpdateTestRequest("Updated sprint", "s", TestCategory.TIME, false));
+
+		assertEquals(new TestResponse(12L, "Updated sprint", "s", TestCategory.TIME, false, true), response);
+	}
+
+	@Test
+	void allowsUnchangedUnitAndCategoryWhenResultsExist() {
+		AthleticTest test = new AthleticTest("Sprint", "s", TestCategory.TIME, false);
+		ReflectionTestUtils.setField(test, "id", 12L);
+		when(testRepository.findById(12L)).thenReturn(java.util.Optional.of(test));
+		when(testRepository.existsByNormalizedNameAndIdNot("Updated sprint", 12L)).thenReturn(false);
+		when(testRepository.saveAndFlush(test)).thenReturn(test);
+
+		TestResponse response = testService.updateTest(12L,
+				new UpdateTestRequest("Updated sprint", "s", TestCategory.TIME, true));
+
+		assertEquals("Updated sprint", response.name());
+		assertEquals(true, response.higherIsBetter());
+		verify(testRepository, never()).existsResultsByTestId(12L);
+	}
+
+	@Test
+	void rejectsUnitOrCategoryChangesWhenResultsExist() {
+		assertThrowsResultConflict("m", TestCategory.TIME);
+		assertThrowsResultConflict("s", TestCategory.SPEED);
+	}
+
+	@Test
+	void rejectsDuplicateNameOwnedByAnotherTest() {
+		AthleticTest test = new AthleticTest("Original", "s", TestCategory.TIME, false);
+		ReflectionTestUtils.setField(test, "id", 12L);
+		when(testRepository.findById(12L)).thenReturn(java.util.Optional.of(test));
+		when(testRepository.existsByNormalizedNameAndIdNot("sprint", 12L)).thenReturn(true);
+
+		assertThrows(TestAlreadyExistsException.class, () -> testService.updateTest(12L,
+				new UpdateTestRequest(" sprint ", "s", TestCategory.TIME, false)));
+		verify(testRepository, never()).existsResultsByTestId(12L);
+		verify(testRepository, never()).saveAndFlush(any(AthleticTest.class));
+	}
+
+	@Test
+	void allowsKeepingTheCurrentNameAndTranslatesConcurrentUniqueViolation() {
+		AthleticTest test = new AthleticTest("Sprint", "s", TestCategory.TIME, false);
+		ReflectionTestUtils.setField(test, "id", 12L);
+		when(testRepository.findById(12L)).thenReturn(java.util.Optional.of(test));
+		when(testRepository.existsByNormalizedNameAndIdNot("Sprint", 12L)).thenReturn(false);
+		ConstraintViolationException constraintViolation = new ConstraintViolationException(
+				"duplicate test name", new SQLException("duplicate"), "uq_tests_normalized_name");
+		when(testRepository.saveAndFlush(test))
+				.thenThrow(new DataIntegrityViolationException("unique constraint", constraintViolation));
+
+		assertThrows(TestAlreadyExistsException.class, () -> testService.updateTest(12L,
+				new UpdateTestRequest("Sprint", "s", TestCategory.TIME, false)));
+	}
+
+	@Test
+	void doesNotModifyTestWhenItDoesNotExist() {
+		when(testRepository.findById(404L)).thenReturn(java.util.Optional.empty());
+
+		assertThrows(TestNotFoundException.class, () -> testService.updateTest(404L,
+				new UpdateTestRequest("Sprint", "s", TestCategory.TIME, false)));
+		verifyNoMoreInteractions(testRepository);
+	}
+
+	@Test
 	void searchesWithEveryCriterionCombinedUsingAndAndMapsResponses() {
 		AthleticTest test = new AthleticTest("Sprint 40m", "s", TestCategory.TIME, false);
 		ReflectionTestUtils.setField(test, "id", 42L);
@@ -218,6 +312,18 @@ class TestServiceTests {
 
 		assertThrows(TestAlreadyExistsException.class, () -> testService.createTest(
 				new CreateTestRequest(name, "s", TestCategory.TIME, false)));
+		verify(testRepository, never()).saveAndFlush(any(AthleticTest.class));
+	}
+
+	private void assertThrowsResultConflict(String unit, TestCategory category) {
+		AthleticTest test = new AthleticTest("Sprint", "s", TestCategory.TIME, false);
+		ReflectionTestUtils.setField(test, "id", 12L);
+		when(testRepository.findById(12L)).thenReturn(java.util.Optional.of(test));
+		when(testRepository.existsByNormalizedNameAndIdNot("Sprint", 12L)).thenReturn(false);
+		when(testRepository.existsResultsByTestId(12L)).thenReturn(true);
+
+		assertThrows(TestHasResultsException.class, () -> testService.updateTest(12L,
+				new UpdateTestRequest("Sprint", unit, category, false)));
 		verify(testRepository, never()).saveAndFlush(any(AthleticTest.class));
 	}
 }

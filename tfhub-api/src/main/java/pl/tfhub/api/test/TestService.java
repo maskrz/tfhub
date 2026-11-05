@@ -9,6 +9,7 @@ import org.springframework.transaction.annotation.Transactional;
 import pl.tfhub.api.test.dto.CreateTestRequest;
 import pl.tfhub.api.test.dto.TestSearchRequest;
 import pl.tfhub.api.test.dto.TestResponse;
+import pl.tfhub.api.test.dto.UpdateTestRequest;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -51,6 +52,32 @@ public class TestService {
 		AthleticTest test = testRepository.findById(id)
 				.orElseThrow(() -> new TestNotFoundException(id));
 		return TestResponse.from(test);
+	}
+
+	@Transactional
+	public TestResponse updateTest(long id, UpdateTestRequest request) {
+		AthleticTest test = testRepository.findById(id)
+				.orElseThrow(() -> new TestNotFoundException(id));
+
+		if (testRepository.existsByNormalizedNameAndIdNot(request.name(), id)) {
+			throw new TestAlreadyExistsException();
+		}
+
+		boolean measurementConfigurationChanged =
+				!test.getUnit().equals(request.unit()) || test.getCategory() != request.category();
+		if (measurementConfigurationChanged && testRepository.existsResultsByTestId(id)) {
+			throw new TestHasResultsException();
+		}
+
+		test.updateDefinition(request.name(), request.unit(), request.category(), request.higherIsBetter());
+		try {
+			return TestResponse.from(testRepository.saveAndFlush(test));
+		} catch (DataIntegrityViolationException exception) {
+			if (isDuplicateTestConstraint(exception)) {
+				throw new TestAlreadyExistsException();
+			}
+			throw exception;
+		}
 	}
 
 	@Transactional(readOnly = true)

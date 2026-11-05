@@ -9,12 +9,14 @@ import org.springframework.test.web.servlet.MockMvc;
 import pl.tfhub.api.test.dto.CreateTestRequest;
 import pl.tfhub.api.test.dto.TestSearchRequest;
 import pl.tfhub.api.test.dto.TestResponse;
+import pl.tfhub.api.test.dto.UpdateTestRequest;
 
 import java.util.List;
 
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
@@ -183,6 +185,85 @@ class TestControllerTests {
 	}
 
 	@Test
+	void updatesTestAndReturnsResponseDto() throws Exception {
+		UpdateTestRequest request = new UpdateTestRequest("Sprint 40m", "m/s", TestCategory.SPEED, true);
+		when(testService.updateTest(12L, request))
+				.thenReturn(new TestResponse(12L, "Sprint 40m", "m/s", TestCategory.SPEED, true, true));
+
+		mockMvc.perform(put("/api/tests/12")
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("""
+								{"name":" Sprint 40m ","unit":"m/s","category":"SPEED","higherIsBetter":true}
+								"""))
+				.andExpect(status().isOk())
+				.andExpect(content().json("""
+						{"id":12,"name":"Sprint 40m","unit":"m/s","category":"SPEED",
+						"higherIsBetter":true,"active":true}
+						""", true))
+				.andExpect(jsonPath("$.class").doesNotExist());
+
+		verify(testService).updateTest(12L, request);
+	}
+
+	@Test
+	void returnsNotFoundAndConflictForUpdateFailures() throws Exception {
+		UpdateTestRequest request = new UpdateTestRequest("Sprint", "s", TestCategory.TIME, false);
+		when(testService.updateTest(404L, request)).thenThrow(new TestNotFoundException(404L));
+		when(testService.updateTest(409L, request)).thenThrow(new TestAlreadyExistsException());
+		when(testService.updateTest(410L, request)).thenThrow(new TestHasResultsException());
+
+		mockMvc.perform(put("/api/tests/404").contentType(MediaType.APPLICATION_JSON)
+						.content("""
+								{"name":"Sprint","unit":"s","category":"TIME","higherIsBetter":false}
+								"""))
+				.andExpect(status().isNotFound());
+		mockMvc.perform(put("/api/tests/409").contentType(MediaType.APPLICATION_JSON)
+						.content("""
+								{"name":"Sprint","unit":"s","category":"TIME","higherIsBetter":false}
+								"""))
+				.andExpect(status().isConflict())
+				.andExpect(jsonPath("$.title").value("Test already exists"));
+		mockMvc.perform(put("/api/tests/410").contentType(MediaType.APPLICATION_JSON)
+						.content("""
+								{"name":"Sprint","unit":"s","category":"TIME","higherIsBetter":false}
+								"""))
+				.andExpect(status().isConflict())
+				.andExpect(jsonPath("$.title").value("Test configuration cannot be changed"));
+	}
+
+	@Test
+	void rejectsInvalidUpdateIdsAndRequests() throws Exception {
+		assertUpdateBadRequest("0", """
+				{"name":"Sprint","unit":"s","category":"TIME","higherIsBetter":false}
+				""");
+		assertUpdateBadRequest("-1", """
+				{"name":"Sprint","unit":"s","category":"TIME","higherIsBetter":false}
+				""");
+		assertUpdateBadRequest("not-a-number", """
+				{"name":"Sprint","unit":"s","category":"TIME","higherIsBetter":false}
+				""");
+		assertUpdateBadRequest("1", """
+				{"unit":"s","category":"TIME","higherIsBetter":false}
+				""");
+		assertUpdateBadRequest("1", """
+				{"name":"   ","unit":"s","category":"TIME","higherIsBetter":false}
+				""");
+		assertUpdateBadRequest("1", """
+				{"name":"%s","unit":"s","category":"TIME","higherIsBetter":false}
+				""".formatted("x".repeat(151)));
+		assertUpdateBadRequest("1", """
+				{"name":"Sprint","unit":"km","category":"TIME","higherIsBetter":false}
+				""");
+		assertUpdateBadRequest("1", """
+				{"name":"Sprint","unit":"s","category":"OTHER","higherIsBetter":false}
+				""");
+		assertUpdateBadRequest("1", """
+				{"name":"Sprint","unit":"s","category":"TIME","higherIsBetter":"false"}
+				""");
+		assertUpdateBadRequest("1", "{\"name\":");
+	}
+
+	@Test
 	void searchesByNameAndReturnsResponseDtos() throws Exception {
 		TestSearchRequest request = new TestSearchRequest("sprint", null, null, null, null);
 		when(testService.searchTests(request)).thenReturn(List.of(
@@ -275,6 +356,13 @@ class TestControllerTests {
 
 	private void assertSearchBadRequest(String body) throws Exception {
 		mockMvc.perform(post("/api/tests/search")
+						.contentType(MediaType.APPLICATION_JSON)
+						.content(body))
+				.andExpect(status().isBadRequest());
+	}
+
+	private void assertUpdateBadRequest(String id, String body) throws Exception {
+		mockMvc.perform(put("/api/tests/{id}", id)
 						.contentType(MediaType.APPLICATION_JSON)
 						.content(body))
 				.andExpect(status().isBadRequest());
