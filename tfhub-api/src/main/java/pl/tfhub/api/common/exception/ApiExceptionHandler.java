@@ -15,6 +15,7 @@ import pl.tfhub.api.athlete.exception.AthleteNotFoundException;
 import pl.tfhub.api.athlete.exception.InvalidAthleteIdException;
 import pl.tfhub.api.result.exception.InactiveTestException;
 import pl.tfhub.api.result.exception.InvalidResultIdException;
+import pl.tfhub.api.result.exception.InvalidResultSearchException;
 import pl.tfhub.api.result.exception.MultipleResultsDuplicateAthleteException;
 import pl.tfhub.api.result.exception.ResultNotFoundException;
 import pl.tfhub.api.test.exception.InvalidTestIdException;
@@ -80,6 +81,14 @@ public class ApiExceptionHandler {
 		ProblemDetail problem = ProblemDetail.forStatusAndDetail(
 				HttpStatus.BAD_REQUEST, "Result ID must be a positive integer");
 		problem.setTitle("Invalid result ID");
+		return problem;
+	}
+
+	@ExceptionHandler(InvalidResultSearchException.class)
+	public ProblemDetail handleInvalidResultSearch() {
+		ProblemDetail problem = ProblemDetail.forStatusAndDetail(
+				HttpStatus.BAD_REQUEST, "Result search parameters are invalid");
+		problem.setTitle("Invalid result search");
 		return problem;
 	}
 

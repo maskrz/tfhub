@@ -18,6 +18,7 @@ import pl.tfhub.api.result.dto.response.CreateMultipleResultsResponse;
 import pl.tfhub.api.result.dto.response.ResultResponse;
 import pl.tfhub.api.result.enums.ResultType;
 import pl.tfhub.api.result.exception.InactiveTestException;
+import pl.tfhub.api.result.exception.InvalidResultSearchException;
 import pl.tfhub.api.result.exception.MultipleResultsDuplicateAthleteException;
 import pl.tfhub.api.result.exception.ResultNotFoundException;
 import pl.tfhub.api.result.service.ResultService;
@@ -77,6 +78,95 @@ class ResultControllerTests {
 				.andExpect(status().isBadRequest())
 				.andExpect(jsonPath("$.title").value("Invalid result ID"));
 		mockMvc.perform(get("/api/results/not-a-number"))
+				.andExpect(status().isBadRequest());
+	}
+
+	@Test
+	void listsResultsWithoutFiltersAndReturnsAnEmptyJsonArrayWhenNoneMatch() throws Exception {
+		when(resultService.searchResults(null, null, null, null, null)).thenReturn(List.of());
+
+		mockMvc.perform(get("/api/results"))
+				.andExpect(status().isOk())
+				.andExpect(content().json("[]", true));
+
+		verify(resultService).searchResults(null, null, null, null, null);
+	}
+
+	@Test
+	void listsResultsWithAllFiltersCombined() throws Exception {
+		ResultResponse result = new ResultResponse(
+				32L, 7L, 2L, LocalDate.parse("2026-11-05"), new BigDecimal("5.420"), ResultType.TRAINING);
+		when(resultService.searchResults(
+				7L, 2L, LocalDate.parse("2026-11-01"), LocalDate.parse("2026-11-30"), ResultType.TRAINING))
+				.thenReturn(List.of(result));
+
+		mockMvc.perform(get("/api/results")
+						.param("athleteId", "7")
+						.param("testId", "2")
+						.param("fromDate", "2026-11-01")
+						.param("toDate", "2026-11-30")
+						.param("type", "TRAINING"))
+				.andExpect(status().isOk())
+				.andExpect(content().json("""
+						[{"id":32,"athleteId":7,"testId":2,"resultDate":"2026-11-05",
+						"value":5.420,"type":"TRAINING"}]
+						""", true))
+				.andExpect(jsonPath("$[0].class").doesNotExist());
+
+		verify(resultService).searchResults(
+				7L, 2L, LocalDate.parse("2026-11-01"), LocalDate.parse("2026-11-30"), ResultType.TRAINING);
+	}
+
+	@Test
+	void acceptsEachResultSearchFilterIndividually() throws Exception {
+		when(resultService.searchResults(7L, null, null, null, null)).thenReturn(List.of());
+		when(resultService.searchResults(null, 2L, null, null, null)).thenReturn(List.of());
+		when(resultService.searchResults(null, null, LocalDate.parse("2026-11-01"), null, null))
+				.thenReturn(List.of());
+		when(resultService.searchResults(null, null, null, LocalDate.parse("2026-11-30"), null))
+				.thenReturn(List.of());
+		when(resultService.searchResults(null, null, null, null, ResultType.COMPETITION)).thenReturn(List.of());
+
+		mockMvc.perform(get("/api/results").param("athleteId", "7")).andExpect(status().isOk());
+		mockMvc.perform(get("/api/results").param("testId", "2")).andExpect(status().isOk());
+		mockMvc.perform(get("/api/results").param("fromDate", "2026-11-01")).andExpect(status().isOk());
+		mockMvc.perform(get("/api/results").param("toDate", "2026-11-30")).andExpect(status().isOk());
+		mockMvc.perform(get("/api/results").param("type", "COMPETITION")).andExpect(status().isOk());
+
+		verify(resultService).searchResults(7L, null, null, null, null);
+		verify(resultService).searchResults(null, 2L, null, null, null);
+		verify(resultService).searchResults(null, null, LocalDate.parse("2026-11-01"), null, null);
+		verify(resultService).searchResults(null, null, null, LocalDate.parse("2026-11-30"), null);
+		verify(resultService).searchResults(null, null, null, null, ResultType.COMPETITION);
+	}
+
+	@Test
+	void listsResultsForAnUnknownButValidAthleteOrTestAsAnEmptyArray() throws Exception {
+		when(resultService.searchResults(999L, null, null, null, null)).thenReturn(List.of());
+		when(resultService.searchResults(null, 998L, null, null, null)).thenReturn(List.of());
+
+		mockMvc.perform(get("/api/results").param("athleteId", "999"))
+				.andExpect(status().isOk())
+				.andExpect(content().json("[]", true));
+		mockMvc.perform(get("/api/results").param("testId", "998"))
+				.andExpect(status().isOk())
+				.andExpect(content().json("[]", true));
+	}
+
+	@Test
+	void rejectsInvalidResultSearchParameters() throws Exception {
+		mockMvc.perform(get("/api/results").param("athleteId", "0"))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.title").value("Invalid result search"));
+		mockMvc.perform(get("/api/results").param("athleteId", "-1"))
+				.andExpect(status().isBadRequest());
+		mockMvc.perform(get("/api/results").param("testId", "not-a-number"))
+				.andExpect(status().isBadRequest());
+		mockMvc.perform(get("/api/results").param("fromDate", "05-11-2026"))
+				.andExpect(status().isBadRequest());
+		mockMvc.perform(get("/api/results").param("toDate", "2026-02-30"))
+				.andExpect(status().isBadRequest());
+		mockMvc.perform(get("/api/results").param("type", "OTHER"))
 				.andExpect(status().isBadRequest());
 	}
 

@@ -9,6 +9,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.test.util.ReflectionTestUtils;
 import pl.tfhub.api.athlete.dto.response.AthleteResponse;
 import pl.tfhub.api.athlete.enums.Gender;
@@ -22,6 +24,7 @@ import pl.tfhub.api.result.dto.response.ResultResponse;
 import pl.tfhub.api.result.entity.TestResult;
 import pl.tfhub.api.result.enums.ResultType;
 import pl.tfhub.api.result.exception.InactiveTestException;
+import pl.tfhub.api.result.exception.InvalidResultSearchException;
 import pl.tfhub.api.result.exception.MultipleResultsDuplicateAthleteException;
 import pl.tfhub.api.result.exception.ResultNotFoundException;
 import pl.tfhub.api.result.repository.ResultRepository;
@@ -75,6 +78,41 @@ class ResultServiceTests {
 		when(resultRepository.findById(404L)).thenReturn(java.util.Optional.empty());
 
 		assertThrows(ResultNotFoundException.class, () -> resultService.getResult(404L));
+		verifyNoMoreInteractions(resultRepository, athleteService, testService);
+	}
+
+	@Test
+	void searchesResultsUsingDatabaseSpecificationAndDeterministicSort() {
+		TestResult newest = new TestResult(
+				7L, 2L, LocalDate.parse("2026-11-06"), new BigDecimal("5.500"), ResultType.TRAINING);
+		TestResult sameDateHigherId = new TestResult(
+				7L, 2L, LocalDate.parse("2026-11-05"), new BigDecimal("5.420"), ResultType.TRAINING);
+		TestResult sameDateLowerId = new TestResult(
+				7L, 2L, LocalDate.parse("2026-11-05"), new BigDecimal("5.300"), ResultType.TRAINING);
+		ReflectionTestUtils.setField(newest, "id", 33L);
+		ReflectionTestUtils.setField(sameDateHigherId, "id", 32L);
+		ReflectionTestUtils.setField(sameDateLowerId, "id", 31L);
+		when(resultRepository.findAll(
+				org.mockito.ArgumentMatchers.<Specification<TestResult>>any(),
+				org.mockito.ArgumentMatchers.any(Sort.class)))
+				.thenReturn(List.of(newest, sameDateHigherId, sameDateLowerId));
+
+		List<ResultResponse> results = resultService.searchResults(
+				7L, 2L, LocalDate.parse("2026-11-01"), LocalDate.parse("2026-11-30"), ResultType.TRAINING);
+
+		assertEquals(List.of(33L, 32L, 31L), results.stream().map(ResultResponse::id).toList());
+		verify(resultRepository).findAll(
+				org.mockito.ArgumentMatchers.<Specification<TestResult>>any(),
+				org.mockito.ArgumentMatchers.eq(Sort.by(
+						Sort.Order.desc("resultDate"),
+						Sort.Order.desc("id"))));
+		verifyNoMoreInteractions(resultRepository, athleteService, testService);
+	}
+
+	@Test
+	void rejectsSearchWhenStartDateIsAfterEndDate() {
+		assertThrows(InvalidResultSearchException.class, () -> resultService.searchResults(
+				null, null, LocalDate.parse("2026-11-06"), LocalDate.parse("2026-11-05"), null));
 		verifyNoMoreInteractions(resultRepository, athleteService, testService);
 	}
 

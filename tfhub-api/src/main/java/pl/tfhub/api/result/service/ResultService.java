@@ -1,8 +1,13 @@
 package pl.tfhub.api.result.service;
 
+import jakarta.persistence.criteria.Predicate;
+import java.util.ArrayList;
+import java.time.LocalDate;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import pl.tfhub.api.athlete.service.AthleteService;
@@ -12,7 +17,9 @@ import pl.tfhub.api.result.dto.request.CreateResultRequest;
 import pl.tfhub.api.result.dto.response.CreateMultipleResultsResponse;
 import pl.tfhub.api.result.dto.response.ResultResponse;
 import pl.tfhub.api.result.entity.TestResult;
+import pl.tfhub.api.result.enums.ResultType;
 import pl.tfhub.api.result.exception.InactiveTestException;
+import pl.tfhub.api.result.exception.InvalidResultSearchException;
 import pl.tfhub.api.result.exception.MultipleResultsDuplicateAthleteException;
 import pl.tfhub.api.result.exception.ResultNotFoundException;
 import pl.tfhub.api.result.repository.ResultRepository;
@@ -53,6 +60,45 @@ public class ResultService {
 		TestResult result = resultRepository.findById(id)
 				.orElseThrow(() -> new ResultNotFoundException(id));
 		return ResultResponse.from(result);
+	}
+
+	@Transactional(readOnly = true)
+	public List<ResultResponse> searchResults(
+			Long athleteId,
+			Long testId,
+			LocalDate fromDate,
+			LocalDate toDate,
+			ResultType type) {
+		if (fromDate != null && toDate != null && fromDate.isAfter(toDate)) {
+			throw new InvalidResultSearchException();
+		}
+
+		Specification<TestResult> specification = (root, query, criteriaBuilder) -> {
+			List<Predicate> predicates = new ArrayList<>();
+			if (athleteId != null) {
+				predicates.add(criteriaBuilder.equal(root.get("athleteId"), athleteId));
+			}
+			if (testId != null) {
+				predicates.add(criteriaBuilder.equal(root.get("testId"), testId));
+			}
+			if (fromDate != null) {
+				predicates.add(criteriaBuilder.greaterThanOrEqualTo(root.get("resultDate"), fromDate));
+			}
+			if (toDate != null) {
+				predicates.add(criteriaBuilder.lessThanOrEqualTo(root.get("resultDate"), toDate));
+			}
+			if (type != null) {
+				predicates.add(criteriaBuilder.equal(root.get("type"), type));
+			}
+			return criteriaBuilder.and(predicates.toArray(Predicate[]::new));
+		};
+
+		return resultRepository.findAll(specification, Sort.by(
+						Sort.Order.desc("resultDate"),
+						Sort.Order.desc("id")))
+				.stream()
+				.map(ResultResponse::from)
+				.toList();
 	}
 
 	@Transactional
