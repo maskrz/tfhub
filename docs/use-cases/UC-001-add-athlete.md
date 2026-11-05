@@ -1,4 +1,4 @@
-# UC-01 – Add Athlete
+# UC-001 – Add Athlete
 
 **Status:** Approved  
 **Version:** 1.0  
