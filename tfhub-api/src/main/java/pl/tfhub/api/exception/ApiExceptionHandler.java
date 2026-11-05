@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import pl.tfhub.api.athlete.AthleteAlreadyExistsException;
 import pl.tfhub.api.athlete.AthleteNotFoundException;
 import pl.tfhub.api.athlete.InvalidAthleteIdException;
+import pl.tfhub.api.test.TestAlreadyExistsException;
 
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -43,6 +44,13 @@ public class ApiExceptionHandler {
 	public ProblemDetail handleDuplicateAthlete(AthleteAlreadyExistsException exception) {
 		ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, exception.getMessage());
 		problem.setTitle("Athlete already exists");
+		return problem;
+	}
+
+	@ExceptionHandler(TestAlreadyExistsException.class)
+	public ProblemDetail handleDuplicateTest(TestAlreadyExistsException exception) {
+		ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, exception.getMessage());
+		problem.setTitle("Test already exists");
 		return problem;
 	}
 

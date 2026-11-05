@@ -99,7 +99,7 @@ pl.tfhub.api/
 │       └── AthleteResponse.java
 │
 ├── test/
-│   ├── Test.java
+│   ├── AthleticTest.java
 │   ├── TestController.java
 │   ├── TestService.java
 │   ├── TestRepository.java

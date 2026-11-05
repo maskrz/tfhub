@@ -1,4 +1,4 @@
-package pl.tfhub.api.athlete.dto;
+package pl.tfhub.api.validation;
 
 import tools.jackson.core.JsonParser;
 import tools.jackson.core.JsonToken;
@@ -15,6 +15,6 @@ public class StrictBooleanDeserializer extends ValueDeserializer<Boolean> {
 		if (parser.hasToken(JsonToken.VALUE_FALSE)) {
 			return false;
 		}
-		return context.reportInputMismatch(Boolean.class, "Active status must be a boolean");
+		return context.reportInputMismatch(Boolean.class, "Value must be a boolean");
 	}
 }

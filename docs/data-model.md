@@ -148,6 +148,7 @@ For example, a result of 2 minutes and 15 seconds is stored as `135.000` seconds
 ### 4.4 Constraints
 
 - Primary key: `id`.
+- Test name must be unique case-insensitively after trimming leading and trailing whitespace, including inactive tests. PostgreSQL enforces this with a unique index on `lower(trim(name))`.
 - `active` defaults to `true`.
 - `higher_is_better` is defined individually for each test.
 
@@ -158,6 +159,7 @@ Examples:
 ### 4.5 Business rules
 
 - Test definitions can be edited.
+- Test names are unique across active and inactive tests, ignoring leading and trailing whitespace and letter casing.
 - Tests with existing results must not be physically deleted.
 - Such tests must be deactivated instead.
 - Inactive tests must not be offered when recording new results by default.

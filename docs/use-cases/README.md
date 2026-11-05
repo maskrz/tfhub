@@ -37,11 +37,14 @@ Manages the catalogue of performance tests used to evaluate athletes.
 
 | ID     | Use Case | Description | Status |
 |--------|---|---|---|
-| UC-101 | Add Test | Create a new test definition. | Planned |
+| UC-101 | Add Test | Create a new test definition. | Implemented |
 | UC-102 | Get Test | Retrieve one test by ID. | Planned |
 | UC-103 | Get All Tests | Retrieve tests with optional status filtering and name search. | Planned |
 | UC-104 | Update Test | Update a test's definition, such as its name or measurement settings. | Planned |
 | UC-105 | Change Test Status | Activate or deactivate a test. | Planned |
+
+Detailed specifications:
+- [UC-101 Add Test](UC-101-add-test.md)
 
 Business rules:
 - Each test has a name, unit, category and information indicating whether higher values are better.
