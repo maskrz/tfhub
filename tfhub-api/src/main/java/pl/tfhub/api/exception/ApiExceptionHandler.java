@@ -11,6 +11,7 @@ import pl.tfhub.api.athlete.AthleteAlreadyExistsException;
 import pl.tfhub.api.athlete.AthleteNotFoundException;
 import pl.tfhub.api.athlete.InvalidAthleteIdException;
 import pl.tfhub.api.result.InactiveTestException;
+import pl.tfhub.api.result.MultipleResultsDuplicateAthleteException;
 import pl.tfhub.api.test.TestAlreadyExistsException;
 import pl.tfhub.api.test.InvalidTestIdException;
 import pl.tfhub.api.test.TestHasResultsException;
@@ -62,6 +63,13 @@ public class ApiExceptionHandler {
 	public ProblemDetail handleInactiveTest(InactiveTestException exception) {
 		ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, exception.getMessage());
 		problem.setTitle("Test is inactive");
+		return problem;
+	}
+
+	@ExceptionHandler(MultipleResultsDuplicateAthleteException.class)
+	public ProblemDetail handleDuplicateAthleteInResultBatch(MultipleResultsDuplicateAthleteException exception) {
+		ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, exception.getMessage());
+		problem.setTitle("Invalid result batch");
 		return problem;
 	}
 

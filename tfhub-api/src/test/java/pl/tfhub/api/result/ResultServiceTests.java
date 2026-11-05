@@ -11,6 +11,9 @@ import pl.tfhub.api.athlete.AthleteService;
 import pl.tfhub.api.athlete.Gender;
 import pl.tfhub.api.athlete.dto.AthleteResponse;
 import pl.tfhub.api.result.dto.CreateResultRequest;
+import pl.tfhub.api.result.dto.CreateMultipleResultsRequest;
+import pl.tfhub.api.result.dto.CreateMultipleResultsResponse;
+import pl.tfhub.api.result.dto.CreateResultEntryRequest;
 import pl.tfhub.api.result.dto.ResultResponse;
 import pl.tfhub.api.test.TestCategory;
 import pl.tfhub.api.test.TestNotFoundException;
@@ -19,6 +22,8 @@ import pl.tfhub.api.test.dto.TestResponse;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.List;
+import java.util.ArrayList;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -117,8 +122,93 @@ class ResultServiceTests {
 		verify(resultRepository, never()).saveAndFlush(any(TestResult.class));
 	}
 
+	@Test
+	void createsBatchForActiveAndInactiveAthletesAndReturnsResultsInRequestOrder() {
+		CreateMultipleResultsRequest request = batchRequest();
+		when(testService.getTest(2L))
+				.thenReturn(new TestResponse(2L, "Sprint", "s", TestCategory.TIME, false, true));
+		when(athleteService.getAthlete(7L))
+				.thenReturn(new AthleteResponse(7L, "A", "B", 2000, Gender.MALE, true));
+		when(athleteService.getAthlete(3L))
+				.thenReturn(new AthleteResponse(3L, "C", "D", 2001, Gender.FEMALE, false));
+		when(resultRepository.saveAllAndFlush(any(Iterable.class))).thenAnswer(invocation -> {
+			Iterable<TestResult> saved = invocation.getArgument(0);
+			List<TestResult> persisted = new ArrayList<>();
+			long id = 50;
+			for (TestResult result : saved) {
+				ReflectionTestUtils.setField(result, "id", id++);
+				persisted.add(result);
+			}
+			return persisted;
+		});
+
+		CreateMultipleResultsResponse response = resultService.createMultipleResults(request);
+
+		assertEquals(2, response.createdCount());
+		assertEquals(List.of(7L, 3L), response.results().stream().map(ResultResponse::athleteId).toList());
+		assertEquals(List.of(2L, 2L), response.results().stream().map(ResultResponse::testId).toList());
+		assertEquals(List.of(new BigDecimal("5.420"), new BigDecimal("5.300")),
+				response.results().stream().map(ResultResponse::value).toList());
+		verify(athleteService).getAthlete(7L);
+		verify(athleteService).getAthlete(3L);
+		verifyNoMoreInteractions(athleteService, testService);
+	}
+
+	@Test
+	void rejectsMissingTestWithoutSavingAnyResults() {
+		when(testService.getTest(2L)).thenThrow(new TestNotFoundException(2));
+		assertThrows(TestNotFoundException.class, () -> resultService.createMultipleResults(batchRequest()));
+		verify(resultRepository, never()).saveAllAndFlush(any(Iterable.class));
+	}
+
+	@Test
+	void rejectsInactiveTestWithoutSavingAnyResults() {
+		when(testService.getTest(2L))
+				.thenReturn(new TestResponse(2L, "Sprint", "s", TestCategory.TIME, false, false));
+		assertThrows(InactiveTestException.class, () -> resultService.createMultipleResults(batchRequest()));
+		verify(resultRepository, never()).saveAllAndFlush(any(Iterable.class));
+	}
+
+	@Test
+	void rejectsMissingAthleteWithoutSavingAnyResults() {
+		when(testService.getTest(2L))
+				.thenReturn(new TestResponse(2L, "Sprint", "s", TestCategory.TIME, false, true));
+		when(athleteService.getAthlete(7L))
+				.thenReturn(new AthleteResponse(7L, "A", "B", 2000, Gender.MALE, true));
+		when(athleteService.getAthlete(3L)).thenThrow(new AthleteNotFoundException(3));
+
+		assertThrows(AthleteNotFoundException.class, () -> resultService.createMultipleResults(batchRequest()));
+		verify(resultRepository, never()).saveAllAndFlush(any(Iterable.class));
+	}
+
+	@Test
+	void rejectsDuplicateAthleteIdsBeforeLookingUpAthletesOrSaving() {
+		CreateMultipleResultsRequest request = new CreateMultipleResultsRequest(
+				2L, LocalDate.parse("2026-11-05"), ResultType.TRAINING,
+				List.of(
+						new CreateResultEntryRequest(7L, new BigDecimal("5.420")),
+						new CreateResultEntryRequest(7L, new BigDecimal("5.300"))));
+		when(testService.getTest(2L))
+				.thenReturn(new TestResponse(2L, "Sprint", "s", TestCategory.TIME, false, true));
+
+		assertThrows(MultipleResultsDuplicateAthleteException.class,
+				() -> resultService.createMultipleResults(request));
+		verify(athleteService, never()).getAthlete(anyLong());
+		verify(resultRepository, never()).saveAllAndFlush(any(Iterable.class));
+	}
+
 	private CreateResultRequest request() {
 		return new CreateResultRequest(
 				1L, 2L, LocalDate.parse("2026-11-05"), new BigDecimal("5.420"), ResultType.TRAINING);
+	}
+
+	private CreateMultipleResultsRequest batchRequest() {
+		return new CreateMultipleResultsRequest(
+				2L,
+				LocalDate.parse("2026-11-05"),
+				ResultType.TRAINING,
+				List.of(
+						new CreateResultEntryRequest(7L, new BigDecimal("5.420")),
+						new CreateResultEntryRequest(3L, new BigDecimal("5.300"))));
 	}
 }
