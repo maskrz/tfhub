@@ -5,12 +5,14 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-import pl.tfhub.api.athlete.dto.AthleteRequest;
+import pl.tfhub.api.athlete.dto.CreateAthleteRequest;
 import pl.tfhub.api.athlete.dto.AthleteResponse;
-import pl.tfhub.api.athlete.dto.AthleteSearchRequest;
+import pl.tfhub.api.athlete.dto.SearchAthletesRequest;
+import pl.tfhub.api.athlete.dto.UpdateAthleteRequest;
 
 import java.net.URI;
 import java.util.List;
@@ -26,13 +28,13 @@ public class AthleteController {
 	}
 
 	@PostMapping
-	public ResponseEntity<AthleteResponse> createAthlete(@Valid @RequestBody AthleteRequest request) {
+	public ResponseEntity<AthleteResponse> createAthlete(@Valid @RequestBody CreateAthleteRequest request) {
 		AthleteResponse athlete = athleteService.createAthlete(request);
 		return ResponseEntity.created(URI.create("/api/athletes/" + athlete.id())).body(athlete);
 	}
 
 	@PostMapping("/search")
-	public List<AthleteResponse> searchAthletes(@Valid @RequestBody AthleteSearchRequest request) {
+	public List<AthleteResponse> searchAthletes(@Valid @RequestBody SearchAthletesRequest request) {
 		return athleteService.searchAthletes(request);
 	}
 
@@ -42,5 +44,15 @@ public class AthleteController {
 			throw new InvalidAthleteIdException();
 		}
 		return athleteService.getAthlete(id);
+	}
+
+	@PutMapping("/{id}")
+	public AthleteResponse updateAthlete(
+			@PathVariable Long id,
+			@Valid @RequestBody UpdateAthleteRequest request) {
+		if (id <= 0) {
+			throw new InvalidAthleteIdException();
+		}
+		return athleteService.updateAthlete(id, request);
 	}
 }

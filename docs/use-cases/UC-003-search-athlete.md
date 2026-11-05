@@ -21,7 +21,7 @@ The search supports filtering by first name, last name, birth year, active statu
 ## 4. Main Flow
 
 1. The client sends a POST request to the athlete search endpoint.
-2. The request contains an AthleteSearchRequest DTO.
+2. The request contains a SearchAthletesRequest DTO.
 3. The controller validates and delegates the request to the Athlete Service.
 4. The service retrieves athletes matching all provided criteria using the Athlete Repository.
 5. The service maps the entities to Athlete Response DTOs.
@@ -66,7 +66,7 @@ All search criteria are optional.
 
 `POST /api/athletes/search`
 
-**Request DTO:** `AthleteSearchRequest`
+**Request DTO:** `SearchAthletesRequest`
 
 All fields are optional.
 
@@ -165,7 +165,7 @@ If no athletes match the criteria, return an empty array with HTTP `200 OK`.
 - No criteria means all athletes are returned.
 - Inactive athletes are included unless explicitly filtered using `active`.
 - The response must contain Athlete Response DTOs, never JPA entities.
-- The request must use a dedicated AthleteSearchRequest DTO, separate from the Athlete entity and response DTO.
+- The request must use a dedicated SearchAthletesRequest DTO, separate from the Athlete entity and response DTO.
 - No pagination or sorting is required at this stage.
 
 ## 8. Validation and Error Handling

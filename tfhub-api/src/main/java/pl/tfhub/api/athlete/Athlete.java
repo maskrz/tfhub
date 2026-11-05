@@ -66,4 +66,11 @@ public class Athlete {
 	public boolean isActive() {
 		return active;
 	}
+
+	public void updatePersonalInformation(String firstName, String lastName, Integer birthYear, Gender gender) {
+		this.firstName = firstName;
+		this.lastName = lastName;
+		this.birthYear = birthYear;
+		this.gender = gender;
+	}
 }

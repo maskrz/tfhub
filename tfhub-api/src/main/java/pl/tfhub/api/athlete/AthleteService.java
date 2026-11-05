@@ -6,9 +6,10 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import pl.tfhub.api.athlete.dto.AthleteRequest;
+import pl.tfhub.api.athlete.dto.CreateAthleteRequest;
 import pl.tfhub.api.athlete.dto.AthleteResponse;
-import pl.tfhub.api.athlete.dto.AthleteSearchRequest;
+import pl.tfhub.api.athlete.dto.SearchAthletesRequest;
+import pl.tfhub.api.athlete.dto.UpdateAthleteRequest;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -26,7 +27,7 @@ public class AthleteService {
 	}
 
 	@Transactional
-	public AthleteResponse createAthlete(AthleteRequest request) {
+	public AthleteResponse createAthlete(CreateAthleteRequest request) {
 		if (athleteRepository.existsByFirstNameAndLastNameAndBirthYear(
 				request.firstName(), request.lastName(), request.birthYear())) {
 			throw new AthleteAlreadyExistsException();
@@ -55,8 +56,34 @@ public class AthleteService {
 		return AthleteResponse.from(athlete);
 	}
 
+	@Transactional
+	public AthleteResponse updateAthlete(long id, UpdateAthleteRequest request) {
+		Athlete athlete = athleteRepository.findById(id)
+				.orElseThrow(() -> new AthleteNotFoundException(id));
+
+		if (athleteRepository.existsByFirstNameAndLastNameAndBirthYearAndIdNot(
+				request.firstName(), request.lastName(), request.birthYear(), id)) {
+			throw new AthleteAlreadyExistsException();
+		}
+
+		athlete.updatePersonalInformation(
+				request.firstName(),
+				request.lastName(),
+				request.birthYear(),
+				request.gender());
+
+		try {
+			return AthleteResponse.from(athleteRepository.saveAndFlush(athlete));
+		} catch (DataIntegrityViolationException exception) {
+			if (isDuplicateAthleteConstraint(exception)) {
+				throw new AthleteAlreadyExistsException();
+			}
+			throw exception;
+		}
+	}
+
 	@Transactional(readOnly = true)
-	public List<AthleteResponse> searchAthletes(AthleteSearchRequest request) {
+	public List<AthleteResponse> searchAthletes(SearchAthletesRequest request) {
 		Specification<Athlete> specification = (root, query, criteriaBuilder) -> {
 			List<Predicate> predicates = new ArrayList<>();
 			if (request.firstName() != null) {

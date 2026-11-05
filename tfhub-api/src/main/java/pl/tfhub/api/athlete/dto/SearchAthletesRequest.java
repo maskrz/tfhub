@@ -5,14 +5,14 @@ import pl.tfhub.api.athlete.Gender;
 import pl.tfhub.api.athlete.validation.ValidBirthYear;
 import tools.jackson.databind.annotation.JsonDeserialize;
 
-public record AthleteSearchRequest(
+public record SearchAthletesRequest(
 		String firstName,
 		String lastName,
 		Boolean active,
 		Gender gender,
 		@Min(1900) @ValidBirthYear @JsonDeserialize(using = StrictIntegerDeserializer.class) Integer birthYear) {
 
-	public AthleteSearchRequest {
+	public SearchAthletesRequest {
 		firstName = normalize(firstName);
 		lastName = normalize(lastName);
 	}

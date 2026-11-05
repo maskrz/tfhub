@@ -6,9 +6,10 @@ import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
-import pl.tfhub.api.athlete.dto.AthleteRequest;
+import pl.tfhub.api.athlete.dto.CreateAthleteRequest;
 import pl.tfhub.api.athlete.dto.AthleteResponse;
-import pl.tfhub.api.athlete.dto.AthleteSearchRequest;
+import pl.tfhub.api.athlete.dto.SearchAthletesRequest;
+import pl.tfhub.api.athlete.dto.UpdateAthleteRequest;
 
 import java.time.Year;
 import java.util.List;
@@ -18,6 +19,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -33,11 +35,155 @@ class AthleteControllerTests {
 	private AthleteService athleteService;
 
 	@Test
+	void updatesAthleteAndReturnsAllUpdatedFields() throws Exception {
+		when(athleteService.updateAthlete(42L,
+				new UpdateAthleteRequest("Janusz", "Nowak", 2011, Gender.FEMALE)))
+				.thenReturn(new AthleteResponse(42L, "Janusz", "Nowak", 2011, Gender.FEMALE, true));
+
+		mockMvc.perform(put("/api/athletes/42")
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("""
+								{"firstName":" Janusz ","lastName":" Nowak ","birthYear":2011,"gender":"FEMALE"}
+								"""))
+				.andExpect(status().isOk())
+				.andExpect(content().json("""
+						{"id":42,"firstName":"Janusz","lastName":"Nowak","birthYear":2011,
+						"gender":"FEMALE","active":true}
+						""", true));
+
+		verify(athleteService).updateAthlete(42L,
+				new UpdateAthleteRequest("Janusz", "Nowak", 2011, Gender.FEMALE));
+	}
+
+	@Test
+	void updatesOnlyNamesWhenOtherFieldsAreSuppliedUnchanged() throws Exception {
+		UpdateAthleteRequest request = new UpdateAthleteRequest("Jan", "Kowalski", 2010, Gender.MALE);
+		when(athleteService.updateAthlete(42L, request))
+				.thenReturn(new AthleteResponse(42L, "Jan", "Kowalski", 2010, Gender.MALE, true));
+
+		mockMvc.perform(put("/api/athletes/42")
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("""
+								{"firstName":"Jan","lastName":"Kowalski","birthYear":2010,"gender":"MALE"}
+								"""))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.firstName").value("Jan"))
+				.andExpect(jsonPath("$.lastName").value("Kowalski"))
+				.andExpect(jsonPath("$.birthYear").value(2010))
+				.andExpect(jsonPath("$.gender").value("MALE"));
+	}
+
+	@Test
+	void keepsActiveStateForActiveAndInactiveAthletes() throws Exception {
+		UpdateAthleteRequest activeUpdate = new UpdateAthleteRequest("Jan", "Nowak", 2010, Gender.MALE);
+		UpdateAthleteRequest inactiveUpdate = new UpdateAthleteRequest("Anna", "Nowak", 2008, Gender.FEMALE);
+		when(athleteService.updateAthlete(1L, activeUpdate))
+				.thenReturn(new AthleteResponse(1L, "Jan", "Nowak", 2010, Gender.MALE, true));
+		when(athleteService.updateAthlete(2L, inactiveUpdate))
+				.thenReturn(new AthleteResponse(2L, "Anna", "Nowak", 2008, Gender.FEMALE, false));
+
+		mockMvc.perform(put("/api/athletes/1")
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("""
+								{"firstName":"Jan","lastName":"Nowak","birthYear":2010,"gender":"MALE"}
+								"""))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.active").value(true));
+		mockMvc.perform(put("/api/athletes/2")
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("""
+								{"firstName":"Anna","lastName":"Nowak","birthYear":2008,"gender":"FEMALE"}
+								"""))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.active").value(false));
+	}
+
+	@Test
+	void acceptsBothGenderValuesOnUpdate() throws Exception {
+		UpdateAthleteRequest male = new UpdateAthleteRequest("Jan", "Nowak", 2010, Gender.MALE);
+		UpdateAthleteRequest female = new UpdateAthleteRequest("Anna", "Nowak", 2008, Gender.FEMALE);
+		when(athleteService.updateAthlete(1L, male))
+				.thenReturn(new AthleteResponse(1L, "Jan", "Nowak", 2010, Gender.MALE, true));
+		when(athleteService.updateAthlete(2L, female))
+				.thenReturn(new AthleteResponse(2L, "Anna", "Nowak", 2008, Gender.FEMALE, true));
+
+		mockMvc.perform(put("/api/athletes/1").contentType(MediaType.APPLICATION_JSON)
+						.content("""
+								{"firstName":"Jan","lastName":"Nowak","birthYear":2010,"gender":"MALE"}
+								"""))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.gender").value("MALE"));
+		mockMvc.perform(put("/api/athletes/2").contentType(MediaType.APPLICATION_JSON)
+						.content("""
+								{"firstName":"Anna","lastName":"Nowak","birthYear":2008,"gender":"FEMALE"}
+								"""))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.gender").value("FEMALE"));
+	}
+
+	@Test
+	void rejectsInvalidUpdateRequests() throws Exception {
+		assertUpdateBadRequest(42, """
+				{"lastName":"Smith","birthYear":2010,"gender":"MALE"}
+				""");
+		assertUpdateBadRequest(42, """
+				{"firstName":"  ","lastName":"Smith","birthYear":2010,"gender":"MALE"}
+				""");
+		assertUpdateBadRequest(42, """
+				{"firstName":"John","lastName":"Smith","birthYear":2010}
+				""");
+		assertUpdateBadRequest(42, """
+				{"firstName":"John","lastName":"Smith","birthYear":1899,"gender":"MALE"}
+				""");
+		assertUpdateBadRequest(42, """
+				{"firstName":"John","lastName":"Smith","birthYear":%d,"gender":"MALE"}
+				""".formatted(Year.now().getValue() + 1));
+		assertUpdateBadRequest(42, """
+				{"firstName":"John","lastName":"Smith","birthYear":2010,"gender":"OTHER"}
+				""");
+		String longName = "a".repeat(101);
+		assertUpdateBadRequest(42, """
+				{"firstName":"%s","lastName":"Smith","birthYear":2010,"gender":"MALE"}
+				""".formatted(longName));
+		assertUpdateBadRequest(42, """
+				{"firstName":"John","lastName":"%s","birthYear":2010,"gender":"MALE"}
+				""".formatted(longName));
+		assertUpdateBadRequest(42, """
+				{"firstName":"John","lastName":"Smith","birthYear":"2010","gender":"MALE"}
+				""");
+		assertUpdateBadRequest(42, """
+				{"firstName":"John","lastName":"Smith","birthYear":2010.5,"gender":"MALE"}
+				""");
+		assertUpdateBadRequest(0, """
+				{"firstName":"John","lastName":"Smith","birthYear":2010,"gender":"MALE"}
+				""");
+		assertUpdateBadRequest(42, "{\"firstName\":");
+	}
+
+	@Test
+	void returnsNotFoundAndConflictForUpdateFailures() throws Exception {
+		UpdateAthleteRequest request = new UpdateAthleteRequest("John", "Smith", 2010, Gender.MALE);
+		when(athleteService.updateAthlete(404L, request)).thenThrow(new AthleteNotFoundException(404L));
+		when(athleteService.updateAthlete(409L, request)).thenThrow(new AthleteAlreadyExistsException());
+
+		mockMvc.perform(put("/api/athletes/404").contentType(MediaType.APPLICATION_JSON)
+						.content("""
+								{"firstName":"John","lastName":"Smith","birthYear":2010,"gender":"MALE"}
+								"""))
+				.andExpect(status().isNotFound());
+		mockMvc.perform(put("/api/athletes/409").contentType(MediaType.APPLICATION_JSON)
+						.content("""
+								{"firstName":"John","lastName":"Smith","birthYear":2010,"gender":"MALE"}
+								"""))
+				.andExpect(status().isConflict());
+	}
+
+	@Test
 	void emptySearchReturnsAllAthletesIncludingInactiveAsDtos() throws Exception {
 		List<AthleteResponse> athletes = List.of(
 				new AthleteResponse(1L, "Jan", "Kowalski", 2010, Gender.MALE, true),
 				new AthleteResponse(2L, "Anna", "Nowak", 2008, Gender.FEMALE, false));
-		when(athleteService.searchAthletes(new AthleteSearchRequest(null, null, null, null, null)))
+		when(athleteService.searchAthletes(new SearchAthletesRequest(null, null, null, null, null)))
 				.thenReturn(athletes);
 
 		mockMvc.perform(post("/api/athletes/search")
@@ -53,12 +199,12 @@ class AthleteControllerTests {
 						]
 						""", true));
 
-		verify(athleteService).searchAthletes(new AthleteSearchRequest(null, null, null, null, null));
+		verify(athleteService).searchAthletes(new SearchAthletesRequest(null, null, null, null, null));
 	}
 
 	@Test
 	void searchesByPartialFirstName() throws Exception {
-		when(athleteService.searchAthletes(new AthleteSearchRequest("ann", null, null, null, null)))
+		when(athleteService.searchAthletes(new SearchAthletesRequest("ann", null, null, null, null)))
 				.thenReturn(List.of(new AthleteResponse(3L, "Anna", "Nowak", 2009, Gender.FEMALE, true)));
 
 		mockMvc.perform(post("/api/athletes/search")
@@ -70,12 +216,12 @@ class AthleteControllerTests {
 				.andExpect(jsonPath("$[0].firstName").value("Anna"))
 				.andExpect(jsonPath("$[0].id").value(3));
 
-		verify(athleteService).searchAthletes(new AthleteSearchRequest("ann", null, null, null, null));
+		verify(athleteService).searchAthletes(new SearchAthletesRequest("ann", null, null, null, null));
 	}
 
 	@Test
 	void searchesByPartialLastNameCaseInsensitively() throws Exception {
-		when(athleteService.searchAthletes(new AthleteSearchRequest(null, "KOW", null, null, null)))
+		when(athleteService.searchAthletes(new SearchAthletesRequest(null, "KOW", null, null, null)))
 				.thenReturn(List.of(new AthleteResponse(1L, "Jan", "Kowalski", 2010, Gender.MALE, true)));
 
 		mockMvc.perform(post("/api/athletes/search")
@@ -86,14 +232,14 @@ class AthleteControllerTests {
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$[0].lastName").value("Kowalski"));
 
-		verify(athleteService).searchAthletes(new AthleteSearchRequest(null, "KOW", null, null, null));
+		verify(athleteService).searchAthletes(new SearchAthletesRequest(null, "KOW", null, null, null));
 	}
 
 	@Test
 	void trimsTextAndIgnoresEmptyOrWhitespaceCriteria() throws Exception {
-		when(athleteService.searchAthletes(new AthleteSearchRequest("Jan", null, null, null, null)))
+		when(athleteService.searchAthletes(new SearchAthletesRequest("Jan", null, null, null, null)))
 				.thenReturn(List.of());
-		when(athleteService.searchAthletes(new AthleteSearchRequest(null, null, null, null, null)))
+		when(athleteService.searchAthletes(new SearchAthletesRequest(null, null, null, null, null)))
 				.thenReturn(List.of());
 
 		mockMvc.perform(post("/api/athletes/search")
@@ -111,15 +257,15 @@ class AthleteControllerTests {
 				.andExpect(status().isOk())
 				.andExpect(content().json("[]", true));
 
-		verify(athleteService).searchAthletes(new AthleteSearchRequest("Jan", null, null, null, null));
-		verify(athleteService).searchAthletes(new AthleteSearchRequest(null, null, null, null, null));
+		verify(athleteService).searchAthletes(new SearchAthletesRequest("Jan", null, null, null, null));
+		verify(athleteService).searchAthletes(new SearchAthletesRequest(null, null, null, null, null));
 	}
 
 	@Test
 	void filtersByActiveStatusForBothValues() throws Exception {
-		when(athleteService.searchAthletes(new AthleteSearchRequest(null, null, true, null, null)))
+		when(athleteService.searchAthletes(new SearchAthletesRequest(null, null, true, null, null)))
 				.thenReturn(List.of(new AthleteResponse(1L, "Jan", "Kowalski", 2010, Gender.MALE, true)));
-		when(athleteService.searchAthletes(new AthleteSearchRequest(null, null, false, null, null)))
+		when(athleteService.searchAthletes(new SearchAthletesRequest(null, null, false, null, null)))
 				.thenReturn(List.of(new AthleteResponse(2L, "Anna", "Nowak", 2008, Gender.FEMALE, false)));
 
 		mockMvc.perform(post("/api/athletes/search")
@@ -140,9 +286,9 @@ class AthleteControllerTests {
 
 	@Test
 	void filtersByBothGenderValues() throws Exception {
-		when(athleteService.searchAthletes(new AthleteSearchRequest(null, null, null, Gender.MALE, null)))
+		when(athleteService.searchAthletes(new SearchAthletesRequest(null, null, null, Gender.MALE, null)))
 				.thenReturn(List.of(new AthleteResponse(1L, "Jan", "Kowalski", 2010, Gender.MALE, true)));
-		when(athleteService.searchAthletes(new AthleteSearchRequest(null, null, null, Gender.FEMALE, null)))
+		when(athleteService.searchAthletes(new SearchAthletesRequest(null, null, null, Gender.FEMALE, null)))
 				.thenReturn(List.of(new AthleteResponse(2L, "Anna", "Nowak", 2008, Gender.FEMALE, false)));
 
 		mockMvc.perform(post("/api/athletes/search")
@@ -163,7 +309,7 @@ class AthleteControllerTests {
 
 	@Test
 	void combinesAllSearchCriteria() throws Exception {
-		AthleteSearchRequest request = new AthleteSearchRequest("Jan", "Kow", true, Gender.MALE, null);
+		SearchAthletesRequest request = new SearchAthletesRequest("Jan", "Kow", true, Gender.MALE, null);
 		when(athleteService.searchAthletes(request))
 				.thenReturn(List.of(new AthleteResponse(1L, "Jan", "Kowalski", 2010, Gender.MALE, true)));
 
@@ -180,7 +326,7 @@ class AthleteControllerTests {
 
 	@Test
 	void searchesByExactBirthYear() throws Exception {
-		AthleteSearchRequest request = new AthleteSearchRequest(null, null, null, null, 2010);
+		SearchAthletesRequest request = new SearchAthletesRequest(null, null, null, null, 2010);
 		when(athleteService.searchAthletes(request))
 				.thenReturn(List.of(new AthleteResponse(1L, "Jan", "Kowalski", 2010, Gender.MALE, true)));
 
@@ -197,7 +343,7 @@ class AthleteControllerTests {
 
 	@Test
 	void returnsNoResultsForUnmatchedBirthYear() throws Exception {
-		when(athleteService.searchAthletes(new AthleteSearchRequest(null, null, null, null, 2001)))
+		when(athleteService.searchAthletes(new SearchAthletesRequest(null, null, null, null, 2001)))
 				.thenReturn(List.of());
 
 		mockMvc.perform(post("/api/athletes/search")
@@ -211,12 +357,12 @@ class AthleteControllerTests {
 
 	@Test
 	void combinesBirthYearWithOtherCriteriaUsingAnd() throws Exception {
-		AthleteSearchRequest byFirstName = new AthleteSearchRequest("Jan", null, null, null, 2010);
-		AthleteSearchRequest byLastName = new AthleteSearchRequest(null, "Kow", null, null, 2010);
-		AthleteSearchRequest byGender = new AthleteSearchRequest(null, null, null, Gender.MALE, 2010);
-		AthleteSearchRequest byStatus = new AthleteSearchRequest(null, null, true, null, 2010);
-		AthleteSearchRequest byMultipleCriteria =
-				new AthleteSearchRequest("Jan", "Kow", true, Gender.MALE, 2010);
+		SearchAthletesRequest byFirstName = new SearchAthletesRequest("Jan", null, null, null, 2010);
+		SearchAthletesRequest byLastName = new SearchAthletesRequest(null, "Kow", null, null, 2010);
+		SearchAthletesRequest byGender = new SearchAthletesRequest(null, null, null, Gender.MALE, 2010);
+		SearchAthletesRequest byStatus = new SearchAthletesRequest(null, null, true, null, 2010);
+		SearchAthletesRequest byMultipleCriteria =
+				new SearchAthletesRequest("Jan", "Kow", true, Gender.MALE, 2010);
 		AthleteResponse matchingAthlete =
 				new AthleteResponse(1L, "Jan", "Kowalski", 2010, Gender.MALE, true);
 		when(athleteService.searchAthletes(byFirstName)).thenReturn(List.of(matchingAthlete));
@@ -244,7 +390,7 @@ class AthleteControllerTests {
 
 	@Test
 	void omittedBirthYearDoesNotRestrictSearchResults() throws Exception {
-		AthleteSearchRequest request = new AthleteSearchRequest(null, null, true, Gender.FEMALE, null);
+		SearchAthletesRequest request = new SearchAthletesRequest(null, null, true, Gender.FEMALE, null);
 		when(athleteService.searchAthletes(request)).thenReturn(List.of(
 				new AthleteResponse(1L, "Anna", "Nowak", 2008, Gender.FEMALE, true),
 				new AthleteResponse(2L, "Maria", "Kowal", 2012, Gender.FEMALE, true)));
@@ -280,7 +426,7 @@ class AthleteControllerTests {
 
 	@Test
 	void returnsEmptyArrayWhenSearchHasNoMatches() throws Exception {
-		when(athleteService.searchAthletes(new AthleteSearchRequest("missing", null, null, null, null)))
+		when(athleteService.searchAthletes(new SearchAthletesRequest("missing", null, null, null, null)))
 				.thenReturn(List.of());
 
 		mockMvc.perform(post("/api/athletes/search")
@@ -362,7 +508,7 @@ class AthleteControllerTests {
 
 	@Test
 	void createsAthleteAndReturnsLocation() throws Exception {
-		when(athleteService.createAthlete(any(AthleteRequest.class))).thenReturn(
+		when(athleteService.createAthlete(any(CreateAthleteRequest.class))).thenReturn(
 				new AthleteResponse(42L, "John", "Smith", 2010, Gender.MALE, true));
 
 		mockMvc.perform(post("/api/athletes")
@@ -378,7 +524,7 @@ class AthleteControllerTests {
 				.andExpect(jsonPath("$.lastName").value("Smith"))
 				.andExpect(jsonPath("$.active").value(true));
 
-		verify(athleteService).createAthlete(new AthleteRequest("John", "Smith", 2010, Gender.MALE));
+		verify(athleteService).createAthlete(new CreateAthleteRequest("John", "Smith", 2010, Gender.MALE));
 	}
 
 	@Test
@@ -426,7 +572,7 @@ class AthleteControllerTests {
 
 	@Test
 	void acceptsTheCurrentCalendarYear() throws Exception {
-		when(athleteService.createAthlete(any(AthleteRequest.class))).thenReturn(
+		when(athleteService.createAthlete(any(CreateAthleteRequest.class))).thenReturn(
 				new AthleteResponse(42L, "John", "Smith", Year.now().getValue(), Gender.MALE, true));
 
 		mockMvc.perform(post("/api/athletes")
@@ -446,7 +592,7 @@ class AthleteControllerTests {
 
 	@Test
 	void returnsConflictForDuplicateAthlete() throws Exception {
-		when(athleteService.createAthlete(any(AthleteRequest.class)))
+		when(athleteService.createAthlete(any(CreateAthleteRequest.class)))
 				.thenThrow(new AthleteAlreadyExistsException());
 
 		mockMvc.perform(post("/api/athletes")
@@ -471,7 +617,7 @@ class AthleteControllerTests {
 				.andExpect(jsonPath("$.title").value("Invalid athlete ID"));
 	}
 
-	private void assertSearchReturns(AthleteSearchRequest request, String json) throws Exception {
+	private void assertSearchReturns(SearchAthletesRequest request, String json) throws Exception {
 		mockMvc.perform(post("/api/athletes/search")
 						.contentType(MediaType.APPLICATION_JSON)
 						.content(json))
@@ -482,6 +628,13 @@ class AthleteControllerTests {
 
 	private void assertSearchBadRequest(String json) throws Exception {
 		mockMvc.perform(post("/api/athletes/search")
+						.contentType(MediaType.APPLICATION_JSON)
+						.content(json))
+				.andExpect(status().isBadRequest());
+	}
+
+	private void assertUpdateBadRequest(long id, String json) throws Exception {
+		mockMvc.perform(put("/api/athletes/{id}", id)
 						.contentType(MediaType.APPLICATION_JSON)
 						.content(json))
 				.andExpect(status().isBadRequest());

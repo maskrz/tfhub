@@ -15,13 +15,10 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import pl.tfhub.api.athlete.dto.AthleteRequest;
+import pl.tfhub.api.athlete.dto.CreateAthleteRequest;
 import pl.tfhub.api.athlete.dto.AthleteResponse;
-import pl.tfhub.api.athlete.dto.AthleteSearchRequest;
-import org.mockito.ArgumentCaptor;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
+import pl.tfhub.api.athlete.dto.SearchAthletesRequest;
+import pl.tfhub.api.athlete.dto.UpdateAthleteRequest;
 
 import java.sql.SQLException;
 import java.util.List;
@@ -49,7 +46,7 @@ class AthleteServiceTests {
 	void searchesWithAllCriteriaAndMapsEntitiesToResponseDtos() {
 		Athlete athlete = new Athlete("Jan", "Kowalski", 2010, Gender.MALE);
 		ReflectionTestUtils.setField(athlete, "id", 1L);
-		AthleteSearchRequest request = new AthleteSearchRequest("Jan", "Kow", true, Gender.MALE, null);
+		SearchAthletesRequest request = new SearchAthletesRequest("Jan", "Kow", true, Gender.MALE, null);
 		when(athleteRepository.findAll(any(Specification.class))).thenReturn(List.of(athlete));
 
 		List<AthleteResponse> responses = athleteService.searchAthletes(request);
@@ -63,7 +60,7 @@ class AthleteServiceTests {
 		when(athleteRepository.findAll(any(Specification.class))).thenReturn(List.of());
 
 		assertEquals(List.of(), athleteService.searchAthletes(
-				new AthleteSearchRequest(null, null, null, null, null)));
+				new SearchAthletesRequest(null, null, null, null, null)));
 
 		verify(athleteRepository).findAll(any(Specification.class));
 	}
@@ -71,7 +68,7 @@ class AthleteServiceTests {
 	@Test
 	void searchSpecificationAddsExactBirthYearAndOmitsItWhenNotProvided() {
 		when(athleteRepository.findAll(any(Specification.class))).thenReturn(List.of());
-		athleteService.searchAthletes(new AthleteSearchRequest(null, null, null, null, 2010));
+		athleteService.searchAthletes(new SearchAthletesRequest(null, null, null, null, 2010));
 
 		ArgumentCaptor<Specification<Athlete>> specificationCaptor = ArgumentCaptor.forClass(Specification.class);
 		verify(athleteRepository).findAll(specificationCaptor.capture());
@@ -89,7 +86,7 @@ class AthleteServiceTests {
 		verify(criteriaBuilder).equal(birthYearPath, 2010);
 
 		when(athleteRepository.findAll(any(Specification.class))).thenReturn(List.of());
-		athleteService.searchAthletes(new AthleteSearchRequest(null, null, null, null, null));
+		athleteService.searchAthletes(new SearchAthletesRequest(null, null, null, null, null));
 		ArgumentCaptor<Specification<Athlete>> noBirthYearCaptor = ArgumentCaptor.forClass(Specification.class);
 		verify(athleteRepository, org.mockito.Mockito.times(2)).findAll(noBirthYearCaptor.capture());
 
@@ -121,8 +118,94 @@ class AthleteServiceTests {
 	}
 
 	@Test
+	void updatesAllPersonalFieldsAndPreservesActiveStatus() {
+		Athlete athlete = new Athlete("Old", "Name", 2000, Gender.MALE);
+		ReflectionTestUtils.setField(athlete, "id", 12L);
+		ReflectionTestUtils.setField(athlete, "active", false);
+		when(athleteRepository.findById(12L)).thenReturn(Optional.of(athlete));
+		when(athleteRepository.existsByFirstNameAndLastNameAndBirthYearAndIdNot(
+				"New", "Name", 2010, 12L)).thenReturn(false);
+		when(athleteRepository.saveAndFlush(athlete)).thenReturn(athlete);
+
+		AthleteResponse response = athleteService.updateAthlete(
+				12L, new UpdateAthleteRequest("New", "Name", 2010, Gender.FEMALE));
+
+		assertEquals(new AthleteResponse(12L, "New", "Name", 2010, Gender.FEMALE, false), response);
+		verify(athleteRepository).existsByFirstNameAndLastNameAndBirthYearAndIdNot(
+				"New", "Name", 2010, 12L);
+	}
+
+	@Test
+	void allowsUnchangedUniqueFieldsAndPreservesActiveStatus() {
+		Athlete athlete = new Athlete("Jan", "Kowalski", 2010, Gender.MALE);
+		ReflectionTestUtils.setField(athlete, "id", 12L);
+		ReflectionTestUtils.setField(athlete, "active", true);
+		when(athleteRepository.findById(12L)).thenReturn(Optional.of(athlete));
+		when(athleteRepository.existsByFirstNameAndLastNameAndBirthYearAndIdNot(
+				"Jan", "Kowalski", 2010, 12L)).thenReturn(false);
+		when(athleteRepository.saveAndFlush(athlete)).thenReturn(athlete);
+
+		AthleteResponse response = athleteService.updateAthlete(
+				12L, new UpdateAthleteRequest("Jan", "Kowalski", 2010, Gender.MALE));
+
+		assertEquals(new AthleteResponse(12L, "Jan", "Kowalski", 2010, Gender.MALE, true), response);
+	}
+
+	@Test
+	void canUpdateNamesWhileKeepingBirthYearAndGenderUnchanged() {
+		Athlete athlete = new Athlete("Old", "Name", 2010, Gender.FEMALE);
+		ReflectionTestUtils.setField(athlete, "id", 12L);
+		when(athleteRepository.findById(12L)).thenReturn(Optional.of(athlete));
+		when(athleteRepository.existsByFirstNameAndLastNameAndBirthYearAndIdNot(
+				"New", "Name", 2010, 12L)).thenReturn(false);
+		when(athleteRepository.saveAndFlush(athlete)).thenReturn(athlete);
+
+		AthleteResponse response = athleteService.updateAthlete(
+				12L, new UpdateAthleteRequest("New", "Name", 2010, Gender.FEMALE));
+
+		assertEquals(new AthleteResponse(12L, "New", "Name", 2010, Gender.FEMALE, true), response);
+	}
+
+	@Test
+	void rejectsDuplicateAthleteOwnedByAnotherId() {
+		Athlete athlete = new Athlete("Old", "Name", 2000, Gender.MALE);
+		ReflectionTestUtils.setField(athlete, "id", 12L);
+		when(athleteRepository.findById(12L)).thenReturn(Optional.of(athlete));
+		when(athleteRepository.existsByFirstNameAndLastNameAndBirthYearAndIdNot(
+				"Existing", "Athlete", 2010, 12L)).thenReturn(true);
+
+		assertThrows(AthleteAlreadyExistsException.class, () -> athleteService.updateAthlete(
+				12L, new UpdateAthleteRequest("Existing", "Athlete", 2010, Gender.FEMALE)));
+		verify(athleteRepository, never()).saveAndFlush(org.mockito.ArgumentMatchers.any(Athlete.class));
+	}
+
+	@Test
+	void returnsNotFoundWhenUpdatingUnknownAthlete() {
+		when(athleteRepository.findById(99L)).thenReturn(Optional.empty());
+
+		assertThrows(AthleteNotFoundException.class, () -> athleteService.updateAthlete(
+				99L, new UpdateAthleteRequest("Jan", "Kowalski", 2010, Gender.MALE)));
+	}
+
+	@Test
+	void translatesConcurrentUpdateUniqueConstraintViolationToDuplicateConflict() {
+		Athlete athlete = new Athlete("Old", "Name", 2000, Gender.MALE);
+		ReflectionTestUtils.setField(athlete, "id", 12L);
+		when(athleteRepository.findById(12L)).thenReturn(Optional.of(athlete));
+		when(athleteRepository.existsByFirstNameAndLastNameAndBirthYearAndIdNot(
+				"New", "Name", 2010, 12L)).thenReturn(false);
+		ConstraintViolationException constraintViolation = new ConstraintViolationException(
+				"duplicate athlete", new SQLException("duplicate"), "uq_athletes_name_birth_year");
+		when(athleteRepository.saveAndFlush(athlete))
+				.thenThrow(new DataIntegrityViolationException("unique constraint", constraintViolation));
+
+		assertThrows(AthleteAlreadyExistsException.class, () -> athleteService.updateAthlete(
+				12L, new UpdateAthleteRequest("New", "Name", 2010, Gender.MALE)));
+	}
+
+	@Test
 	void createsAndPersistsAnActiveAthlete() {
-		AthleteRequest request = new AthleteRequest("John", "Smith", 2010, Gender.MALE);
+		CreateAthleteRequest request = new CreateAthleteRequest("John", "Smith", 2010, Gender.MALE);
 		when(athleteRepository.saveAndFlush(org.mockito.ArgumentMatchers.any(Athlete.class)))
 				.thenAnswer(invocation -> invocation.getArgument(0));
 
@@ -145,7 +228,7 @@ class AthleteServiceTests {
 				.thenReturn(true);
 
 		assertThrows(AthleteAlreadyExistsException.class, () -> athleteService.createAthlete(
-				new AthleteRequest("John", "Smith", 2010, Gender.MALE)));
+				new CreateAthleteRequest("John", "Smith", 2010, Gender.MALE)));
 
 		verify(athleteRepository, never()).saveAndFlush(org.mockito.ArgumentMatchers.any(Athlete.class));
 	}
@@ -158,7 +241,7 @@ class AthleteServiceTests {
 				.thenThrow(new DataIntegrityViolationException("unique constraint", constraintViolation));
 
 		assertThrows(AthleteAlreadyExistsException.class, () -> athleteService.createAthlete(
-				new AthleteRequest("John", "Smith", 2010, Gender.MALE)));
+				new CreateAthleteRequest("John", "Smith", 2010, Gender.MALE)));
 	}
 
 	@Test
@@ -169,6 +252,6 @@ class AthleteServiceTests {
 				.thenThrow(new DataIntegrityViolationException("constraint", constraintViolation));
 
 		assertThrows(DataIntegrityViolationException.class, () -> athleteService.createAthlete(
-				new AthleteRequest("John", "Smith", 2010, Gender.MALE)));
+				new CreateAthleteRequest("John", "Smith", 2010, Gender.MALE)));
 	}
 }

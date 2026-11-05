@@ -6,4 +6,7 @@ import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 public interface AthleteRepository extends JpaRepository<Athlete, Long>, JpaSpecificationExecutor<Athlete> {
 
 	boolean existsByFirstNameAndLastNameAndBirthYear(String firstName, String lastName, Integer birthYear);
+
+	boolean existsByFirstNameAndLastNameAndBirthYearAndIdNot(
+			String firstName, String lastName, Integer birthYear, Long id);
 }

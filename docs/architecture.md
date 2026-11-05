@@ -95,7 +95,7 @@ pl.tfhub.api/
 │   ├── AthleteService.java
 │   ├── AthleteRepository.java
 │   └── dto/
-│       ├── AthleteRequest.java
+│       ├── CreateAthleteRequest.java
 │       └── AthleteResponse.java
 │
 ├── test/
