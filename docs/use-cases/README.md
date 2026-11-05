@@ -58,7 +58,7 @@ Manages individual athlete performance results, including single and group data 
 
 | ID     | Use Case | Description | Status |
 |--------|---|---|---|
-| UC-201 | Add Result | Record one athlete's result for a selected test and date. | Planned |
+| UC-201 | Add Result | Record one athlete's result for a selected test and date. | Implemented |
 | UC-202 | Add Multiple Results | Record results for multiple athletes in one operation, using a shared test and date. | Planned |
 | UC-203 | Get Result | Retrieve one result by ID. | Planned |
 | UC-204 | Get Results | Retrieve results with optional filters, such as athlete, test, date range and result type. | Planned |
