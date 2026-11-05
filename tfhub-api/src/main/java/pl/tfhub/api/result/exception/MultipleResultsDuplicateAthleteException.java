@@ -1,0 +1,10 @@
+package pl.tfhub.api.result.exception;
+
+
+
+public class MultipleResultsDuplicateAthleteException extends RuntimeException {
+
+	public MultipleResultsDuplicateAthleteException() {
+		super("Each athlete may appear only once in a batch request");
+	}
+}

@@ -49,12 +49,20 @@ Backend modules are organized by functionality:
 - `test`
 - `result`
 
-Each module may contain:
-- Entity
-- Controller
-- Service
-- Repository
-- DTOs
+Place classes in responsibility-based subpackages:
+
+- `controller/` for REST controllers
+- `dto/request/` and `dto/response/` for API request and response DTOs
+- `entity/` for JPA entities
+- `enums/` for module-specific enums
+- `repository/` for Spring Data repositories
+- `service/` for business logic and transaction handling
+- `exception/` for module-specific exceptions
+
+Application-wide configuration belongs in `config/`. Global exception
+handling and genuinely shared utilities belong in `common/`, such as
+`common/exception/` or `common/validation/`. Keep module-specific exceptions
+and business logic within their owning module; do not create empty packages.
 
 Follow the responsibilities described in `docs/architecture.md`.
 
@@ -66,8 +74,10 @@ Important rules:
 4. Repositories are responsible for persistence.
 5. JPA entities must not be exposed directly through REST endpoints.
 6. Use request and response DTOs.
-7. Avoid circular dependencies between modules.
-8. Do not introduce unnecessary architectural abstractions.
+7. A module must not access another module's repository directly; use that
+   module's service layer for cross-module operations.
+8. Avoid circular dependencies between modules.
+9. Do not introduce unnecessary architectural abstractions.
 
 Do not implement full DDD, CQRS, event sourcing or microservices.
 

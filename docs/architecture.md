@@ -84,43 +84,54 @@ These approaches may be considered in the future if actual requirements justify 
 
 Backend code is organized by functional modules.
 
-Initial proposed structure:
+The implemented structure separates classes by responsibility within each
+functional module:
 
 ```text
 pl.tfhub.api/
-│
 ├── athlete/
-│   ├── Athlete.java
-│   ├── AthleteController.java
-│   ├── AthleteService.java
-│   ├── AthleteRepository.java
-│   └── dto/
-│       ├── CreateAthleteRequest.java
-│       └── AthleteResponse.java
-│
+│   ├── controller/
+│   ├── dto/request/
+│   ├── dto/response/
+│   ├── entity/
+│   ├── enums/
+│   ├── exception/
+│   ├── repository/
+│   └── service/
 ├── test/
-│   ├── AthleticTest.java
-│   ├── TestController.java
-│   ├── TestService.java
-│   ├── TestRepository.java
-│   └── dto/
-│
+│   ├── controller/
+│   ├── dto/request/
+│   ├── dto/response/
+│   ├── entity/
+│   ├── enums/
+│   ├── exception/
+│   ├── repository/
+│   └── service/
 ├── result/
-│   ├── TestResult.java
-│   ├── TestResultController.java
-│   ├── TestResultService.java
-│   ├── TestResultRepository.java
-│   └── dto/
-│
+│   ├── controller/
+│   ├── dto/request/
+│   ├── dto/response/
+│   ├── entity/
+│   ├── enums/
+│   ├── exception/
+│   ├── repository/
+│   └── service/
 ├── config/
-│
+├── common/
+│   ├── exception/
+│   └── validation/
 └── TfhubApiApplication.java
 ```
 
-Additional packages may be introduced when justified, for example:
-- `exception/` – global exception handling.
-- `common/` – genuinely shared components.
-- `validation/` – custom validation logic.
+Create only packages required by actual classes. Controllers, request and
+response DTOs, entities, enums, repositories, services, and module-specific
+exceptions belong in their respective responsibility subpackages. Application
+configuration belongs in `config`.
+
+Global exception handling and genuinely shared validation utilities belong in
+`common` (for example, `common.exception` and `common.validation`). Exceptions
+that represent a specific module's business conditions belong in that module's
+`exception` package. Do not move module-specific behavior into `common`.
 
 Do not create empty packages or generic abstractions without an actual use case.
 
@@ -211,7 +222,8 @@ Repositories may depend on JPA and database infrastructure.
 
 Lower layers must not depend on controllers.
 
-Modules should not directly access another module's repository. Cross-module operations should use the other module's public service interface.
+Modules must not directly access another module's repository. Cross-module
+operations should use the other module's public service layer.
 
 Avoid circular dependencies between modules.
 
