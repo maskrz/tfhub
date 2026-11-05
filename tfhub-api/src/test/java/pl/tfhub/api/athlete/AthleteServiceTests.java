@@ -4,6 +4,7 @@ import org.hibernate.exception.ConstraintViolationException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.test.util.ReflectionTestUtils;
 import pl.tfhub.api.athlete.dto.AthleteRequest;
 import pl.tfhub.api.athlete.dto.AthleteResponse;
 import org.mockito.ArgumentCaptor;
@@ -12,6 +13,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.sql.SQLException;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -28,6 +30,25 @@ class AthleteServiceTests {
 
 	@InjectMocks
 	private AthleteService athleteService;
+
+	@Test
+	void retrievesAthleteAndMapsItToResponseDto() {
+		Athlete athlete = new Athlete("Anna", "Nowak", 2008, Gender.FEMALE);
+		ReflectionTestUtils.setField(athlete, "id", 7L);
+		when(athleteRepository.findById(7L)).thenReturn(Optional.of(athlete));
+
+		AthleteResponse response = athleteService.getAthlete(7L);
+
+		assertEquals(new AthleteResponse(7L, "Anna", "Nowak", 2008, Gender.FEMALE, true), response);
+		verify(athleteRepository).findById(7L);
+	}
+
+	@Test
+	void throwsNotFoundWhenAthleteDoesNotExist() {
+		when(athleteRepository.findById(99L)).thenReturn(Optional.empty());
+
+		assertThrows(AthleteNotFoundException.class, () -> athleteService.getAthlete(99L));
+	}
 
 	@Test
 	void createsAndPersistsAnActiveAthlete() {

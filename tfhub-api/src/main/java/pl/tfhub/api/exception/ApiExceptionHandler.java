@@ -3,10 +3,13 @@ package pl.tfhub.api.exception;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import pl.tfhub.api.athlete.AthleteAlreadyExistsException;
+import pl.tfhub.api.athlete.AthleteNotFoundException;
+import pl.tfhub.api.athlete.InvalidAthleteIdException;
 
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -40,6 +43,21 @@ public class ApiExceptionHandler {
 	public ProblemDetail handleDuplicateAthlete(AthleteAlreadyExistsException exception) {
 		ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, exception.getMessage());
 		problem.setTitle("Athlete already exists");
+		return problem;
+	}
+
+	@ExceptionHandler(AthleteNotFoundException.class)
+	public ProblemDetail handleAthleteNotFound(AthleteNotFoundException exception) {
+		ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, exception.getMessage());
+		problem.setTitle("Athlete not found");
+		return problem;
+	}
+
+	@ExceptionHandler({InvalidAthleteIdException.class, MethodArgumentTypeMismatchException.class})
+	public ProblemDetail handleInvalidAthleteId() {
+		ProblemDetail problem = ProblemDetail.forStatusAndDetail(
+				HttpStatus.BAD_REQUEST, "Athlete ID must be a positive integer");
+		problem.setTitle("Invalid athlete ID");
 		return problem;
 	}
 }

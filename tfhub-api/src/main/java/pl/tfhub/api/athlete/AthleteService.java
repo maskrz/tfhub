@@ -41,6 +41,13 @@ public class AthleteService {
 		}
 	}
 
+	@Transactional(readOnly = true)
+	public AthleteResponse getAthlete(long id) {
+		Athlete athlete = athleteRepository.findById(id)
+				.orElseThrow(() -> new AthleteNotFoundException(id));
+		return AthleteResponse.from(athlete);
+	}
+
 	private boolean isDuplicateAthleteConstraint(Throwable exception) {
 		Throwable cause = exception;
 		while (cause != null) {

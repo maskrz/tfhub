@@ -14,7 +14,9 @@ import java.time.Year;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -27,6 +29,59 @@ class AthleteControllerTests {
 
 	@MockitoBean
 	private AthleteService athleteService;
+
+	@Test
+	void retrievesExistingActiveAthleteAsResponseDto() throws Exception {
+		when(athleteService.getAthlete(42L)).thenReturn(
+				new AthleteResponse(42L, "Jan", "Kowalski", 2010, Gender.MALE, true));
+
+		mockMvc.perform(get("/api/athletes/42"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.id").value(42))
+				.andExpect(jsonPath("$.firstName").value("Jan"))
+				.andExpect(jsonPath("$.lastName").value("Kowalski"))
+				.andExpect(jsonPath("$.birthYear").value(2010))
+				.andExpect(jsonPath("$.gender").value("MALE"))
+				.andExpect(jsonPath("$.active").value(true))
+				.andExpect(content().json("""
+						{"id":42,"firstName":"Jan","lastName":"Kowalski","birthYear":2010,
+						"gender":"MALE","active":true}
+						""", true));
+
+		verify(athleteService).getAthlete(42L);
+	}
+
+	@Test
+	void retrievesExistingInactiveAthlete() throws Exception {
+		when(athleteService.getAthlete(7L)).thenReturn(
+				new AthleteResponse(7L, "Anna", "Nowak", 2008, Gender.FEMALE, false));
+
+		mockMvc.perform(get("/api/athletes/7"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.id").value(7))
+				.andExpect(jsonPath("$.firstName").value("Anna"))
+				.andExpect(jsonPath("$.lastName").value("Nowak"))
+				.andExpect(jsonPath("$.birthYear").value(2008))
+				.andExpect(jsonPath("$.gender").value("FEMALE"))
+				.andExpect(jsonPath("$.active").value(false));
+	}
+
+	@Test
+	void returnsNotFoundWhenAthleteDoesNotExist() throws Exception {
+		when(athleteService.getAthlete(99L)).thenThrow(new AthleteNotFoundException(99L));
+
+		mockMvc.perform(get("/api/athletes/99"))
+				.andExpect(status().isNotFound())
+				.andExpect(jsonPath("$.title").value("Athlete not found"));
+	}
+
+	@Test
+	void rejectsInvalidAthleteIds() throws Exception {
+		assertInvalidAthleteId("0");
+		assertInvalidAthleteId("-1");
+		assertInvalidAthleteId("not-a-number");
+		assertInvalidAthleteId("9223372036854775808");
+	}
 
 	@Test
 	void createsAthleteAndReturnsLocation() throws Exception {
@@ -131,5 +186,11 @@ class AthleteControllerTests {
 						.contentType(MediaType.APPLICATION_JSON)
 						.content(request))
 				.andExpect(status().isBadRequest());
+	}
+
+	private void assertInvalidAthleteId(String id) throws Exception {
+		mockMvc.perform(get("/api/athletes/{id}", id))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.title").value("Invalid athlete ID"));
 	}
 }
