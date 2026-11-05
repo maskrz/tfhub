@@ -10,8 +10,10 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import pl.tfhub.api.athlete.dto.AthleteRequest;
 import pl.tfhub.api.athlete.dto.AthleteResponse;
+import pl.tfhub.api.athlete.dto.AthleteSearchRequest;
 
 import java.net.URI;
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/athletes")
@@ -27,6 +29,11 @@ public class AthleteController {
 	public ResponseEntity<AthleteResponse> createAthlete(@Valid @RequestBody AthleteRequest request) {
 		AthleteResponse athlete = athleteService.createAthlete(request);
 		return ResponseEntity.created(URI.create("/api/athletes/" + athlete.id())).body(athlete);
+	}
+
+	@PostMapping("/search")
+	public List<AthleteResponse> searchAthletes(@Valid @RequestBody AthleteSearchRequest request) {
+		return athleteService.searchAthletes(request);
 	}
 
 	@GetMapping("/{id}")

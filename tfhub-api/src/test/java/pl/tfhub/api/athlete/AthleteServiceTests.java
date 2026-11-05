@@ -1,23 +1,37 @@
 package pl.tfhub.api.athlete;
 
+import jakarta.persistence.criteria.CriteriaBuilder;
+import jakarta.persistence.criteria.CriteriaQuery;
+import jakarta.persistence.criteria.Path;
+import jakarta.persistence.criteria.Predicate;
+import jakarta.persistence.criteria.Root;
 import org.hibernate.exception.ConstraintViolationException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.test.util.ReflectionTestUtils;
+import org.mockito.ArgumentCaptor;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
 import pl.tfhub.api.athlete.dto.AthleteRequest;
 import pl.tfhub.api.athlete.dto.AthleteResponse;
+import pl.tfhub.api.athlete.dto.AthleteSearchRequest;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.sql.SQLException;
+import java.util.List;
 import java.util.Optional;
 
+import static org.mockito.ArgumentMatchers.any;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -30,6 +44,62 @@ class AthleteServiceTests {
 
 	@InjectMocks
 	private AthleteService athleteService;
+
+	@Test
+	void searchesWithAllCriteriaAndMapsEntitiesToResponseDtos() {
+		Athlete athlete = new Athlete("Jan", "Kowalski", 2010, Gender.MALE);
+		ReflectionTestUtils.setField(athlete, "id", 1L);
+		AthleteSearchRequest request = new AthleteSearchRequest("Jan", "Kow", true, Gender.MALE, null);
+		when(athleteRepository.findAll(any(Specification.class))).thenReturn(List.of(athlete));
+
+		List<AthleteResponse> responses = athleteService.searchAthletes(request);
+
+		assertEquals(List.of(new AthleteResponse(1L, "Jan", "Kowalski", 2010, Gender.MALE, true)), responses);
+		verify(athleteRepository).findAll(any(Specification.class));
+	}
+
+	@Test
+	void searchesAllAthletesWhenCriteriaAreAbsent() {
+		when(athleteRepository.findAll(any(Specification.class))).thenReturn(List.of());
+
+		assertEquals(List.of(), athleteService.searchAthletes(
+				new AthleteSearchRequest(null, null, null, null, null)));
+
+		verify(athleteRepository).findAll(any(Specification.class));
+	}
+
+	@Test
+	void searchSpecificationAddsExactBirthYearAndOmitsItWhenNotProvided() {
+		when(athleteRepository.findAll(any(Specification.class))).thenReturn(List.of());
+		athleteService.searchAthletes(new AthleteSearchRequest(null, null, null, null, 2010));
+
+		ArgumentCaptor<Specification<Athlete>> specificationCaptor = ArgumentCaptor.forClass(Specification.class);
+		verify(athleteRepository).findAll(specificationCaptor.capture());
+		Root<Athlete> root = mock(Root.class);
+		CriteriaQuery<?> query = mock(CriteriaQuery.class);
+		CriteriaBuilder criteriaBuilder = mock(CriteriaBuilder.class);
+		Path<Object> birthYearPath = mock(Path.class);
+		Predicate birthYearPredicate = mock(Predicate.class);
+		when(root.get("birthYear")).thenReturn(birthYearPath);
+		when(criteriaBuilder.equal(birthYearPath, 2010)).thenReturn(birthYearPredicate);
+		when(criteriaBuilder.and(birthYearPredicate)).thenReturn(birthYearPredicate);
+
+		specificationCaptor.getValue().toPredicate(root, query, criteriaBuilder);
+
+		verify(criteriaBuilder).equal(birthYearPath, 2010);
+
+		when(athleteRepository.findAll(any(Specification.class))).thenReturn(List.of());
+		athleteService.searchAthletes(new AthleteSearchRequest(null, null, null, null, null));
+		ArgumentCaptor<Specification<Athlete>> noBirthYearCaptor = ArgumentCaptor.forClass(Specification.class);
+		verify(athleteRepository, org.mockito.Mockito.times(2)).findAll(noBirthYearCaptor.capture());
+
+		Root<Athlete> rootWithoutBirthYear = mock(Root.class);
+		CriteriaBuilder criteriaBuilderWithoutBirthYear = mock(CriteriaBuilder.class);
+		noBirthYearCaptor.getAllValues().get(1)
+				.toPredicate(rootWithoutBirthYear, query, criteriaBuilderWithoutBirthYear);
+
+		verify(rootWithoutBirthYear, never()).get("birthYear");
+	}
 
 	@Test
 	void retrievesAthleteAndMapsItToResponseDto() {
