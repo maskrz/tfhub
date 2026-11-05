@@ -11,7 +11,9 @@ import pl.tfhub.api.athlete.AthleteAlreadyExistsException;
 import pl.tfhub.api.athlete.AthleteNotFoundException;
 import pl.tfhub.api.athlete.InvalidAthleteIdException;
 import pl.tfhub.api.result.InactiveTestException;
+import pl.tfhub.api.result.InvalidResultIdException;
 import pl.tfhub.api.result.MultipleResultsDuplicateAthleteException;
+import pl.tfhub.api.result.ResultNotFoundException;
 import pl.tfhub.api.test.TestAlreadyExistsException;
 import pl.tfhub.api.test.InvalidTestIdException;
 import pl.tfhub.api.test.TestHasResultsException;
@@ -63,6 +65,21 @@ public class ApiExceptionHandler {
 	public ProblemDetail handleInactiveTest(InactiveTestException exception) {
 		ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, exception.getMessage());
 		problem.setTitle("Test is inactive");
+		return problem;
+	}
+
+	@ExceptionHandler(ResultNotFoundException.class)
+	public ProblemDetail handleResultNotFound(ResultNotFoundException exception) {
+		ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, exception.getMessage());
+		problem.setTitle("Result not found");
+		return problem;
+	}
+
+	@ExceptionHandler(InvalidResultIdException.class)
+	public ProblemDetail handleInvalidResultId() {
+		ProblemDetail problem = ProblemDetail.forStatusAndDetail(
+				HttpStatus.BAD_REQUEST, "Result ID must be a positive integer");
+		problem.setTitle("Invalid result ID");
 		return problem;
 	}
 

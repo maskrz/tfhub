@@ -4,9 +4,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import pl.tfhub.api.athlete.AthleteService;
 import pl.tfhub.api.result.dto.CreateMultipleResultsRequest;
-import pl.tfhub.api.result.dto.CreateResultRequest;
-import pl.tfhub.api.result.dto.CreateResultEntryRequest;
 import pl.tfhub.api.result.dto.CreateMultipleResultsResponse;
+import pl.tfhub.api.result.dto.CreateResultEntryRequest;
+import pl.tfhub.api.result.dto.CreateResultRequest;
 import pl.tfhub.api.result.dto.ResultResponse;
 import pl.tfhub.api.test.TestService;
 
@@ -42,6 +42,13 @@ public class ResultService {
 				request.value(),
 				request.type());
 		return ResultResponse.from(resultRepository.saveAndFlush(result));
+	}
+
+	@Transactional(readOnly = true)
+	public ResultResponse getResult(long id) {
+		TestResult result = resultRepository.findById(id)
+				.orElseThrow(() -> new ResultNotFoundException(id));
+		return ResultResponse.from(result);
 	}
 
 	@Transactional

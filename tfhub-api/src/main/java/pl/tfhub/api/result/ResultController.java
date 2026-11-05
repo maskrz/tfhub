@@ -2,13 +2,15 @@ package pl.tfhub.api.result;
 
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-import pl.tfhub.api.result.dto.CreateResultRequest;
 import pl.tfhub.api.result.dto.CreateMultipleResultsRequest;
 import pl.tfhub.api.result.dto.CreateMultipleResultsResponse;
+import pl.tfhub.api.result.dto.CreateResultRequest;
 import pl.tfhub.api.result.dto.ResultResponse;
 
 import java.net.URI;
@@ -21,6 +23,20 @@ public class ResultController {
 
 	public ResultController(ResultService resultService) {
 		this.resultService = resultService;
+	}
+
+	@GetMapping("/{id}")
+	public ResultResponse getResult(@PathVariable String id) {
+		long resultId;
+		try {
+			resultId = Long.parseLong(id);
+		} catch (NumberFormatException exception) {
+			throw new InvalidResultIdException();
+		}
+		if (resultId <= 0) {
+			throw new InvalidResultIdException();
+		}
+		return resultService.getResult(resultId);
 	}
 
 	@PostMapping

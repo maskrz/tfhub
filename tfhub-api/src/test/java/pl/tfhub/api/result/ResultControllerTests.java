@@ -24,6 +24,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -37,6 +38,43 @@ class ResultControllerTests {
 
 	@MockitoBean
 	private ResultService resultService;
+
+	@Test
+	void retrievesResultAsResponseDto() throws Exception {
+		when(resultService.getResult(32L)).thenReturn(new ResultResponse(
+				32L, 7L, 2L, LocalDate.parse("2026-11-05"), new BigDecimal("5.420"), ResultType.TRAINING));
+
+		mockMvc.perform(get("/api/results/32"))
+				.andExpect(status().isOk())
+				.andExpect(content().json("""
+						{"id":32,"athleteId":7,"testId":2,"resultDate":"2026-11-05",
+						"value":5.420,"type":"TRAINING"}
+						""", true))
+				.andExpect(jsonPath("$.class").doesNotExist());
+
+		verify(resultService).getResult(32L);
+	}
+
+	@Test
+	void returnsNotFoundWhenResultDoesNotExist() throws Exception {
+		when(resultService.getResult(404L)).thenThrow(new ResultNotFoundException(404L));
+
+		mockMvc.perform(get("/api/results/404"))
+				.andExpect(status().isNotFound())
+				.andExpect(jsonPath("$.title").value("Result not found"));
+	}
+
+	@Test
+	void rejectsInvalidResultIds() throws Exception {
+		mockMvc.perform(get("/api/results/0"))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.title").value("Invalid result ID"));
+		mockMvc.perform(get("/api/results/-1"))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.title").value("Invalid result ID"));
+		mockMvc.perform(get("/api/results/not-a-number"))
+				.andExpect(status().isBadRequest());
+	}
 
 	@Test
 	void createsResultAndReturnsLocationAndResponseDto() throws Exception {

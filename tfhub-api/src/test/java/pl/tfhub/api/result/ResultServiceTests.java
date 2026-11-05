@@ -50,6 +50,30 @@ class ResultServiceTests {
 	private ResultService resultService;
 
 	@Test
+	void retrievesResultAndReturnsOnlyResultFieldsRegardlessOfRelatedStatus() {
+		TestResult result = new TestResult(
+				7L, 2L, LocalDate.parse("2026-11-05"), new BigDecimal("5.420"), ResultType.TRAINING);
+		ReflectionTestUtils.setField(result, "id", 32L);
+		when(resultRepository.findById(32L)).thenReturn(java.util.Optional.of(result));
+
+		ResultResponse response = resultService.getResult(32L);
+
+		assertEquals(new ResultResponse(
+				32L, 7L, 2L, LocalDate.parse("2026-11-05"), new BigDecimal("5.420"), ResultType.TRAINING),
+				response);
+		verify(resultRepository).findById(32L);
+		verifyNoMoreInteractions(resultRepository, athleteService, testService);
+	}
+
+	@Test
+	void throwsNotFoundWhenResultDoesNotExist() {
+		when(resultRepository.findById(404L)).thenReturn(java.util.Optional.empty());
+
+		assertThrows(ResultNotFoundException.class, () -> resultService.getResult(404L));
+		verifyNoMoreInteractions(resultRepository, athleteService, testService);
+	}
+
+	@Test
 	void createsResultForAnInactiveAthleteAndActiveTest() {
 		CreateResultRequest request = request();
 		when(athleteService.getAthlete(1L))
