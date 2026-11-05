@@ -8,6 +8,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import pl.tfhub.api.athlete.dto.CreateAthleteRequest;
 import pl.tfhub.api.athlete.dto.AthleteResponse;
+import pl.tfhub.api.athlete.dto.ChangeAthleteStatusRequest;
 import pl.tfhub.api.athlete.dto.SearchAthletesRequest;
 import pl.tfhub.api.athlete.dto.UpdateAthleteRequest;
 
@@ -18,6 +19,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
@@ -176,6 +178,81 @@ class AthleteControllerTests {
 								{"firstName":"John","lastName":"Smith","birthYear":2010,"gender":"MALE"}
 								"""))
 				.andExpect(status().isConflict());
+	}
+
+	@Test
+	void deactivatesAthleteAndReturnsUpdatedResponse() throws Exception {
+		ChangeAthleteStatusRequest request = new ChangeAthleteStatusRequest(false);
+		when(athleteService.changeAthleteStatus(42L, request))
+				.thenReturn(new AthleteResponse(42L, "Jan", "Kowalski", 2010, Gender.MALE, false));
+
+		mockMvc.perform(patch("/api/athletes/42/status")
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("""
+								{"active":false}
+								"""))
+				.andExpect(status().isOk())
+				.andExpect(content().json("""
+						{"id":42,"firstName":"Jan","lastName":"Kowalski","birthYear":2010,
+						"gender":"MALE","active":false}
+						""", true));
+
+		verify(athleteService).changeAthleteStatus(42L, request);
+	}
+
+	@Test
+	void activatesAthleteAndAllowsRepeatingCurrentStatus() throws Exception {
+		ChangeAthleteStatusRequest activeRequest = new ChangeAthleteStatusRequest(true);
+		ChangeAthleteStatusRequest inactiveRequest = new ChangeAthleteStatusRequest(false);
+		when(athleteService.changeAthleteStatus(1L, activeRequest))
+				.thenReturn(new AthleteResponse(1L, "Jan", "Nowak", 2010, Gender.MALE, true));
+		when(athleteService.changeAthleteStatus(2L, activeRequest))
+				.thenReturn(new AthleteResponse(2L, "Anna", "Nowak", 2008, Gender.FEMALE, true));
+		when(athleteService.changeAthleteStatus(1L, inactiveRequest))
+				.thenReturn(new AthleteResponse(1L, "Jan", "Nowak", 2010, Gender.MALE, false));
+		when(athleteService.changeAthleteStatus(2L, inactiveRequest))
+				.thenReturn(new AthleteResponse(2L, "Anna", "Nowak", 2008, Gender.FEMALE, false));
+
+		mockMvc.perform(patch("/api/athletes/1/status").contentType(MediaType.APPLICATION_JSON)
+						.content("{\"active\":true}"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.active").value(true));
+		mockMvc.perform(patch("/api/athletes/2/status").contentType(MediaType.APPLICATION_JSON)
+						.content("{\"active\":false}"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.active").value(false));
+		mockMvc.perform(patch("/api/athletes/1/status").contentType(MediaType.APPLICATION_JSON)
+						.content("{\"active\":false}"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.active").value(false));
+		mockMvc.perform(patch("/api/athletes/2/status").contentType(MediaType.APPLICATION_JSON)
+						.content("{\"active\":true}"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.active").value(true));
+	}
+
+	@Test
+	void returnsNotFoundForStatusChangeWhenAthleteDoesNotExist() throws Exception {
+		when(athleteService.changeAthleteStatus(99L, new ChangeAthleteStatusRequest(false)))
+				.thenThrow(new AthleteNotFoundException(99L));
+
+		mockMvc.perform(patch("/api/athletes/99/status")
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("{\"active\":false}"))
+				.andExpect(status().isNotFound())
+				.andExpect(jsonPath("$.title").value("Athlete not found"));
+	}
+
+	@Test
+	void rejectsInvalidStatusChangeIdsAndBodies() throws Exception {
+		assertStatusChangeBadRequest("0", "{\"active\":false}");
+		assertStatusChangeBadRequest("-1", "{\"active\":false}");
+		assertStatusChangeBadRequest("not-a-number", "{\"active\":false}");
+		assertStatusChangeBadRequest("1", "{}");
+		assertStatusChangeBadRequest("1", "{\"active\":null}");
+		assertStatusChangeBadRequest("1", "{\"active\":\"false\"}");
+		assertStatusChangeBadRequest("1", "{\"active\":[]}");
+		assertStatusChangeBadRequest("1", "{\"active\":");
 	}
 
 	@Test
@@ -635,6 +712,13 @@ class AthleteControllerTests {
 
 	private void assertUpdateBadRequest(long id, String json) throws Exception {
 		mockMvc.perform(put("/api/athletes/{id}", id)
+						.contentType(MediaType.APPLICATION_JSON)
+						.content(json))
+				.andExpect(status().isBadRequest());
+	}
+
+	private void assertStatusChangeBadRequest(String id, String json) throws Exception {
+		mockMvc.perform(patch("/api/athletes/{id}/status", id)
 						.contentType(MediaType.APPLICATION_JSON)
 						.content(json))
 				.andExpect(status().isBadRequest());

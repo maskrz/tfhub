@@ -73,4 +73,8 @@ public class Athlete {
 		this.birthYear = birthYear;
 		this.gender = gender;
 	}
+
+	public void changeStatus(boolean active) {
+		this.active = active;
+	}
 }

@@ -3,6 +3,7 @@ package pl.tfhub.api.athlete;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -11,6 +12,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import pl.tfhub.api.athlete.dto.CreateAthleteRequest;
 import pl.tfhub.api.athlete.dto.AthleteResponse;
+import pl.tfhub.api.athlete.dto.ChangeAthleteStatusRequest;
 import pl.tfhub.api.athlete.dto.SearchAthletesRequest;
 import pl.tfhub.api.athlete.dto.UpdateAthleteRequest;
 
@@ -54,5 +56,15 @@ public class AthleteController {
 			throw new InvalidAthleteIdException();
 		}
 		return athleteService.updateAthlete(id, request);
+	}
+
+	@PatchMapping("/{id}/status")
+	public AthleteResponse changeAthleteStatus(
+			@PathVariable Long id,
+			@Valid @RequestBody ChangeAthleteStatusRequest request) {
+		if (id <= 0) {
+			throw new InvalidAthleteIdException();
+		}
+		return athleteService.changeAthleteStatus(id, request);
 	}
 }

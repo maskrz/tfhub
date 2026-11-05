@@ -17,6 +17,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import pl.tfhub.api.athlete.dto.CreateAthleteRequest;
 import pl.tfhub.api.athlete.dto.AthleteResponse;
+import pl.tfhub.api.athlete.dto.ChangeAthleteStatusRequest;
 import pl.tfhub.api.athlete.dto.SearchAthletesRequest;
 import pl.tfhub.api.athlete.dto.UpdateAthleteRequest;
 
@@ -185,6 +186,60 @@ class AthleteServiceTests {
 
 		assertThrows(AthleteNotFoundException.class, () -> athleteService.updateAthlete(
 				99L, new UpdateAthleteRequest("Jan", "Kowalski", 2010, Gender.MALE)));
+	}
+
+	@Test
+	void changesStatusWithoutModifyingOtherAthleteFieldsOrDeletingRecords() {
+		Athlete athlete = new Athlete("Anna", "Nowak", 2008, Gender.FEMALE);
+		ReflectionTestUtils.setField(athlete, "id", 42L);
+		when(athleteRepository.findById(42L)).thenReturn(Optional.of(athlete));
+		when(athleteRepository.saveAndFlush(athlete)).thenReturn(athlete);
+
+		AthleteResponse response = athleteService.changeAthleteStatus(
+				42L, new ChangeAthleteStatusRequest(false));
+
+		assertEquals(new AthleteResponse(42L, "Anna", "Nowak", 2008, Gender.FEMALE, false), response);
+		assertEquals("Anna", athlete.getFirstName());
+		assertEquals("Nowak", athlete.getLastName());
+		assertEquals(2008, athlete.getBirthYear());
+		assertEquals(Gender.FEMALE, athlete.getGender());
+		verify(athleteRepository).saveAndFlush(athlete);
+		verify(athleteRepository, never()).delete(athlete);
+		verify(athleteRepository, never()).deleteById(42L);
+	}
+
+	@Test
+	void allowsChangingStatusToTheCurrentValue() {
+		Athlete athlete = new Athlete("Jan", "Kowalski", 2010, Gender.MALE);
+		ReflectionTestUtils.setField(athlete, "id", 42L);
+		when(athleteRepository.findById(42L)).thenReturn(Optional.of(athlete));
+		when(athleteRepository.saveAndFlush(athlete)).thenReturn(athlete);
+
+		assertEquals(new AthleteResponse(42L, "Jan", "Kowalski", 2010, Gender.MALE, true),
+				athleteService.changeAthleteStatus(42L, new ChangeAthleteStatusRequest(true)));
+	}
+
+	@Test
+	void activatesInactiveAthleteAndAllowsRepeatingDeactivation() {
+		Athlete athlete = new Athlete("Anna", "Nowak", 2008, Gender.FEMALE);
+		ReflectionTestUtils.setField(athlete, "id", 42L);
+		ReflectionTestUtils.setField(athlete, "active", false);
+		when(athleteRepository.findById(42L)).thenReturn(Optional.of(athlete));
+		when(athleteRepository.saveAndFlush(athlete)).thenReturn(athlete);
+
+		assertEquals(new AthleteResponse(42L, "Anna", "Nowak", 2008, Gender.FEMALE, true),
+				athleteService.changeAthleteStatus(42L, new ChangeAthleteStatusRequest(true)));
+		assertEquals(new AthleteResponse(42L, "Anna", "Nowak", 2008, Gender.FEMALE, false),
+				athleteService.changeAthleteStatus(42L, new ChangeAthleteStatusRequest(false)));
+	}
+
+	@Test
+	void throwsNotFoundWhenChangingStatusOfUnknownAthlete() {
+		when(athleteRepository.findById(99L)).thenReturn(Optional.empty());
+
+		assertThrows(AthleteNotFoundException.class, () -> athleteService.changeAthleteStatus(
+				99L, new ChangeAthleteStatusRequest(false)));
+		verify(athleteRepository, never()).saveAndFlush(any(Athlete.class));
 	}
 
 	@Test

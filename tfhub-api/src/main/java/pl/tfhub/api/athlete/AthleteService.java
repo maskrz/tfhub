@@ -8,6 +8,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import pl.tfhub.api.athlete.dto.CreateAthleteRequest;
 import pl.tfhub.api.athlete.dto.AthleteResponse;
+import pl.tfhub.api.athlete.dto.ChangeAthleteStatusRequest;
 import pl.tfhub.api.athlete.dto.SearchAthletesRequest;
 import pl.tfhub.api.athlete.dto.UpdateAthleteRequest;
 
@@ -80,6 +81,14 @@ public class AthleteService {
 			}
 			throw exception;
 		}
+	}
+
+	@Transactional
+	public AthleteResponse changeAthleteStatus(long id, ChangeAthleteStatusRequest request) {
+		Athlete athlete = athleteRepository.findById(id)
+				.orElseThrow(() -> new AthleteNotFoundException(id));
+		athlete.changeStatus(request.active());
+		return AthleteResponse.from(athleteRepository.saveAndFlush(athlete));
 	}
 
 	@Transactional(readOnly = true)
