@@ -3,6 +3,7 @@ package pl.tfhub.api.test;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -12,6 +13,7 @@ import org.springframework.web.bind.annotation.RestController;
 import pl.tfhub.api.test.dto.CreateTestRequest;
 import pl.tfhub.api.test.dto.TestSearchRequest;
 import pl.tfhub.api.test.dto.TestResponse;
+import pl.tfhub.api.test.dto.ChangeTestStatusRequest;
 import pl.tfhub.api.test.dto.UpdateTestRequest;
 
 import java.net.URI;
@@ -49,6 +51,16 @@ public class TestController {
 			throw new InvalidTestIdException();
 		}
 		return testService.updateTest(id, request);
+	}
+
+	@PatchMapping("/{id}/status")
+	public TestResponse changeTestStatus(
+			@PathVariable Long id,
+			@Valid @RequestBody ChangeTestStatusRequest request) {
+		if (id <= 0) {
+			throw new InvalidTestIdException();
+		}
+		return testService.changeTestStatus(id, request);
 	}
 
 	@PostMapping("/search")

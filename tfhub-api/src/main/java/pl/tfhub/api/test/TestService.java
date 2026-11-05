@@ -9,6 +9,7 @@ import org.springframework.transaction.annotation.Transactional;
 import pl.tfhub.api.test.dto.CreateTestRequest;
 import pl.tfhub.api.test.dto.TestSearchRequest;
 import pl.tfhub.api.test.dto.TestResponse;
+import pl.tfhub.api.test.dto.ChangeTestStatusRequest;
 import pl.tfhub.api.test.dto.UpdateTestRequest;
 
 import java.util.ArrayList;
@@ -78,6 +79,14 @@ public class TestService {
 			}
 			throw exception;
 		}
+	}
+
+	@Transactional
+	public TestResponse changeTestStatus(long id, ChangeTestStatusRequest request) {
+		AthleticTest test = testRepository.findById(id)
+				.orElseThrow(() -> new TestNotFoundException(id));
+		test.changeStatus(request.active());
+		return TestResponse.from(testRepository.saveAndFlush(test));
 	}
 
 	@Transactional(readOnly = true)

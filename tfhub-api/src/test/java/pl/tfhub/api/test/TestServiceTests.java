@@ -18,6 +18,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 import pl.tfhub.api.test.dto.CreateTestRequest;
 import pl.tfhub.api.test.dto.TestSearchRequest;
 import pl.tfhub.api.test.dto.TestResponse;
+import pl.tfhub.api.test.dto.ChangeTestStatusRequest;
 import pl.tfhub.api.test.dto.UpdateTestRequest;
 
 import java.sql.SQLException;
@@ -221,6 +222,67 @@ class TestServiceTests {
 
 		assertThrows(TestNotFoundException.class, () -> testService.updateTest(404L,
 				new UpdateTestRequest("Sprint", "s", TestCategory.TIME, false)));
+		verifyNoMoreInteractions(testRepository);
+	}
+
+	@Test
+	void deactivatesTestWithoutChangingItsDefinitionOrDeletingHistoricalData() {
+		AthleticTest test = new AthleticTest("Sprint", "s", TestCategory.TIME, false);
+		ReflectionTestUtils.setField(test, "id", 12L);
+		when(testRepository.findById(12L)).thenReturn(java.util.Optional.of(test));
+		when(testRepository.saveAndFlush(test)).thenReturn(test);
+
+		TestResponse response = testService.changeTestStatus(12L, new ChangeTestStatusRequest(false));
+
+		assertEquals(new TestResponse(12L, "Sprint", "s", TestCategory.TIME, false, false), response);
+		assertEquals(12L, test.getId());
+		assertEquals("Sprint", test.getName());
+		assertEquals("s", test.getUnit());
+		assertEquals(TestCategory.TIME, test.getCategory());
+		assertEquals(false, test.isHigherIsBetter());
+		assertEquals(false, test.isActive());
+		verify(testRepository).findById(12L);
+		verify(testRepository).saveAndFlush(test);
+		verifyNoMoreInteractions(testRepository);
+	}
+
+	@Test
+	void activatesInactiveTestAndRepeatedStatusChangesAreAllowed() {
+		AthleticTest test = new AthleticTest("Long jump", "m", TestCategory.DISTANCE, true);
+		ReflectionTestUtils.setField(test, "id", 13L);
+		ReflectionTestUtils.setField(test, "active", false);
+		when(testRepository.findById(13L)).thenReturn(java.util.Optional.of(test));
+		when(testRepository.saveAndFlush(test)).thenReturn(test);
+
+		assertEquals(new TestResponse(13L, "Long jump", "m", TestCategory.DISTANCE, true, true),
+				testService.changeTestStatus(13L, new ChangeTestStatusRequest(true)));
+		assertEquals(new TestResponse(13L, "Long jump", "m", TestCategory.DISTANCE, true, true),
+				testService.changeTestStatus(13L, new ChangeTestStatusRequest(true)));
+		assertEquals(new TestResponse(13L, "Long jump", "m", TestCategory.DISTANCE, true, false),
+				testService.changeTestStatus(13L, new ChangeTestStatusRequest(false)));
+		assertEquals(new TestResponse(13L, "Long jump", "m", TestCategory.DISTANCE, true, false),
+				testService.changeTestStatus(13L, new ChangeTestStatusRequest(false)));
+	}
+
+	@Test
+	void testRemainsRetrievableAfterDeactivation() {
+		AthleticTest test = new AthleticTest("Sprint", "s", TestCategory.TIME, false);
+		ReflectionTestUtils.setField(test, "id", 12L);
+		when(testRepository.findById(12L)).thenReturn(java.util.Optional.of(test));
+		when(testRepository.saveAndFlush(test)).thenReturn(test);
+
+		testService.changeTestStatus(12L, new ChangeTestStatusRequest(false));
+
+		assertEquals(new TestResponse(12L, "Sprint", "s", TestCategory.TIME, false, false),
+				testService.getTest(12L));
+	}
+
+	@Test
+	void throwsNotFoundWhenChangingStatusOfMissingTest() {
+		when(testRepository.findById(404L)).thenReturn(java.util.Optional.empty());
+
+		assertThrows(TestNotFoundException.class,
+				() -> testService.changeTestStatus(404L, new ChangeTestStatusRequest(false)));
 		verifyNoMoreInteractions(testRepository);
 	}
 

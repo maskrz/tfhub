@@ -9,6 +9,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import pl.tfhub.api.test.dto.CreateTestRequest;
 import pl.tfhub.api.test.dto.TestSearchRequest;
 import pl.tfhub.api.test.dto.TestResponse;
+import pl.tfhub.api.test.dto.ChangeTestStatusRequest;
 import pl.tfhub.api.test.dto.UpdateTestRequest;
 
 import java.util.List;
@@ -16,6 +17,7 @@ import java.util.List;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
@@ -264,6 +266,77 @@ class TestControllerTests {
 	}
 
 	@Test
+	void changesTestStatusAndReturnsResponseDto() throws Exception {
+		ChangeTestStatusRequest request = new ChangeTestStatusRequest(false);
+		when(testService.changeTestStatus(12L, request))
+				.thenReturn(new TestResponse(12L, "Sprint 40m", "s", TestCategory.TIME, false, false));
+
+		mockMvc.perform(patch("/api/tests/12/status")
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("""
+								{"active":false}
+								"""))
+				.andExpect(status().isOk())
+				.andExpect(content().json("""
+						{"id":12,"name":"Sprint 40m","unit":"s","category":"TIME",
+						"higherIsBetter":false,"active":false}
+						""", true))
+				.andExpect(jsonPath("$.class").doesNotExist());
+
+		verify(testService).changeTestStatus(12L, request);
+	}
+
+	@Test
+	void changesStatusInBothDirectionsAndAllowsRepeatedStatusRequests() throws Exception {
+		ChangeTestStatusRequest deactivate = new ChangeTestStatusRequest(false);
+		ChangeTestStatusRequest activate = new ChangeTestStatusRequest(true);
+		when(testService.changeTestStatus(12L, deactivate))
+				.thenReturn(new TestResponse(12L, "Sprint", "s", TestCategory.TIME, false, false));
+		when(testService.changeTestStatus(13L, activate))
+				.thenReturn(new TestResponse(13L, "Long jump", "m", TestCategory.DISTANCE, true, true));
+
+		mockMvc.perform(patch("/api/tests/12/status").contentType(MediaType.APPLICATION_JSON)
+						.content("{\"active\":false}"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.active").value(false));
+		mockMvc.perform(patch("/api/tests/12/status").contentType(MediaType.APPLICATION_JSON)
+						.content("{\"active\":false}"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.active").value(false));
+		mockMvc.perform(patch("/api/tests/13/status").contentType(MediaType.APPLICATION_JSON)
+						.content("{\"active\":true}"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.active").value(true));
+		mockMvc.perform(patch("/api/tests/13/status").contentType(MediaType.APPLICATION_JSON)
+						.content("{\"active\":true}"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.active").value(true));
+	}
+
+	@Test
+	void returnsNotFoundWhenChangingStatusOfMissingTest() throws Exception {
+		when(testService.changeTestStatus(404L, new ChangeTestStatusRequest(false)))
+				.thenThrow(new TestNotFoundException(404L));
+
+		mockMvc.perform(patch("/api/tests/404/status")
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("{\"active\":false}"))
+				.andExpect(status().isNotFound())
+				.andExpect(jsonPath("$.title").value("Test not found"));
+	}
+
+	@Test
+	void rejectsInvalidStatusIdsAndRequestBodies() throws Exception {
+		assertStatusBadRequest("0", "{\"active\":false}");
+		assertStatusBadRequest("-1", "{\"active\":false}");
+		assertStatusBadRequest("not-a-number", "{\"active\":false}");
+		assertStatusBadRequest("1", "{}");
+		assertStatusBadRequest("1", "{\"active\":\"false\"}");
+		assertStatusBadRequest("1", "{\"active\":1}");
+		assertStatusBadRequest("1", "{\"active\":");
+	}
+
+	@Test
 	void searchesByNameAndReturnsResponseDtos() throws Exception {
 		TestSearchRequest request = new TestSearchRequest("sprint", null, null, null, null);
 		when(testService.searchTests(request)).thenReturn(List.of(
@@ -363,6 +436,13 @@ class TestControllerTests {
 
 	private void assertUpdateBadRequest(String id, String body) throws Exception {
 		mockMvc.perform(put("/api/tests/{id}", id)
+						.contentType(MediaType.APPLICATION_JSON)
+						.content(body))
+				.andExpect(status().isBadRequest());
+	}
+
+	private void assertStatusBadRequest(String id, String body) throws Exception {
+		mockMvc.perform(patch("/api/tests/{id}/status", id)
 						.contentType(MediaType.APPLICATION_JSON)
 						.content(body))
 				.andExpect(status().isBadRequest());

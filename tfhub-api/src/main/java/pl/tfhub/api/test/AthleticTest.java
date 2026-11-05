@@ -73,4 +73,8 @@ public class AthleticTest {
 		this.category = category;
 		this.higherIsBetter = higherIsBetter;
 	}
+
+	public void changeStatus(boolean active) {
+		this.active = active;
+	}
 }
