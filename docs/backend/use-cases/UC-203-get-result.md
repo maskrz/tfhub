@@ -1,7 +1,7 @@
 # UC-203 – Get Result
 
 **Version:** 1.0  
-**Status:** Planned
+**Status:** Implemented
 
 ## 1. Description
 

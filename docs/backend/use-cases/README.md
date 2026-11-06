@@ -4,7 +4,7 @@
 
 This document is the central catalog of use cases for TFHub.
 
-Detailed specifications are maintained in separate files under `docs/use-cases/`.
+Detailed specifications are maintained in separate files in this directory.
 
 ## Status Definitions
 
@@ -23,13 +23,17 @@ Manages athlete records and their active status.
 | ID     | Use Case | Description | Status |
 |--------|---|---|---|
 | UC-001 | Add Athlete | Create a new athlete. | Implemented |
-| UC-002 | Get Athlete | Retrieve one athlete by ID, including inactive athletes. | Planned |
-| UC-003 | Get All Athletes | Retrieve athletes with optional status filtering and name search. | Planned |
-| UC-004 | Update Athlete | Update an athlete's personal information. | Planned |
-| UC-005 | Change Athlete Status | Activate or deactivate an athlete. | Planned |
+| UC-002 | Get Athlete | Retrieve one athlete by ID, including inactive athletes. | Implemented |
+| UC-003 | Search Athletes | Retrieve athletes with optional status filtering and name search. | Implemented |
+| UC-004 | Update Athlete | Update an athlete's personal information. | Implemented |
+| UC-005 | Change Athlete Status | Activate or deactivate an athlete. | Implemented |
 
 Detailed specifications:
 - [UC-001 Add Athlete](UC-001-add-athlete.md)
+- [UC-002 Get Athlete](UC-002-get-athlete.md)
+- [UC-003 Search Athletes](UC-003-search-athlete.md)
+- [UC-004 Update Athlete](UC-004-update-athlete.md)
+- [UC-005 Change Athlete Status](UC-005-change-athlete-status.md)
 
 ## 2. Test Module
 

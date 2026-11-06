@@ -1,7 +1,7 @@
 # UC-204 – Get Results
 
 **Version:** 1.0  
-**Status:** Planned
+**Status:** Implemented
 
 ## 1. Description
 

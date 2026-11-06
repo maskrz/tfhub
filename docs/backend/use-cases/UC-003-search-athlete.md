@@ -1,7 +1,7 @@
 # UC-003 – Search Athletes
 
 **Version:** 1.2
-**Status:** Specified
+**Status:** Implemented
 **Module:** Athlete
 
 ## 1. Goal

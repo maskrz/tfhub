@@ -8,9 +8,9 @@ The application is initially designed for a single coach and is used to manage a
 
 Before implementing any feature, read and follow:
 
-- `docs/architecture.md`
-- `docs/data-model.md`
-- Relevant use-case documentation in `docs/use-cases/`, when available.
+- `docs/backend/architecture.md`
+- `docs/backend/data-model.md`
+- Relevant backend use-case documentation in `docs/backend/use-cases/`, when available.
 
 These documents are the primary source of truth for architectural and business decisions.
 
@@ -64,7 +64,7 @@ handling and genuinely shared utilities belong in `common/`, such as
 `common/exception/` or `common/validation/`. Keep module-specific exceptions
 and business logic within their owning module; do not create empty packages.
 
-Follow the responsibilities described in `docs/architecture.md`.
+Follow the responsibilities described in `docs/backend/architecture.md`.
 
 Important rules:
 
@@ -100,7 +100,7 @@ Before creating or modifying entities, inspect the existing Flyway migrations.
 
 ## 5. Business Rules
 
-Follow `docs/data-model.md` and relevant use-case documentation.
+Follow `docs/backend/data-model.md` and relevant backend use-case documentation.
 
 Important rules include:
 
@@ -230,3 +230,14 @@ A feature is considered complete when:
 - Existing functionality is not unintentionally broken.
 - The code is understandable and maintainable.
 - The implementation has been reviewed by the project owner.
+
+## 13. Documentation and Scope Rules
+
+- Project documentation is the source of truth for architecture, requirements, and approved rules. If documentation conflicts, report the conflict rather than choosing a new rule independently.
+- Before implementing frontend features, read the relevant documents in `docs/frontend/`, including requirements, UI design, architecture, and the applicable use-case catalog or specification.
+- Do not independently change approved business rules or API contracts.
+- Architectural changes require prior approval from the project owner.
+- Keep each use-case implementation within that use case's scope; do not add related but unrequested functionality.
+- If implementation requires changing an established decision, explain the conflict and obtain approval first, then update the relevant documentation.
+- Do not introduce dependencies without technical justification and approval.
+- Preserve existing documents and their references. Do not move or remove documentation without a clear reason and updates to all affected references.

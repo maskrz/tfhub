@@ -1,7 +1,7 @@
 # UC-105 – Change Test Status
 
 **Version:** 1.0  
-**Status:** Planned
+**Status:** Implemented
 
 ## 1. Goal
 

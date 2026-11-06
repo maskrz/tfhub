@@ -1,7 +1,7 @@
 # UC-004 – Update Athlete
 
 **Version:** 1.0  
-**Status:** Specified  
+**Status:** Implemented
 **Module:** Athlete
 
 ## 1. Goal

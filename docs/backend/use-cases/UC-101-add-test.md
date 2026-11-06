@@ -1,7 +1,7 @@
 # UC-101 – Add Test
 
 **Version:** 1.0  
-**Status:** Planned
+**Status:** Implemented
 
 ## 1. Goal
 

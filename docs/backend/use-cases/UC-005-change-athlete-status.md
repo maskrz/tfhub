@@ -1,7 +1,7 @@
 # UC-005 – Change Athlete Status
 
 **Version:** 1.0  
-**Status:** Planned
+**Status:** Implemented
 
 ## 1. Goal
 

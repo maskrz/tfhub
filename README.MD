@@ -34,7 +34,11 @@ tfhub/
 ├── tfhub-api/          # Spring Boot REST API
 ├── tfhub-frontend/     # Angular application
 ├── infrastructure/     # Infrastructure configuration
-└── docs/               # Project documentation
+└── docs/
+    ├── backend/        # Backend architecture, data model, and use cases
+    ├── frontend/       # Frontend requirements, design, architecture, and use cases
+    ├── deployment/     # Deployment plans
+    └── security.md     # Security requirements
 ```
 
 ## Getting Started
@@ -130,21 +134,13 @@ http://localhost:4200
 
 ## Development Status
 
-**Current stage: Initial project setup**
+**Backend:** Initial athlete, test, and result use cases are implemented. Their scope and status are tracked in the [backend use-case catalog](docs/backend/use-cases/README.md).
 
-Already configured:
-- Spring Boot backend with Java 21.
-- Angular frontend.
-- PostgreSQL database running in Docker.
-- Local development environment.
-- Git repository and initial project structure.
+**Frontend:** Angular 22 project scaffold is present. The functional frontend areas are planned in the [frontend use-case catalog](docs/frontend/use-cases/README.md); the requirements and shared design direction are documented under `docs/frontend/`.
 
-Planned:
-- Athlete management.
-- Test definitions and result recording.
-- Performance history and progress tracking.
-- Athlete comparisons and statistics.
-- Data visualization and dashboards.
+**Security and production deployment:** Requirements and target architecture are documented, but authentication and the Raspberry Pi production deployment are not implemented yet.
+
+Statistics, rankings, and charts remain future scope.
 
 ## License
 
