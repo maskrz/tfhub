@@ -47,6 +47,14 @@ public class TestResult {
 		this.type = type;
 	}
 
+	public void update(Long athleteId, Long testId, LocalDate resultDate, BigDecimal value, ResultType type) {
+		this.athleteId = athleteId;
+		this.testId = testId;
+		this.resultDate = resultDate;
+		this.value = value;
+		this.type = type;
+	}
+
 	public Long getId() {
 		return id;
 	}

@@ -9,12 +9,14 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import pl.tfhub.api.result.dto.request.CreateMultipleResultsRequest;
 import pl.tfhub.api.result.dto.request.CreateResultRequest;
+import pl.tfhub.api.result.dto.request.UpdateResultRequest;
 import pl.tfhub.api.result.dto.response.CreateMultipleResultsResponse;
 import pl.tfhub.api.result.dto.response.ResultResponse;
 import pl.tfhub.api.result.enums.ResultType;
@@ -34,16 +36,7 @@ public class ResultController {
 
 	@GetMapping("/{id}")
 	public ResultResponse getResult(@PathVariable String id) {
-		long resultId;
-		try {
-			resultId = Long.parseLong(id);
-		} catch (NumberFormatException exception) {
-			throw new InvalidResultIdException();
-		}
-		if (resultId <= 0) {
-			throw new InvalidResultIdException();
-		}
-		return resultService.getResult(resultId);
+		return resultService.getResult(parseResultId(id));
 	}
 
 	@GetMapping
@@ -65,6 +58,13 @@ public class ResultController {
 	public ResponseEntity<ResultResponse> createResult(@Valid @RequestBody CreateResultRequest request) {
 		ResultResponse result = resultService.createResult(request);
 		return ResponseEntity.created(URI.create("/api/results/" + result.id())).body(result);
+	}
+
+	@PutMapping("/{id}")
+	public ResultResponse updateResult(
+			@PathVariable String id,
+			@Valid @RequestBody UpdateResultRequest request) {
+		return resultService.updateResult(parseResultId(id), request);
 	}
 
 	@PostMapping("/batch")
@@ -108,5 +108,17 @@ public class ResultController {
 		} catch (IllegalArgumentException exception) {
 			throw new InvalidResultSearchException();
 		}
+	}
+
+	private long parseResultId(String value) {
+		try {
+			long id = Long.parseLong(value);
+			if (id > 0) {
+				return id;
+			}
+		} catch (NumberFormatException exception) {
+			throw new InvalidResultIdException();
+		}
+		throw new InvalidResultIdException();
 	}
 }

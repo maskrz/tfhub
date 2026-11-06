@@ -14,6 +14,7 @@ import pl.tfhub.api.athlete.service.AthleteService;
 import pl.tfhub.api.result.dto.request.CreateMultipleResultsRequest;
 import pl.tfhub.api.result.dto.request.CreateResultEntryRequest;
 import pl.tfhub.api.result.dto.request.CreateResultRequest;
+import pl.tfhub.api.result.dto.request.UpdateResultRequest;
 import pl.tfhub.api.result.dto.response.CreateMultipleResultsResponse;
 import pl.tfhub.api.result.dto.response.ResultResponse;
 import pl.tfhub.api.result.entity.TestResult;
@@ -60,6 +61,22 @@ public class ResultService {
 		TestResult result = resultRepository.findById(id)
 				.orElseThrow(() -> new ResultNotFoundException(id));
 		return ResultResponse.from(result);
+	}
+
+	@Transactional
+	public ResultResponse updateResult(long id, UpdateResultRequest request) {
+		TestResult result = resultRepository.findById(id)
+				.orElseThrow(() -> new ResultNotFoundException(id));
+		athleteService.getAthlete(request.athleteId());
+		requireActiveTest(request.testId());
+
+		result.update(
+				request.athleteId(),
+				request.testId(),
+				request.resultDate(),
+				request.value(),
+				request.type());
+		return ResultResponse.from(resultRepository.saveAndFlush(result));
 	}
 
 	@Transactional(readOnly = true)

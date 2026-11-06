@@ -14,6 +14,7 @@ import pl.tfhub.api.athlete.exception.AthleteNotFoundException;
 import pl.tfhub.api.result.dto.request.CreateMultipleResultsRequest;
 import pl.tfhub.api.result.dto.request.CreateResultEntryRequest;
 import pl.tfhub.api.result.dto.request.CreateResultRequest;
+import pl.tfhub.api.result.dto.request.UpdateResultRequest;
 import pl.tfhub.api.result.dto.response.CreateMultipleResultsResponse;
 import pl.tfhub.api.result.dto.response.ResultResponse;
 import pl.tfhub.api.result.enums.ResultType;
@@ -30,6 +31,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -79,6 +81,123 @@ class ResultControllerTests {
 				.andExpect(jsonPath("$.title").value("Invalid result ID"));
 		mockMvc.perform(get("/api/results/not-a-number"))
 				.andExpect(status().isBadRequest());
+	}
+
+	@Test
+	void updatesResultAndReturnsUpdatedResponseWithSameId() throws Exception {
+		UpdateResultRequest request = updateRequest();
+		when(resultService.updateResult(32L, request)).thenReturn(new ResultResponse(
+				32L, 8L, 3L, LocalDate.parse("2026-11-06"), new BigDecimal("6.125"), ResultType.COMPETITION));
+
+		mockMvc.perform(put("/api/results/32")
+						.contentType(MediaType.APPLICATION_JSON)
+						.content(validUpdateBody()))
+				.andExpect(status().isOk())
+				.andExpect(content().json("""
+						{"id":32,"athleteId":8,"testId":3,"resultDate":"2026-11-06",
+						"value":6.125,"type":"COMPETITION"}
+						""", true))
+				.andExpect(jsonPath("$.class").doesNotExist());
+
+		verify(resultService).updateResult(32L, request);
+	}
+
+	@Test
+	void returnsNotFoundWhenResultUpdateTargetDoesNotExist() throws Exception {
+		when(resultService.updateResult(404L, updateRequest()))
+				.thenThrow(new ResultNotFoundException(404L));
+
+		mockMvc.perform(put("/api/results/404")
+						.contentType(MediaType.APPLICATION_JSON)
+						.content(validUpdateBody()))
+				.andExpect(status().isNotFound())
+				.andExpect(jsonPath("$.title").value("Result not found"));
+	}
+
+	@Test
+	void mapsMissingAthleteAndTestToNotFoundAndInactiveTestToConflictForUpdates() throws Exception {
+		UpdateResultRequest request = updateRequest();
+		doThrow(new AthleteNotFoundException(8)).when(resultService).updateResult(32L, request);
+		mockMvc.perform(put("/api/results/32")
+						.contentType(MediaType.APPLICATION_JSON)
+						.content(validUpdateBody()))
+				.andExpect(status().isNotFound())
+				.andExpect(jsonPath("$.title").value("Athlete not found"));
+
+		doThrow(new TestNotFoundException(3)).when(resultService).updateResult(32L, request);
+		mockMvc.perform(put("/api/results/32")
+						.contentType(MediaType.APPLICATION_JSON)
+						.content(validUpdateBody()))
+				.andExpect(status().isNotFound())
+				.andExpect(jsonPath("$.title").value("Test not found"));
+
+		doThrow(new InactiveTestException(3)).when(resultService).updateResult(32L, request);
+		mockMvc.perform(put("/api/results/32")
+						.contentType(MediaType.APPLICATION_JSON)
+						.content(validUpdateBody()))
+				.andExpect(status().isConflict())
+				.andExpect(jsonPath("$.title").value("Test is inactive"));
+	}
+
+	@Test
+	void rejectsInvalidUpdateResultIds() throws Exception {
+		mockMvc.perform(put("/api/results/0")
+						.contentType(MediaType.APPLICATION_JSON)
+						.content(validUpdateBody()))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.title").value("Invalid result ID"));
+		mockMvc.perform(put("/api/results/-1")
+						.contentType(MediaType.APPLICATION_JSON)
+						.content(validUpdateBody()))
+				.andExpect(status().isBadRequest());
+		mockMvc.perform(put("/api/results/not-a-number")
+						.contentType(MediaType.APPLICATION_JSON)
+						.content(validUpdateBody()))
+				.andExpect(status().isBadRequest());
+	}
+
+	@Test
+	void rejectsMissingInvalidAndMalformedUpdateRequestFields() throws Exception {
+		assertUpdateBadRequest("""
+				{"testId":2,"resultDate":"2026-11-05","value":5.42,"type":"TRAINING"}
+				""");
+		assertUpdateBadRequest("""
+				{"athleteId":1,"resultDate":"2026-11-05","value":5.42,"type":"TRAINING"}
+				""");
+		assertUpdateBadRequest("""
+				{"athleteId":1,"testId":2,"value":5.42,"type":"TRAINING"}
+				""");
+		assertUpdateBadRequest("""
+				{"athleteId":1,"testId":2,"resultDate":"2026-11-05","type":"TRAINING"}
+				""");
+		assertUpdateBadRequest("""
+				{"athleteId":1,"testId":2,"resultDate":"2026-11-05","value":5.42}
+				""");
+		assertUpdateBadRequest("""
+				{"athleteId":0,"testId":2,"resultDate":"2026-11-05","value":5.42,"type":"TRAINING"}
+				""");
+		assertUpdateBadRequest("""
+				{"athleteId":1,"testId":-2,"resultDate":"2026-11-05","value":5.42,"type":"TRAINING"}
+				""");
+		assertUpdateBadRequest("""
+				{"athleteId":1,"testId":2,"resultDate":"2026-11-05","value":0,"type":"TRAINING"}
+				""");
+		assertUpdateBadRequest("""
+				{"athleteId":1,"testId":2,"resultDate":"2026-11-05","value":-1,"type":"TRAINING"}
+				""");
+		assertUpdateBadRequest("""
+				{"athleteId":1,"testId":2,"resultDate":"2026-11-05","value":1.2345,"type":"TRAINING"}
+				""");
+		assertUpdateBadRequest("""
+				{"athleteId":1,"testId":2,"resultDate":"2026-11-05","value":1000000000,"type":"TRAINING"}
+				""");
+		assertUpdateBadRequest("""
+				{"athleteId":1,"testId":2,"resultDate":"2026-11-05","value":5.42,"type":"OTHER"}
+				""");
+		assertUpdateBadRequest("""
+				{"athleteId":1,"testId":2,"resultDate":"05-11-2026","value":5.42,"type":"TRAINING"}
+				""");
+		assertUpdateBadRequest("{\"athleteId\":");
 	}
 
 	@Test
@@ -424,6 +543,13 @@ class ResultControllerTests {
 				.andExpect(status().isBadRequest());
 	}
 
+	private void assertUpdateBadRequest(String body) throws Exception {
+		mockMvc.perform(put("/api/results/32")
+						.contentType(MediaType.APPLICATION_JSON)
+						.content(body))
+				.andExpect(status().isBadRequest());
+	}
+
 	private void assertBatchBadRequest(String body) throws Exception {
 		mockMvc.perform(post("/api/results/batch")
 						.contentType(MediaType.APPLICATION_JSON)
@@ -434,6 +560,17 @@ class ResultControllerTests {
 	private String validBody() {
 		return """
 				{"athleteId":1,"testId":2,"resultDate":"2026-11-05","value":5.42,"type":"TRAINING"}
+				""";
+	}
+
+	private UpdateResultRequest updateRequest() {
+		return new UpdateResultRequest(
+				8L, 3L, LocalDate.parse("2026-11-06"), new BigDecimal("6.125"), ResultType.COMPETITION);
+	}
+
+	private String validUpdateBody() {
+		return """
+				{"athleteId":8,"testId":3,"resultDate":"2026-11-06","value":6.125,"type":"COMPETITION"}
 				""";
 	}
 }

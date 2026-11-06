@@ -19,6 +19,7 @@ import pl.tfhub.api.athlete.service.AthleteService;
 import pl.tfhub.api.result.dto.request.CreateMultipleResultsRequest;
 import pl.tfhub.api.result.dto.request.CreateResultEntryRequest;
 import pl.tfhub.api.result.dto.request.CreateResultRequest;
+import pl.tfhub.api.result.dto.request.UpdateResultRequest;
 import pl.tfhub.api.result.dto.response.CreateMultipleResultsResponse;
 import pl.tfhub.api.result.dto.response.ResultResponse;
 import pl.tfhub.api.result.entity.TestResult;
@@ -79,6 +80,110 @@ class ResultServiceTests {
 
 		assertThrows(ResultNotFoundException.class, () -> resultService.getResult(404L));
 		verifyNoMoreInteractions(resultRepository, athleteService, testService);
+	}
+
+	@Test
+	void updatesAllResultFieldsInPlaceAndPreservesId() {
+		TestResult result = existingResult();
+		UpdateResultRequest request = updateRequest();
+		when(resultRepository.findById(32L)).thenReturn(java.util.Optional.of(result));
+		when(athleteService.getAthlete(8L))
+				.thenReturn(new AthleteResponse(8L, "C", "D", 2001, Gender.FEMALE, true));
+		when(testService.getTest(3L))
+				.thenReturn(new TestResponse(3L, "Jump", "m", TestCategory.DISTANCE, true, true));
+		when(resultRepository.saveAndFlush(result)).thenReturn(result);
+
+		ResultResponse response = resultService.updateResult(32L, request);
+
+		assertEquals(new ResultResponse(
+				32L, 8L, 3L, LocalDate.parse("2026-11-06"), new BigDecimal("6.125"), ResultType.COMPETITION),
+				response);
+		assertEquals(32L, result.getId());
+		verify(resultRepository).saveAndFlush(result);
+	}
+
+	@Test
+	void updatesOnlyValueWhenOtherFieldsAreUnchanged() {
+		TestResult result = existingResult();
+		UpdateResultRequest request = new UpdateResultRequest(
+				7L, 2L, LocalDate.parse("2026-11-05"), new BigDecimal("5.900"), ResultType.TRAINING);
+		when(resultRepository.findById(32L)).thenReturn(java.util.Optional.of(result));
+		when(athleteService.getAthlete(7L))
+				.thenReturn(new AthleteResponse(7L, "A", "B", 2000, Gender.MALE, true));
+		when(testService.getTest(2L))
+				.thenReturn(new TestResponse(2L, "Sprint", "s", TestCategory.TIME, false, true));
+		when(resultRepository.saveAndFlush(result)).thenReturn(result);
+
+		ResultResponse response = resultService.updateResult(32L, request);
+
+		assertEquals(32L, response.id());
+		assertEquals(7L, response.athleteId());
+		assertEquals(2L, response.testId());
+		assertEquals(LocalDate.parse("2026-11-05"), response.resultDate());
+		assertEquals(new BigDecimal("5.900"), response.value());
+		assertEquals(ResultType.TRAINING, response.type());
+	}
+
+	@Test
+	void allowsUpdatingResultForInactiveAthlete() {
+		TestResult result = existingResult();
+		UpdateResultRequest request = updateRequest();
+		when(resultRepository.findById(32L)).thenReturn(java.util.Optional.of(result));
+		when(athleteService.getAthlete(8L))
+				.thenReturn(new AthleteResponse(8L, "C", "D", 2001, Gender.FEMALE, false));
+		when(testService.getTest(3L))
+				.thenReturn(new TestResponse(3L, "Jump", "m", TestCategory.DISTANCE, true, true));
+		when(resultRepository.saveAndFlush(result)).thenReturn(result);
+
+		assertEquals(8L, resultService.updateResult(32L, request).athleteId());
+		assertEquals(32L, result.getId());
+	}
+
+	@Test
+	void doesNotMutateExistingResultWhenAthleteDoesNotExist() {
+		TestResult result = existingResult();
+		when(resultRepository.findById(32L)).thenReturn(java.util.Optional.of(result));
+		when(athleteService.getAthlete(8L)).thenThrow(new AthleteNotFoundException(8));
+
+		assertThrows(AthleteNotFoundException.class, () -> resultService.updateResult(32L, updateRequest()));
+		assertExistingFieldsUnchanged(result);
+		verify(resultRepository, never()).saveAndFlush(any(TestResult.class));
+	}
+
+	@Test
+	void doesNotMutateExistingResultWhenTestDoesNotExist() {
+		TestResult result = existingResult();
+		when(resultRepository.findById(32L)).thenReturn(java.util.Optional.of(result));
+		when(athleteService.getAthlete(8L))
+				.thenReturn(new AthleteResponse(8L, "C", "D", 2001, Gender.FEMALE, true));
+		when(testService.getTest(3L)).thenThrow(new TestNotFoundException(3));
+
+		assertThrows(TestNotFoundException.class, () -> resultService.updateResult(32L, updateRequest()));
+		assertExistingFieldsUnchanged(result);
+		verify(resultRepository, never()).saveAndFlush(any(TestResult.class));
+	}
+
+	@Test
+	void doesNotMutateExistingResultWhenTestIsInactive() {
+		TestResult result = existingResult();
+		when(resultRepository.findById(32L)).thenReturn(java.util.Optional.of(result));
+		when(athleteService.getAthlete(8L))
+				.thenReturn(new AthleteResponse(8L, "C", "D", 2001, Gender.FEMALE, true));
+		when(testService.getTest(3L))
+				.thenReturn(new TestResponse(3L, "Jump", "m", TestCategory.DISTANCE, true, false));
+
+		assertThrows(InactiveTestException.class, () -> resultService.updateResult(32L, updateRequest()));
+		assertExistingFieldsUnchanged(result);
+		verify(resultRepository, never()).saveAndFlush(any(TestResult.class));
+	}
+
+	@Test
+	void doesNotValidateReferencesWhenResultDoesNotExist() {
+		when(resultRepository.findById(404L)).thenReturn(java.util.Optional.empty());
+
+		assertThrows(ResultNotFoundException.class, () -> resultService.updateResult(404L, updateRequest()));
+		verifyNoMoreInteractions(athleteService, testService);
+		verify(resultRepository, never()).saveAndFlush(any(TestResult.class));
 	}
 
 	@Test
@@ -267,6 +372,27 @@ class ResultServiceTests {
 	private CreateResultRequest request() {
 		return new CreateResultRequest(
 				1L, 2L, LocalDate.parse("2026-11-05"), new BigDecimal("5.420"), ResultType.TRAINING);
+	}
+
+	private TestResult existingResult() {
+		TestResult result = new TestResult(
+				7L, 2L, LocalDate.parse("2026-11-05"), new BigDecimal("5.420"), ResultType.TRAINING);
+		ReflectionTestUtils.setField(result, "id", 32L);
+		return result;
+	}
+
+	private UpdateResultRequest updateRequest() {
+		return new UpdateResultRequest(
+				8L, 3L, LocalDate.parse("2026-11-06"), new BigDecimal("6.125"), ResultType.COMPETITION);
+	}
+
+	private void assertExistingFieldsUnchanged(TestResult result) {
+		assertEquals(32L, result.getId());
+		assertEquals(7L, result.getAthleteId());
+		assertEquals(2L, result.getTestId());
+		assertEquals(LocalDate.parse("2026-11-05"), result.getResultDate());
+		assertEquals(new BigDecimal("5.420"), result.getValue());
+		assertEquals(ResultType.TRAINING, result.getType());
 	}
 
 	private CreateMultipleResultsRequest batchRequest() {
