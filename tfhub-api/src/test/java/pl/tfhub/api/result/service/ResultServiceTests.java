@@ -38,6 +38,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
@@ -79,6 +80,45 @@ class ResultServiceTests {
 		when(resultRepository.findById(404L)).thenReturn(java.util.Optional.empty());
 
 		assertThrows(ResultNotFoundException.class, () -> resultService.getResult(404L));
+		verifyNoMoreInteractions(resultRepository, athleteService, testService);
+	}
+
+	@Test
+	void deletesOnlyTheRequestedResultAndLeavesRelatedModulesUntouched() {
+		TestResult selected = existingResult();
+		TestResult otherResult = new TestResult(
+				7L, 2L, LocalDate.parse("2026-11-06"), new BigDecimal("5.500"), ResultType.TRAINING);
+		ReflectionTestUtils.setField(otherResult, "id", 33L);
+		when(resultRepository.findById(32L)).thenReturn(java.util.Optional.of(selected));
+		doNothing().when(resultRepository).delete(selected);
+
+		resultService.deleteResult(32L);
+
+		verify(resultRepository).delete(selected);
+		verify(resultRepository, never()).delete(otherResult);
+		verifyNoMoreInteractions(resultRepository, athleteService, testService);
+	}
+
+	@Test
+	void deletedResultCanNoLongerBeRetrieved() {
+		TestResult selected = existingResult();
+		when(resultRepository.findById(32L))
+				.thenReturn(java.util.Optional.of(selected))
+				.thenReturn(java.util.Optional.empty());
+
+		resultService.deleteResult(32L);
+
+		assertThrows(ResultNotFoundException.class, () -> resultService.getResult(32L));
+		verify(resultRepository).delete(selected);
+	}
+
+	@Test
+	void throwsNotFoundAndDoesNotDeleteWhenResultDoesNotExist() {
+		when(resultRepository.findById(404L)).thenReturn(java.util.Optional.empty());
+
+		assertThrows(ResultNotFoundException.class, () -> resultService.deleteResult(404L));
+
+		verify(resultRepository, never()).delete(any(TestResult.class));
 		verifyNoMoreInteractions(resultRepository, athleteService, testService);
 	}
 

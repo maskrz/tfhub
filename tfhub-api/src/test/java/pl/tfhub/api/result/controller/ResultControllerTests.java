@@ -29,6 +29,7 @@ import pl.tfhub.api.test.exception.TestNotFoundException;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -80,6 +81,35 @@ class ResultControllerTests {
 				.andExpect(status().isBadRequest())
 				.andExpect(jsonPath("$.title").value("Invalid result ID"));
 		mockMvc.perform(get("/api/results/not-a-number"))
+				.andExpect(status().isBadRequest());
+	}
+
+	@Test
+	void deletesResultAndReturnsNoContentWithEmptyBody() throws Exception {
+		mockMvc.perform(delete("/api/results/32"))
+				.andExpect(status().isNoContent())
+				.andExpect(content().string(""));
+
+		verify(resultService).deleteResult(32L);
+	}
+
+	@Test
+	void returnsNotFoundWhenDeletingNonexistentResult() throws Exception {
+		doThrow(new ResultNotFoundException(404L)).when(resultService).deleteResult(404L);
+
+		mockMvc.perform(delete("/api/results/404"))
+				.andExpect(status().isNotFound())
+				.andExpect(jsonPath("$.title").value("Result not found"));
+	}
+
+	@Test
+	void rejectsInvalidResultIdsForDeletion() throws Exception {
+		mockMvc.perform(delete("/api/results/0"))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.title").value("Invalid result ID"));
+		mockMvc.perform(delete("/api/results/-1"))
+				.andExpect(status().isBadRequest());
+		mockMvc.perform(delete("/api/results/not-a-number"))
 				.andExpect(status().isBadRequest());
 	}
 

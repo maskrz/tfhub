@@ -79,6 +79,13 @@ public class ResultService {
 		return ResultResponse.from(resultRepository.saveAndFlush(result));
 	}
 
+	@Transactional
+	public void deleteResult(long id) {
+		TestResult result = resultRepository.findById(id)
+				.orElseThrow(() -> new ResultNotFoundException(id));
+		resultRepository.delete(result);
+	}
+
 	@Transactional(readOnly = true)
 	public List<ResultResponse> searchResults(
 			Long athleteId,

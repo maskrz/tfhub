@@ -7,6 +7,7 @@ import java.time.format.DateTimeParseException;
 import java.util.List;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -65,6 +66,12 @@ public class ResultController {
 			@PathVariable String id,
 			@Valid @RequestBody UpdateResultRequest request) {
 		return resultService.updateResult(parseResultId(id), request);
+	}
+
+	@DeleteMapping("/{id}")
+	public ResponseEntity<Void> deleteResult(@PathVariable String id) {
+		resultService.deleteResult(parseResultId(id));
+		return ResponseEntity.noContent().build();
 	}
 
 	@PostMapping("/batch")

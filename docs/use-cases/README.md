@@ -63,7 +63,7 @@ Manages individual athlete performance results, including single and group data 
 | UC-203 | Get Result | Retrieve one result by ID. | Implemented |
 | UC-204 | Get Results | Retrieve results with optional filters, such as athlete, test, date range and result type. | Implemented |
 | UC-205 | Update Result | Modify an existing result. | Implemented |
-| UC-206 | Delete Result | Delete an existing result. | Planned |
+| UC-206 | Delete Result | Delete an existing result. | Implemented |
 
 Business rules:
 - A result belongs to exactly one athlete and one test.
