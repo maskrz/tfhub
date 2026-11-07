@@ -17,6 +17,23 @@ export interface CreateResultRequest {
   type: ResultType;
 }
 
+export interface CreateMultipleResultsEntryRequest {
+  athleteId: number;
+  value: number;
+}
+
+export interface CreateMultipleResultsRequest {
+  testId: number;
+  resultDate: string;
+  type: ResultType;
+  results: CreateMultipleResultsEntryRequest[];
+}
+
+export interface CreateMultipleResultsResponse {
+  createdCount: number;
+  results: ResultResponse[];
+}
+
 export interface ResultRow extends ResultResponse {
   athleteName: string;
   testName: string;

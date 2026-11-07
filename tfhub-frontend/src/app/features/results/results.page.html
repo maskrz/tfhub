@@ -4,9 +4,14 @@
       <h1 id="page-title">Wyniki</h1>
       <p>Przeglądaj i analizuj wyniki sportowe</p>
     </div>
-    <button type="button" class="button button--primary" [disabled]="loading() || !!errorMessage()" (click)="openCreateForm()">
-      Dodaj wynik
-    </button>
+    <div class="page-actions">
+      <button type="button" class="button button--primary" [disabled]="loading() || !!errorMessage()" (click)="openCreateForm()">
+        Dodaj wynik
+      </button>
+      <button type="button" class="button button--secondary" [disabled]="loading() || !!errorMessage()" (click)="openMultipleCreateForm()">
+        Dodaj wiele wyników
+      </button>
+    </div>
   </div>
 
   @if (successMessage(); as message) {
@@ -156,5 +161,14 @@
     [tests]="tests()"
     (saved)="onResultCreated($event)"
     (cancelled)="closeCreateForm()"
+  />
+}
+
+@if (isMultipleCreateFormOpen()) {
+  <app-multiple-results-form-modal
+    [athletes]="athletes()"
+    [tests]="tests()"
+    (saved)="onResultsCreated($event)"
+    (cancelled)="closeMultipleCreateForm()"
   />
 }

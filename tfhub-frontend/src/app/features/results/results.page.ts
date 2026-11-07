@@ -6,12 +6,13 @@ import { AthleteResponse } from '../athletes/athlete.model';
 import { AthletesApiService } from '../athletes/athletes-api.service';
 import { TestResponse } from '../tests/test.model';
 import { TestsApiService } from '../tests/tests-api.service';
-import { ResultResponse, ResultRow, ResultType } from './result.model';
+import { CreateMultipleResultsResponse, ResultResponse, ResultRow, ResultType } from './result.model';
 import { ResultsApiService } from './results-api.service';
 import { ResultFormModalComponent } from './result-form-modal.component';
+import { MultipleResultsFormModalComponent } from './multiple-results-form-modal.component';
 
 @Component({
-  imports: [ResultFormModalComponent],
+  imports: [ResultFormModalComponent, MultipleResultsFormModalComponent],
   selector: 'app-results-page',
   styleUrl: './results.page.scss',
   templateUrl: './results.page.html',
@@ -30,6 +31,7 @@ export class ResultsPage implements OnInit {
   readonly selectedType = signal<ResultType | ''>('');
   readonly sortDirection = signal<'asc' | 'desc'>('desc');
   readonly isCreateFormOpen = signal(false);
+  readonly isMultipleCreateFormOpen = signal(false);
   readonly successMessage = signal<string | null>(null);
   readonly visibleResults = computed(() => {
     const terms = this.query().trim().toLocaleLowerCase('pl-PL').split(/\s+/).filter(Boolean);
@@ -164,11 +166,39 @@ export class ResultsPage implements OnInit {
     this.isCreateFormOpen.set(false);
   }
 
+  openMultipleCreateForm(): void {
+    this.successMessage.set(null);
+    this.isMultipleCreateFormOpen.set(true);
+  }
+
+  closeMultipleCreateForm(): void {
+    this.isMultipleCreateFormOpen.set(false);
+  }
+
   onResultCreated(result: ResultResponse): void {
     const [row] = this.joinResults([result], this.athletes(), this.tests());
     this.allResults.update((current) => [...current, row]);
     this.isCreateFormOpen.set(false);
     this.successMessage.set('Wynik został dodany.');
+  }
+
+  onResultsCreated(response: CreateMultipleResultsResponse): void {
+    const rows = this.joinResults(response.results, this.athletes(), this.tests());
+    this.allResults.update((current) => [...current, ...rows]);
+    this.isMultipleCreateFormOpen.set(false);
+    this.successMessage.set(this.multipleResultsSuccessMessage(response.createdCount));
+  }
+
+  private multipleResultsSuccessMessage(count: number): string {
+    const lastTwoDigits = count % 100;
+    const lastDigit = count % 10;
+    let noun = 'wyników';
+    if (count === 1) {
+      noun = 'wynik';
+    } else if (lastTwoDigits < 12 || lastTwoDigits > 14) {
+      if (lastDigit >= 2 && lastDigit <= 4) noun = 'wyniki';
+    }
+    return `Dodano ${count} ${noun}.`;
   }
 
   private loadResults(): void {

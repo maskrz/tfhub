@@ -1,0 +1,112 @@
+<form id="multiple-results-form" [formGroup]="form" (ngSubmit)="submit()" novalidate>
+  @if (errorMessage(); as message) {
+    <p class="form-error" role="alert">{{ message }}</p>
+  }
+
+  @if (!tests.some(isActiveTest)) {
+    <p class="form-notice" role="status">Brak aktywnych testów, do których można dodać wyniki.</p>
+  }
+  @if (activeAthletes().length === 0) {
+    <p class="form-notice" role="status">Brak aktywnych zawodników, którym można dodać wyniki.</p>
+  }
+
+  <div class="shared-fields">
+    <div class="field">
+      <label for="multiple-result-test">Test <span aria-hidden="true">*</span></label>
+      <select
+        id="multiple-result-test"
+        class="field-control select-with-arrow"
+        formControlName="testId"
+        [attr.aria-invalid]="fieldError('testId') ? 'true' : null"
+        aria-describedby="multiple-result-test-error"
+      >
+        <option value="" disabled>Wybierz test</option>
+        @for (test of tests; track test.id) {
+          @if (test.active) {
+            <option [value]="test.id">{{ test.name }}</option>
+          }
+        }
+      </select>
+      @if (fieldError('testId'); as message) {
+        <span class="field-error" id="multiple-result-test-error">{{ message }}</span>
+      }
+    </div>
+
+    @if (formMessage(); as message) {
+      <p class="form-notice" role="status">{{ message }}</p>
+    }
+
+    <div class="field">
+      <label for="multiple-result-date">Data <span aria-hidden="true">*</span></label>
+      <input
+        id="multiple-result-date"
+        class="field-control"
+        type="date"
+        formControlName="resultDate"
+        [attr.aria-invalid]="fieldError('resultDate') ? 'true' : null"
+        aria-describedby="multiple-result-date-error"
+      />
+      @if (fieldError('resultDate'); as message) {
+        <span class="field-error" id="multiple-result-date-error">{{ message }}</span>
+      }
+    </div>
+
+    <div class="field">
+      <label for="multiple-result-type">Rodzaj <span aria-hidden="true">*</span></label>
+      <select
+        id="multiple-result-type"
+        class="field-control select-with-arrow"
+        formControlName="type"
+        [attr.aria-invalid]="fieldError('type') ? 'true' : null"
+        aria-describedby="multiple-result-type-error"
+      >
+        <option value="" disabled>Wybierz rodzaj</option>
+        <option value="TRAINING">Trening</option>
+        <option value="COMPETITION">Zawody</option>
+      </select>
+      @if (fieldError('type'); as message) {
+        <span class="field-error" id="multiple-result-type-error">{{ message }}</span>
+      }
+    </div>
+
+    <p class="selected-unit" aria-live="polite">
+      Jednostka wyniku: <strong>{{ currentTest()?.unit ?? 'Wybierz test' }}</strong>
+    </p>
+  </div>
+
+  @if (currentTest()) {
+    <section class="athlete-results" aria-labelledby="athlete-results-title">
+      <div class="list-heading">
+        <h3 id="athlete-results-title">Wyniki zawodników</h3>
+        <span>Wyniki nie są wymagane dla każdego zawodnika.</span>
+      </div>
+
+      <div class="athlete-list">
+        @for (athlete of activeAthletes(); track athlete.id) {
+          <div class="athlete-row">
+            <label [for]="'multiple-result-value-' + athlete.id">
+              {{ athlete.firstName }} {{ athlete.lastName }}
+            </label>
+            <div class="athlete-value">
+              <input
+                [id]="'multiple-result-value-' + athlete.id"
+                class="field-control"
+                type="text"
+                inputmode="decimal"
+                autocomplete="off"
+                [formControl]="resultControl(athlete.id)"
+                placeholder="Wynik"
+                [attr.aria-invalid]="resultError(athlete.id) ? 'true' : null"
+                [attr.aria-describedby]="'multiple-result-error-' + athlete.id"
+              />
+              <span class="value-unit" aria-hidden="true">{{ currentTest()?.unit }}</span>
+              @if (resultError(athlete.id); as message) {
+                <span class="field-error" [id]="'multiple-result-error-' + athlete.id">{{ message }}</span>
+              }
+            </div>
+          </div>
+        }
+      </div>
+    </section>
+  }
+</form>

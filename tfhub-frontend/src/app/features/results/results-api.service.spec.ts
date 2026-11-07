@@ -1,7 +1,12 @@
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
-import { CreateResultRequest, ResultResponse } from './result.model';
+import {
+  CreateMultipleResultsRequest,
+  CreateMultipleResultsResponse,
+  CreateResultRequest,
+  ResultResponse,
+} from './result.model';
 import { ResultsApiService } from './results-api.service';
 
 describe('ResultsApiService', () => {
@@ -58,6 +63,35 @@ describe('ResultsApiService', () => {
     service.createResult(requestBody).subscribe((result) => (actual = result));
 
     const request = httpTesting.expectOne('/api/results');
+    expect(request.request.method).toBe('POST');
+    expect(request.request.body).toEqual(requestBody);
+    request.flush(response, { status: 201, statusText: 'Created' });
+
+    expect(actual).toEqual(response);
+  });
+
+  it('creates multiple results in one request using the batch endpoint and DTO', () => {
+    const requestBody: CreateMultipleResultsRequest = {
+      testId: 3,
+      resultDate: '2025-02-01',
+      type: 'TRAINING',
+      results: [
+        { athleteId: 2, value: 7.25 },
+        { athleteId: 4, value: 6.5 },
+      ],
+    };
+    const response: CreateMultipleResultsResponse = {
+      createdCount: 2,
+      results: [
+        { id: 8, athleteId: 2, testId: 3, resultDate: '2025-02-01', value: 7.25, type: 'TRAINING' },
+        { id: 9, athleteId: 4, testId: 3, resultDate: '2025-02-01', value: 6.5, type: 'TRAINING' },
+      ],
+    };
+    let actual: CreateMultipleResultsResponse | undefined;
+
+    service.createMultipleResults(requestBody).subscribe((result) => (actual = result));
+
+    const request = httpTesting.expectOne('/api/results/batch');
     expect(request.request.method).toBe('POST');
     expect(request.request.body).toEqual(requestBody);
     request.flush(response, { status: 201, statusText: 'Created' });

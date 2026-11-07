@@ -15,6 +15,8 @@
   margin-bottom: 2.4rem;
 }
 
+.page-actions { display: flex; flex-wrap: wrap; gap: .65rem; }
+
 h1 {
   color: #141c2b;
   font-size: clamp(2.4rem, 5vw, 3.4rem);
@@ -153,6 +155,7 @@ td strong { font-size: 1.02rem; font-weight: 650; }
 
 @media (max-width: 760px) {
   .page-heading { margin-bottom: 1.5rem; }
+  .page-actions { width: 100%; }
   .filters { gap: .75rem; }
   .search-filter { flex-basis: 100%; }
   .filter-field { flex-basis: 100%; }

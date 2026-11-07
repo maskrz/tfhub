@@ -5,13 +5,14 @@ import { AthleteResponse } from '../athletes/athlete.model';
 import { AthletesApiService } from '../athletes/athletes-api.service';
 import { TestResponse } from '../tests/test.model';
 import { TestsApiService } from '../tests/tests-api.service';
-import { ResultResponse } from './result.model';
+import { CreateMultipleResultsResponse, ResultResponse } from './result.model';
 import { ResultsApiService } from './results-api.service';
 import { ResultsPage } from './results.page';
 
 const athletes: AthleteResponse[] = [
   { id: 1, firstName: 'Jan', lastName: 'Kowalski', birthYear: 2010, gender: 'MALE', active: true },
   { id: 2, firstName: 'Anna', lastName: 'Nowak', birthYear: 2011, gender: 'FEMALE', active: false },
+  { id: 3, firstName: 'Piotr', lastName: 'Zieliński', birthYear: 2009, gender: 'MALE', active: true },
 ];
 
 const tests: TestResponse[] = [
@@ -30,6 +31,7 @@ describe('ResultsPage', () => {
   let resultsApi: {
     getAll: ReturnType<typeof vi.fn>;
     createResult: ReturnType<typeof vi.fn>;
+    createMultipleResults: ReturnType<typeof vi.fn>;
   };
   let athletesApi: { getAll: ReturnType<typeof vi.fn> };
   let testsApi: { getAll: ReturnType<typeof vi.fn> };
@@ -39,8 +41,14 @@ describe('ResultsPage', () => {
     athleteLoader: () => Observable<AthleteResponse[]> = () => of(athletes),
     testLoader: () => Observable<TestResponse[]> = () => of(tests),
     createLoader: (request: object) => Observable<ResultResponse> = () => of(results[0]),
+    multipleCreateLoader: (request: object) => Observable<CreateMultipleResultsResponse> = () =>
+      of({ createdCount: 1, results: [results[0]] }),
   ): Promise<void> {
-    resultsApi = { getAll: vi.fn(resultLoader), createResult: vi.fn(createLoader) };
+    resultsApi = {
+      getAll: vi.fn(resultLoader),
+      createResult: vi.fn(createLoader),
+      createMultipleResults: vi.fn(multipleCreateLoader),
+    };
     athletesApi = { getAll: vi.fn(athleteLoader) };
     testsApi = { getAll: vi.fn(testLoader) };
 
@@ -89,6 +97,13 @@ describe('ResultsPage', () => {
     fixture.detectChanges();
   }
 
+  function openMultipleCreateForm(): void {
+    const button = Array.from(fixture.nativeElement.querySelectorAll('.page-actions button'))
+      .find((candidate) => (candidate as HTMLButtonElement).textContent?.includes('Dodaj wiele wyników')) as HTMLButtonElement;
+    button.click();
+    fixture.detectChanges();
+  }
+
   function setFormValue(selector: string, value: string): void {
     const control = fixture.nativeElement.querySelector(selector) as HTMLInputElement | HTMLSelectElement;
     control.value = value;
@@ -99,6 +114,22 @@ describe('ResultsPage', () => {
   function submitCreateForm(): void {
     (fixture.nativeElement.querySelector('.save-button') as HTMLButtonElement).click();
     fixture.detectChanges();
+  }
+
+  function submitMultipleCreateForm(): void {
+    (fixture.nativeElement.querySelector('#multiple-results-form') as HTMLFormElement)
+      .dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    fixture.detectChanges();
+  }
+
+  function setMultipleResult(athleteId: number, value: string): void {
+    setFormValue(`#multiple-result-value-${athleteId}`, value);
+  }
+
+  function fillMultipleSharedFields(): void {
+    setFormValue('#multiple-result-test', '10');
+    setFormValue('#multiple-result-date', '2025-02-01');
+    setFormValue('#multiple-result-type', 'TRAINING');
   }
 
   it('loads the results and lookup collections once and shows date-descending results by default', async () => {
@@ -226,6 +257,7 @@ describe('ResultsPage', () => {
     resultsApi = {
       getAll: vi.fn(() => resultsSubject.asObservable()),
       createResult: vi.fn(() => of(results[0])),
+      createMultipleResults: vi.fn(() => of({ createdCount: 1, results: [results[0]] })),
     };
     athletesApi = { getAll: vi.fn(() => athletesSubject.asObservable()) };
     testsApi = { getAll: vi.fn(() => testsSubject.asObservable()) };
@@ -310,7 +342,7 @@ describe('ResultsPage', () => {
     );
     expect(athleteOptions).not.toContain('Anna Nowak (nieaktywny)');
     expect(athleteOptions).not.toContain('Anna Nowak');
-    expect(athleteOptions).toEqual(['Wybierz zawodnika', 'Jan Kowalski']);
+    expect(athleteOptions).toEqual(['Wybierz zawodnika', 'Jan Kowalski', 'Piotr Zieliński']);
     expect(testOptions).toEqual(['Wybierz test', 'Bieg na 40 m']);
 
     setFormValue('#result-test', '10');
@@ -452,6 +484,181 @@ describe('ResultsPage', () => {
     pending.complete();
     fixture.detectChanges();
     expect(fixture.nativeElement.querySelector('app-result-form-modal')).toBeNull();
+    expectSingleLoad();
+  });
+
+  it('opens the batch modal with eligible athletes, empty inputs, today, and current test unit', async () => {
+    await createPage();
+    openMultipleCreateForm();
+
+    expect(fixture.nativeElement.querySelector('#multiple-modal-title')?.textContent).toContain('Dodaj wiele wyników');
+    expect(fixture.nativeElement.querySelector('#multiple-result-test')).toBeTruthy();
+    expect(fixture.nativeElement.querySelector('#multiple-result-date')).toBeTruthy();
+    expect(fixture.nativeElement.querySelector('#multiple-result-type')).toBeTruthy();
+    expect(fixture.nativeElement.querySelector('.selected-unit')?.textContent).toContain('Wybierz test');
+    setFormValue('#multiple-result-test', '10');
+    expect(fixture.nativeElement.querySelector('.selected-unit')?.textContent).toContain('s');
+    const athleteListText = (fixture.nativeElement.querySelector('.athlete-list') as HTMLElement).textContent;
+    expect(athleteListText).toContain('Jan Kowalski');
+    expect(athleteListText).toContain('Piotr Zieliński');
+    expect(athleteListText).not.toContain('Anna Nowak');
+    expect(fixture.nativeElement.querySelector('#multiple-result-value-1')).toBeTruthy();
+    expect((fixture.nativeElement.querySelector('#multiple-result-value-1') as HTMLInputElement).value).toBe('');
+    expect(fixture.nativeElement.querySelector('#multiple-results-form')?.textContent).not.toContain('Skok w dal');
+
+    const now = new Date();
+    const expectedDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    expect((fixture.nativeElement.querySelector('#multiple-result-date') as HTMLInputElement).value).toBe(expectedDate);
+    expectSingleLoad();
+
+    (fixture.nativeElement.querySelector('.cancel-button') as HTMLButtonElement).click();
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('app-multiple-results-form-modal')).toBeNull();
+    expect(resultsApi.createMultipleResults).not.toHaveBeenCalled();
+  });
+
+  it('updates the displayed unit and clears results when the selected test changes', async () => {
+    const activeTests: TestResponse[] = [
+      tests[0],
+      { ...tests[1], active: true },
+    ];
+    await createPage(undefined, undefined, () => of(activeTests));
+    openMultipleCreateForm();
+    setFormValue('#multiple-result-test', '10');
+    setMultipleResult(1, '7.25');
+    expect(fixture.nativeElement.querySelector('.selected-unit')?.textContent).toContain('s');
+
+    setFormValue('#multiple-result-test', '20');
+
+    expect(fixture.nativeElement.querySelector('.selected-unit')?.textContent).toContain('m');
+    expect((fixture.nativeElement.querySelector('#multiple-result-value-1') as HTMLInputElement).value).toBe('');
+    expect(fixture.nativeElement.textContent).toContain('Po zmianie testu wpisane wyniki zostały wyczyszczone.');
+  });
+
+  it('requires shared fields and at least one result, and validates positive precision without submitting', async () => {
+    await createPage();
+    openMultipleCreateForm();
+    setFormValue('#multiple-result-date', '');
+    submitMultipleCreateForm();
+
+    expect(resultsApi.createMultipleResults).not.toHaveBeenCalled();
+    expect(fixture.nativeElement.querySelector('#multiple-result-test-error')?.textContent).toContain('Wybierz test');
+    expect(fixture.nativeElement.querySelector('#multiple-result-date-error')?.textContent).toContain('Wybierz datę');
+    expect(fixture.nativeElement.querySelector('#multiple-result-type-error')?.textContent).toContain('Wybierz rodzaj');
+    expect(fixture.nativeElement.textContent).toContain('Wpisz co najmniej jeden wynik.');
+
+    fillMultipleSharedFields();
+    for (const invalidValue of ['0', '-1', '1.2345', '1000000000', '1e3']) {
+      setMultipleResult(1, invalidValue);
+      submitMultipleCreateForm();
+      expect(resultsApi.createMultipleResults).not.toHaveBeenCalled();
+      expect(fixture.nativeElement.querySelector(`#multiple-result-error-1`)?.textContent).toBeTruthy();
+    }
+
+    setMultipleResult(1, '1,234');
+    submitMultipleCreateForm();
+    expect(resultsApi.createMultipleResults).toHaveBeenCalledTimes(1);
+    expect(resultsApi.createMultipleResults).toHaveBeenCalledWith({
+      testId: 10,
+      resultDate: '2025-02-01',
+      type: 'TRAINING',
+      results: [{ athleteId: 1, value: 1.234 }],
+    });
+  });
+
+  it('rejects more than 100 non-empty results before making a batch request', async () => {
+    const manyAthletes = Array.from({ length: 101 }, (_, index): AthleteResponse => ({
+      id: index + 1,
+      firstName: `Zawodnik${index + 1}`,
+      lastName: 'Testowy',
+      birthYear: 2010,
+      gender: 'MALE',
+      active: true,
+    }));
+    await createPage(() => of([]), () => of(manyAthletes));
+    openMultipleCreateForm();
+    fillMultipleSharedFields();
+    for (const athlete of manyAthletes) {
+      setMultipleResult(athlete.id, '1');
+    }
+    submitMultipleCreateForm();
+
+    expect(resultsApi.createMultipleResults).not.toHaveBeenCalled();
+    expect(fixture.nativeElement.textContent).toContain('maksymalnie 100 wyników');
+  });
+
+  it('submits one batch with only entered athletes and updates locally while preserving filters and sorting', async () => {
+    const batchResponse: CreateMultipleResultsResponse = {
+      createdCount: 2,
+      results: [
+        { id: 4, athleteId: 1, testId: 10, resultDate: '2025-03-01', value: 6.01, type: 'TRAINING' },
+        { id: 5, athleteId: 3, testId: 10, resultDate: '2025-03-01', value: 7.2, type: 'TRAINING' },
+      ],
+    };
+    const batchLoader = vi.fn(() => of(batchResponse));
+    await createPage(undefined, undefined, undefined, undefined, batchLoader);
+    setSelect('[aria-label="Filtruj według zawodnika"]', '1');
+    setSelect('[aria-label="Filtruj według rodzaju"]', 'TRAINING');
+    (fixture.nativeElement.querySelector('.sort-button') as HTMLButtonElement).click();
+    fixture.detectChanges();
+    openMultipleCreateForm();
+    fillMultipleSharedFields();
+    setMultipleResult(1, '6.01');
+    setMultipleResult(3, '7.2');
+    submitMultipleCreateForm();
+
+    expect(batchLoader).toHaveBeenCalledTimes(1);
+    expect(batchLoader).toHaveBeenCalledWith({
+      testId: 10,
+      resultDate: '2025-02-01',
+      type: 'TRAINING',
+      results: [
+        { athleteId: 1, value: 6.01 },
+        { athleteId: 3, value: 7.2 },
+      ],
+    });
+    expect(fixture.nativeElement.querySelector('app-multiple-results-form-modal')).toBeNull();
+    expect(fixture.nativeElement.textContent).toContain('Dodano 2 wyniki.');
+    expect(rowTexts()).toHaveLength(2);
+    expect(rowTexts()[0]).toContain('01.02.2025');
+    expect(rowTexts()[1]).toContain('01.03.2025');
+    expectSingleLoad();
+  });
+
+  it('keeps entered values and avoids partial local updates after a batch API failure', async () => {
+    const batchLoader = vi.fn(() =>
+      throwError(() => new HttpErrorResponse({ status: 409, error: { title: 'Athlete is inactive' } })),
+    );
+    await createPage(undefined, undefined, undefined, undefined, batchLoader);
+    openMultipleCreateForm();
+    fillMultipleSharedFields();
+    setMultipleResult(1, '4.125');
+    submitMultipleCreateForm();
+
+    expect(fixture.nativeElement.querySelector('app-multiple-results-form-modal')).toBeTruthy();
+    expect(fixture.nativeElement.textContent).toContain('Jeden z zawodników jest nieaktywny');
+    expect((fixture.nativeElement.querySelector('#multiple-result-value-1') as HTMLInputElement).value).toBe('4.125');
+    expect(rowTexts()).toHaveLength(3);
+    expectSingleLoad();
+  });
+
+  it('prevents duplicate batch submissions while the request is pending', async () => {
+    const pending = new Subject<CreateMultipleResultsResponse>();
+    const batchLoader = vi.fn(() => pending.asObservable());
+    await createPage(undefined, undefined, undefined, undefined, batchLoader);
+    openMultipleCreateForm();
+    fillMultipleSharedFields();
+    setMultipleResult(1, '7.5');
+    submitMultipleCreateForm();
+    submitMultipleCreateForm();
+
+    expect(batchLoader).toHaveBeenCalledTimes(1);
+    expect((fixture.nativeElement.querySelector('.save-button') as HTMLButtonElement).disabled).toBe(true);
+    expect((fixture.nativeElement.querySelector('.cancel-button') as HTMLButtonElement).disabled).toBe(true);
+    pending.next({ createdCount: 1, results: [results[0]] });
+    pending.complete();
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('app-multiple-results-form-modal')).toBeNull();
     expectSingleLoad();
   });
 });
