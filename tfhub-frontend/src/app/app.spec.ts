@@ -3,6 +3,7 @@ import { provideRouter, Router } from '@angular/router';
 import { of } from 'rxjs';
 import { App } from './app';
 import { routes } from './app.routes';
+import { AthletesApiService } from './features/athletes/athletes-api.service';
 import { TestsApiService } from './features/tests/tests-api.service';
 
 describe('App', () => {
@@ -13,6 +14,10 @@ describe('App', () => {
         provideRouter(routes),
         {
           provide: TestsApiService,
+          useValue: { getAll: () => of([]) },
+        },
+        {
+          provide: AthletesApiService,
           useValue: { getAll: () => of([]) },
         },
       ],
@@ -36,5 +41,18 @@ describe('App', () => {
     expect(compiled.querySelector('app-header')).toBeTruthy();
     expect(compiled.querySelector('app-footer')).toBeTruthy();
     expect(compiled.querySelector('h1')?.textContent).toContain('Testy');
+  });
+
+  it('renders the Athletes view inside the shared shell', async () => {
+    const fixture = TestBed.createComponent(App);
+    fixture.detectChanges();
+    await TestBed.inject(Router).navigateByUrl('/athletes');
+    await fixture.whenStable();
+    fixture.detectChanges();
+    const compiled = fixture.nativeElement as HTMLElement;
+    expect(compiled.querySelector('app-header')).toBeTruthy();
+    expect(compiled.querySelector('app-footer')).toBeTruthy();
+    expect(compiled.querySelector('h1')?.textContent).toContain('Zawodnicy');
+    expect(compiled.querySelector('nav a[routerlink="/athletes"]')).toBeTruthy();
   });
 });

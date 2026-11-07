@@ -1,0 +1,109 @@
+<section class="page" aria-labelledby="page-title">
+  <div class="page-heading">
+    <div>
+      <h1 id="page-title">Zawodnicy</h1>
+      <p>Zarządzaj listą zawodników</p>
+    </div>
+    <button
+      type="button"
+      class="button button--primary"
+      disabled
+      title="Dodawanie zawodników będzie dostępne w FE-ATHLETE-002"
+      aria-label="Dodaj zawodnika — funkcja będzie dostępna w przyszłości"
+    >
+      Dodaj zawodnika
+    </button>
+  </div>
+
+  <div class="filters">
+    <label class="search-field">
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <circle cx="10.8" cy="10.8" r="6.8"></circle>
+        <path d="m16 16 5 5"></path>
+      </svg>
+      <input
+        type="search"
+        aria-label="Szukaj zawodnika"
+        placeholder="Szukaj zawodnika..."
+        [value]="query()"
+        (input)="onSearchInput($event)"
+      />
+    </label>
+
+    <label class="inactive-toggle">
+      <input type="checkbox" [checked]="showInactive()" (change)="onInactiveToggle($event)" />
+      <span class="switch" aria-hidden="true"></span>
+      <span>Pokaż nieaktywnych</span>
+    </label>
+  </div>
+
+  @if (statusError(); as message) {
+    <p class="feedback error status-error" role="alert">{{ message }}</p>
+  }
+
+  @if (loading()) {
+    <p class="feedback" role="status">Ładowanie zawodników...</p>
+  } @else if (errorMessage(); as message) {
+    <div class="feedback error" role="alert">
+      <p>{{ message }}</p>
+      <button type="button" class="button button--primary retry-button" (click)="retry()">
+        Spróbuj ponownie
+      </button>
+    </div>
+  } @else if (visibleAthletes().length === 0) {
+    <p class="feedback" role="status">
+      {{ hasSearchQuery ? 'Nie znaleziono zawodników pasujących do wyszukiwania.' : 'Brak zawodników do wyświetlenia.' }}
+    </p>
+  } @else {
+    <div class="table-surface">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">Zawodnik</th>
+            <th scope="col">Rok urodzenia</th>
+            <th scope="col">Płeć</th>
+            <th scope="col">Status</th>
+            <th scope="col">Akcje</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (athlete of visibleAthletes(); track athlete.id) {
+            <tr [class.inactive-row]="!athlete.active">
+              <td data-label="Zawodnik">
+                <strong>{{ athlete.firstName }} {{ athlete.lastName }}</strong>
+              </td>
+              <td data-label="Rok urodzenia">{{ athlete.birthYear }}</td>
+              <td data-label="Płeć">{{ genderLabel(athlete.gender) }}</td>
+              <td data-label="Status">
+                <button
+                  type="button"
+                  class="status-toggle"
+                  role="switch"
+                  [attr.aria-label]="'Status zawodnika: ' + athlete.firstName + ' ' + athlete.lastName"
+                  [attr.aria-checked]="athlete.active"
+                  [attr.aria-busy]="statusUpdatingId() === athlete.id"
+                  [disabled]="statusUpdatingId() !== null"
+                  (click)="toggleStatus(athlete)"
+                >
+                  <span>{{ athlete.active ? 'Aktywny' : 'Nieaktywny' }}</span>
+                  <span class="status-toggle__track" aria-hidden="true"></span>
+                </button>
+              </td>
+              <td data-label="Akcje" class="action-cell">
+                <button
+                  type="button"
+                  class="button button--secondary edit-button"
+                  disabled
+                  [title]="'Edycja zawodnika ' + athlete.firstName + ' ' + athlete.lastName + ' będzie dostępna w FE-ATHLETE-003'"
+                  [attr.aria-label]="'Edytuj ' + athlete.firstName + ' ' + athlete.lastName + ' — funkcja będzie dostępna w przyszłości'"
+                >
+                  Edytuj
+                </button>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  }
+</section>
