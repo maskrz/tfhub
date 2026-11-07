@@ -2,7 +2,7 @@
 
 **Status:** Initial version<br>
 **Scope:** Technical architecture and development conventions for the Angular frontend<br>
-**Out of scope:** UI requirements, screen designs, detailed user workflows, and deployment architecture
+**Out of scope:** Detailed screen designs, detailed user workflows, and deployment architecture
 
 ## 1. Purpose
 
@@ -35,9 +35,11 @@ A suggested starting point is:
 src/
 └── app/
     ├── core/
+    │   ├── layout/
+    │   │   └── ...          # AppShellComponent, HeaderComponent, FooterComponent
     │   └── ...              # application-wide infrastructure
     ├── shared/
-    │   └── ...              # reusable UI components and utilities
+    │   └── ...              # genuinely reusable UI components and utilities
     ├── features/
     │   ├── auth/
     │   │   └── ...          # planned login view and authentication flow
@@ -53,6 +55,8 @@ src/
 ```
 
 The structure is a guideline, not a requirement to create every directory immediately.
+
+The application shell composes `HeaderComponent`, Angular `RouterOutlet`, and `FooterComponent`. The shell renders the header and footer once; `RouterOutlet` displays the selected feature view. Feature views contain only their own page content and should be independently structured Angular components, preferably standalone. See the shared [UI guidelines](ui-guidelines.md).
 
 ### 3.1 Core
 
@@ -233,7 +237,7 @@ Refer to the backend documentation under `docs/backend/` for backend architectur
 The following topics are intentionally not defined here:
 
 - Functional requirements.
-- Specific screens, views, or page layouts.
+- Detailed screen and page layouts.
 - Visual design, colors, typography, and responsive breakpoints.
 - Navigation items and user workflows.
 - Detailed frontend use cases.
@@ -242,6 +246,8 @@ The following topics are intentionally not defined here:
 - Statistics, rankings, and charts.
 
 These topics will be documented separately when their scope and decisions are established.
+
+Shared visual and layout principles are defined in [UI guidelines](ui-guidelines.md); detailed view requirements belong in `views/`.
 
 ## 14. Open Decisions
 
