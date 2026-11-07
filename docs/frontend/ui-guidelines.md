@@ -118,6 +118,7 @@ Zachować czytelny kontrast tekstu oraz stanów. Animacje powinny być krótkie 
 - Klasa `.field-control` zapewnia wspólną bazę dla pól tekstowych i list wyboru. Klasa `.field-control-shell` zapewnia tę samą bazę dla wyszukiwarek z ikoną; wewnętrzne pole tekstowe pozostaje bez własnego obramowania.
 - Fokus klawiatury używa wspólnego zielonego obrysu/cienia; pola nieprawidłowe zachowują czytelne czerwone obramowanie.
 - Pola wyboru używające własnej ikony strzałki powinny pozostawić 0,9 rem odstępu od prawej krawędzi do ikony oraz odpowiednie miejsce wewnątrz pola, aby tekst nie nachodził na strzałkę. Wspólna klasa `.select-with-arrow` w `src/styles.scss` zapewnia ten sam wygląd w filtrach i formularzach.
+- Etykiety filtrów są umieszczane nad polami, nie obok nich. Wspólna klasa `.filter-field` z `src/styles.scss` ustala układ pionowy, odstęp i wygląd etykiety dla wyszukiwarek, list wyboru, pól daty/liczbowych i przełączników filtrujących. Przełącznik jest wyrównany pionowo w obszarze kontrolki o wysokości wspólnej z pozostałymi polami; jego etykieta znajduje się nad nim. Należy używać `.filter-field` we wszystkich widokach zamiast definiować lokalne warianty etykiet.
 
 ## 10. Otwarte kwestie
 

@@ -34,7 +34,7 @@ Katalog opisuje planowaną funkcjonalność interfejsu. Kontrakty API i reguły 
 
 | ID | Use case | Status |
 |---|---|---|
-| FE-RESULT-001 | Wyświetlenie listy wyników | Planowany |
+| FE-RESULT-001 | Wyświetlenie listy wyników | Implemented |
 | FE-RESULT-002 | Filtrowanie listy wyników | Planowany |
 | FE-RESULT-003 | Dodanie pojedynczego wyniku | Planowany |
 | FE-RESULT-004 | Dodanie wielu wyników | Planowany |

@@ -264,6 +264,14 @@ describe('TestManagementPage', () => {
     expect(statusToggle.lastElementChild?.classList.contains('status-toggle__track')).toBe(true);
     expect(statusToggle.nextElementSibling).toBe(editButton);
     expect(editButton.classList.contains('button--secondary')).toBe(true);
+    expect(editButton.querySelector('svg')).toBeNull();
+    expect(fixture.nativeElement.querySelector('.search-filter > span:first-child')?.textContent).toBe('Szukaj testu');
+    expect(fixture.nativeElement.querySelector('.category-filter > span')?.textContent).toBe('Kategoria');
+    expect(fixture.nativeElement.querySelector('.inactive-filter > span')?.textContent).toBe('Pokaż nieaktywne');
+    expect(statusToggle.getAttribute('aria-checked')).toBe('true');
+    expect(
+      (fixture.nativeElement.querySelector('.inactive-toggle input') as HTMLInputElement).getAttribute('aria-labelledby'),
+    ).toBe('inactive-filter-label');
 
     openCreate();
     expect(

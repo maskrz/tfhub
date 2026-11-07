@@ -143,6 +143,14 @@ describe('AthletesPage', () => {
     await createPage();
 
     expect(api.getAll).toHaveBeenCalledTimes(1);
+    expect(fixture.nativeElement.querySelector('.search-filter > span:first-child')?.textContent).toBe('Szukaj zawodnika');
+    expect(fixture.nativeElement.querySelector('.gender-filter > span')?.textContent).toBe('Płeć');
+    expect(fixture.nativeElement.querySelector('.birth-year-filter .filter-field:first-child > span')?.textContent).toBe('Od roku');
+    expect(fixture.nativeElement.querySelector('.birth-year-filter .filter-field:last-child > span')?.textContent).toBe('Do roku');
+    expect(fixture.nativeElement.querySelector('.inactive-filter > span')?.textContent).toBe('Pokaż nieaktywnych');
+    expect(
+      (fixture.nativeElement.querySelector('.inactive-toggle input') as HTMLInputElement).getAttribute('aria-labelledby'),
+    ).toBe('inactive-filter-label');
     expect(fixture.nativeElement.textContent).toContain('Jan Kowalski');
     expect(fixture.nativeElement.textContent).not.toContain('Anna Nowak');
     expect(fixture.nativeElement.querySelectorAll('tbody tr')).toHaveLength(1);

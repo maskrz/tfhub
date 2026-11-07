@@ -18,22 +18,25 @@
   }
 
   <div class="filters">
-    <label class="search-field field-control-shell">
-      <svg viewBox="0 0 24 24" aria-hidden="true">
-        <circle cx="10.8" cy="10.8" r="6.8"></circle>
-        <path d="m16 16 5 5"></path>
-      </svg>
-      <input
-        class="field-control__search"
-        type="search"
-        aria-label="Szukaj zawodnika"
-        placeholder="Szukaj zawodnika..."
-        [value]="query()"
-        (input)="onSearchInput($event)"
-      />
+    <label class="filter-field search-filter">
+      <span>Szukaj zawodnika</span>
+      <span class="search-field field-control-shell">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <circle cx="10.8" cy="10.8" r="6.8"></circle>
+          <path d="m16 16 5 5"></path>
+        </svg>
+        <input
+          class="field-control__search"
+          type="search"
+          aria-label="Szukaj zawodnika"
+          placeholder="Szukaj zawodnika..."
+          [value]="query()"
+          (input)="onSearchInput($event)"
+        />
+      </span>
     </label>
 
-    <label class="gender-filter">
+    <label class="filter-field gender-filter">
       <span>Płeć</span>
       <select
         class="field-control select-with-arrow"
@@ -48,34 +51,46 @@
     </label>
 
     <div class="birth-year-filter" role="group" aria-label="Filtruj według roku urodzenia">
-      <span>Rok urodzenia</span>
-      <input
-        class="field-control"
-        type="number"
-        inputmode="numeric"
-        step="1"
-        placeholder="Od"
-        aria-label="Od roku urodzenia"
-        [value]="birthYearFrom()"
-        (input)="onBirthYearChange($event, 'from')"
-      />
-      <input
-        class="field-control"
-        type="number"
-        inputmode="numeric"
-        step="1"
-        placeholder="Do"
-        aria-label="Do roku urodzenia"
-        [value]="birthYearTo()"
-        (input)="onBirthYearChange($event, 'to')"
-      />
+      <label class="filter-field">
+        <span>Od roku</span>
+        <input
+          class="field-control"
+          type="number"
+          inputmode="numeric"
+          step="1"
+          placeholder="Od"
+          aria-label="Od roku urodzenia"
+          [value]="birthYearFrom()"
+          (input)="onBirthYearChange($event, 'from')"
+        />
+      </label>
+      <label class="filter-field">
+        <span>Do roku</span>
+        <input
+          class="field-control"
+          type="number"
+          inputmode="numeric"
+          step="1"
+          placeholder="Do"
+          aria-label="Do roku urodzenia"
+          [value]="birthYearTo()"
+          (input)="onBirthYearChange($event, 'to')"
+        />
+      </label>
     </div>
 
-    <label class="inactive-toggle">
-      <input type="checkbox" [checked]="showInactive()" (change)="onInactiveToggle($event)" />
-      <span class="switch" aria-hidden="true"></span>
-      <span>Pokaż nieaktywnych</span>
-    </label>
+    <div class="filter-field inactive-filter">
+      <span id="inactive-filter-label">Pokaż nieaktywnych</span>
+      <label class="inactive-toggle">
+        <input
+          type="checkbox"
+          aria-labelledby="inactive-filter-label"
+          [checked]="showInactive()"
+          (change)="onInactiveToggle($event)"
+        />
+        <span class="switch" aria-hidden="true"></span>
+      </label>
+    </div>
   </div>
 
   @if (statusError(); as message) {

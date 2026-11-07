@@ -8,22 +8,25 @@
   </div>
 
   <div class="filters">
-    <label class="search-field field-control-shell">
-      <svg viewBox="0 0 24 24" aria-hidden="true">
-        <circle cx="10.8" cy="10.8" r="6.8"></circle>
-        <path d="m16 16 5 5"></path>
-      </svg>
-      <input
-        class="field-control__search"
-        type="search"
-        aria-label="Szukaj testu"
-        placeholder="Szukaj testu..."
-        [value]="query()"
-        (input)="onSearchInput($event)"
-      />
+    <label class="filter-field search-filter">
+      <span>Szukaj testu</span>
+      <span class="search-field field-control-shell">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <circle cx="10.8" cy="10.8" r="6.8"></circle>
+          <path d="m16 16 5 5"></path>
+        </svg>
+        <input
+          class="field-control__search"
+          type="search"
+          aria-label="Szukaj testu"
+          placeholder="Szukaj testu..."
+          [value]="query()"
+          (input)="onSearchInput($event)"
+        />
+      </span>
     </label>
 
-    <label class="category-filter">
+    <label class="filter-field category-filter">
       <span>Kategoria</span>
       <select class="field-control select-with-arrow" aria-label="Filtruj według kategorii" [value]="selectedCategory()" (change)="onCategoryChange($event)">
         <option value="">Wszystkie kategorie</option>
@@ -33,11 +36,18 @@
       </select>
     </label>
 
-    <label class="inactive-toggle">
-      <input type="checkbox" [checked]="showInactive()" (change)="onInactiveToggle($event)" />
-      <span class="switch" aria-hidden="true"></span>
-      <span>Pokaż nieaktywne</span>
-    </label>
+    <div class="filter-field inactive-filter">
+      <span id="inactive-filter-label">Pokaż nieaktywne</span>
+      <label class="inactive-toggle">
+        <input
+          type="checkbox"
+          aria-labelledby="inactive-filter-label"
+          [checked]="showInactive()"
+          (change)="onInactiveToggle($event)"
+        />
+        <span class="switch" aria-hidden="true"></span>
+      </label>
+    </div>
   </div>
 
   @if (statusError(); as message) {
@@ -100,10 +110,7 @@
                   <span>{{ test.active ? 'Aktywny' : 'Nieaktywny' }}</span>
                   <span class="status-toggle__track" aria-hidden="true"></span>
                 </button>
-                <button type="button" class="button button--secondary edit-button" (click)="openEditForm(test)">
-                  <svg viewBox="0 0 24 24" aria-hidden="true">
-                    <path d="m14 5 5 5M4 20l4.5-1 10-10a2.1 2.1 0 0 0-3-3l-10 10L4 20Z"></path>
-                  </svg>
+                <button type="button" class="button button--secondary edit-button" (click)="openEditForm(test)"                >
                   Edytuj
                 </button>
               </td>

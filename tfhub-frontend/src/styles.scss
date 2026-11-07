@@ -77,6 +77,18 @@ button, input { font: inherit; }
   padding-right: 2.5rem;
 }
 
+.filter-field {
+  display: grid;
+  gap: .35rem;
+  min-width: 10rem;
+}
+
+.filter-field > span:first-child {
+  color: #59667e;
+  font-size: .85rem;
+  font-weight: 600;
+}
+
 .button {
   align-items: center;
   border: 1px solid transparent;

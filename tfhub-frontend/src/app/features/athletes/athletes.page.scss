@@ -43,6 +43,8 @@ h1 {
   gap: .8rem;
 }
 
+.search-filter { flex: 0 1 33.5rem; }
+
 .search-field svg {
   fill: none;
   flex: 0 0 1.5rem;
@@ -64,29 +66,23 @@ h1 {
   width: 100%;
 }
 
-.gender-filter,
-.birth-year-filter {
-  align-items: center;
-  display: inline-flex;
-  gap: .55rem;
-}
-
 .gender-filter select {
   min-width: 10rem;
   padding-left: .75rem;
 }
 
 .birth-year-filter input {
-  max-width: 7rem;
-  padding: .5rem .65rem;
+  width: 100%;
 }
+
+.birth-year-filter { display: flex; gap: .75rem; }
+.birth-year-filter .filter-field { flex: 1 1 7rem; min-width: 0; }
 
 .inactive-toggle {
   align-items: center;
   cursor: pointer;
   display: inline-flex;
-  gap: .85rem;
-  min-height: 2.8rem;
+  height: var(--field-height);
 }
 
 .inactive-toggle input {
@@ -189,13 +185,10 @@ td strong { display: block; font-size: 1.08rem; font-weight: 650; }
 @media (max-width: 800px) {
   .page-heading { margin-bottom: 1.5rem; }
   .filters { align-items: stretch; gap: .75rem; }
-  .search-field { flex-basis: 100%; }
-  .gender-filter,
-  .birth-year-filter { justify-content: space-between; }
+  .search-filter { flex-basis: 100%; }
   .gender-filter { flex: 1 1 100%; }
   .gender-filter select { flex: 1; }
   .birth-year-filter { flex: 1 1 100%; }
-  .birth-year-filter input { flex: 1; max-width: none; }
   .table-surface { background: transparent; border: 0; border-radius: 0; overflow: visible; }
   table, tbody { display: block; }
   thead { clip: rect(0, 0, 0, 0); clip-path: inset(50%); height: 1px; overflow: hidden; position: absolute; width: 1px; }

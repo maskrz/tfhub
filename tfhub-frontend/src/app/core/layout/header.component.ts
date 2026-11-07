@@ -13,7 +13,7 @@ import { RouterLink, RouterLinkActive } from '@angular/router';
         <span class="planned-link" aria-disabled="true">Panel główny</span>
         <a routerLink="/tests" routerLinkActive="active" ariaCurrentWhenActive="page">Testy</a>
         <a routerLink="/athletes" routerLinkActive="active" ariaCurrentWhenActive="page">Zawodnicy</a>
-        <span class="planned-link" aria-disabled="true">Wyniki</span>
+        <a routerLink="/results" routerLinkActive="active" ariaCurrentWhenActive="page">Wyniki</a>
       </nav>
       <span class="account" aria-label="Konto" title="Konto">
         <svg viewBox="0 0 24 24" aria-hidden="true">
