@@ -5,32 +5,6 @@ form { display: grid; gap: 1.15rem; }
 .field label { color: #20283a; font-weight: 650; }
 .field label span { color: #bd3434; }
 
-input[type='text'], select {
-  background: #fff;
-  border: 1px solid #cbd3df;
-  border-radius: .6rem;
-  color: #172033;
-  font: inherit;
-  min-height: 3.25rem;
-  padding: .65rem .85rem;
-  width: 100%;
-}
-
-select {
-  appearance: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23536078' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
-  background-position: right .9rem center;
-  background-repeat: no-repeat;
-  background-size: 1rem;
-  padding-right: 2.5rem;
-}
-
-input[type='text']:focus, select:focus {
-  border-color: #399c66;
-  outline: 3px solid rgb(57 156 102 / 14%);
-}
-
-[aria-invalid='true'] { border-color: #b63838 !important; }
 .field-error { color: #a12e2e; font-size: .88rem; }
 .form-error {
   background: #fff1f1;
@@ -44,7 +18,4 @@ input[type='text']:focus, select:focus {
 .checkbox-field { align-items: center; display: flex; gap: .65rem; }
 .checkbox-field input { accent-color: #188c55; height: 1.15rem; width: 1.15rem; }
 
-@media (max-width: 520px) {
-  form { gap: .9rem; }
-  input[type='text'], select { min-height: 3rem; }
-}
+@media (max-width: 520px) { form { gap: .9rem; } }

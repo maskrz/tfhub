@@ -112,7 +112,14 @@ Nie podkreślać wizualnie każdej akcji. Przycisk zamknięcia modalu może uży
 
 Zachować czytelny kontrast tekstu oraz stanów. Animacje powinny być krótkie i respektować ustawienie ograniczenia ruchu systemowego. Kontrolki przełączające muszą obsługiwać klawiaturę i dostępny stan, np. `role="switch"` z `aria-checked`.
 
-## 9. Otwarte kwestie
+## 9. Pola formularzy i filtry
+
+- Wszystkie pola tekstowe, wyszukiwarki i listy wyboru korzystają ze wspólnej definicji w `src/styles.scss`: jednakowa wysokość 3,25 rem, białe tło, neutralne obramowanie, grafitowy tekst i ten sam promień narożnika. Definicję stosuje się niezależnie od tego, czy pole znajduje się w filtrze, formularzu, czy modalu.
+- Klasa `.field-control` zapewnia wspólną bazę dla pól tekstowych i list wyboru. Klasa `.field-control-shell` zapewnia tę samą bazę dla wyszukiwarek z ikoną; wewnętrzne pole tekstowe pozostaje bez własnego obramowania.
+- Fokus klawiatury używa wspólnego zielonego obrysu/cienia; pola nieprawidłowe zachowują czytelne czerwone obramowanie.
+- Pola wyboru używające własnej ikony strzałki powinny pozostawić 0,9 rem odstępu od prawej krawędzi do ikony oraz odpowiednie miejsce wewnątrz pola, aby tekst nie nachodził na strzałkę. Wspólna klasa `.select-with-arrow` w `src/styles.scss` zapewnia ten sam wygląd w filtrach i formularzach.
+
+## 10. Otwarte kwestie
 
 - Sposób zwijania głównej nawigacji na wąskich ekranach.
 - Konkretne breakpointy i szczegółowy system typografii, kolorów oraz ikon.

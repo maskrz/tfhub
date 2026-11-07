@@ -23,6 +23,15 @@ const inactiveTest: TestResponse = {
   active: false,
 };
 
+const speedTest: TestResponse = {
+  id: 4,
+  name: 'Sprint',
+  unit: 'm/s',
+  category: 'SPEED',
+  higherIsBetter: true,
+  active: true,
+};
+
 const createdTest: TestResponse = {
   id: 3,
   name: 'Rzut piłką',
@@ -78,6 +87,19 @@ describe('TestManagementPage', () => {
     fixture.detectChanges();
   }
 
+  function showInactiveForTest(): void {
+    const toggle = fixture.nativeElement.querySelector('.inactive-toggle input') as HTMLInputElement;
+    toggle.checked = true;
+    toggle.dispatchEvent(new Event('change'));
+    fixture.detectChanges();
+  }
+
+  function visibleTestNames(): string[] {
+    return Array.from(fixture.nativeElement.querySelectorAll('tbody tr')).map((row) =>
+      (row as HTMLElement).querySelector('td strong')?.textContent?.trim() ?? '',
+    );
+  }
+
   function openCreate(): void {
     (fixture.nativeElement.querySelector('.page-heading .button--primary') as HTMLButtonElement).click();
     fixture.detectChanges();
@@ -125,6 +147,91 @@ describe('TestManagementPage', () => {
     expect(fixture.nativeElement.textContent).not.toContain('Skok w dal');
     setTextInput('input[type="search"]', '');
     expect(fixture.nativeElement.textContent).toContain('Bieg na 40 m');
+    expect(api.getAll).toHaveBeenCalledTimes(1);
+  });
+
+  it('sorts by name ascending by default and toggles to descending', async () => {
+    await createPage(() => of([speedTest, inactiveTest, activeTest]));
+    const toggle = fixture.nativeElement.querySelector('.inactive-toggle input') as HTMLInputElement;
+    toggle.checked = true;
+    toggle.dispatchEvent(new Event('change'));
+    fixture.detectChanges();
+
+    expect(visibleTestNames()).toEqual(['Bieg na 40 m', 'Skok w dal', 'Sprint']);
+    const nameSort = fixture.nativeElement.querySelector('thead th button') as HTMLButtonElement;
+    nameSort.click();
+    fixture.detectChanges();
+
+    expect(visibleTestNames()).toEqual(['Sprint', 'Skok w dal', 'Bieg na 40 m']);
+    expect(nameSort.closest('th')?.getAttribute('aria-sort')).toBe('descending');
+    expect(api.getAll).toHaveBeenCalledTimes(1);
+  });
+
+  it('sorts by localized category names', async () => {
+    await createPage(() => of([speedTest, inactiveTest, activeTest]));
+    showInactiveForTest();
+    const sortButtons = Array.from(
+      fixture.nativeElement.querySelectorAll('thead th button'),
+    ) as HTMLButtonElement[];
+    const categorySort = sortButtons.find((button) => button.textContent?.includes('Kategoria'))!;
+    categorySort.click();
+    fixture.detectChanges();
+
+    expect(visibleTestNames()).toEqual(['Bieg na 40 m', 'Skok w dal', 'Sprint']);
+    expect(
+      Array.from(fixture.nativeElement.querySelectorAll('tbody tr td:nth-child(2)')).map(
+        (cell) => (cell as HTMLElement).textContent?.trim(),
+      ),
+    ).toEqual(['Czas', 'Dystans', 'Prędkość']);
+    expect(categorySort.closest('th')?.getAttribute('aria-sort')).toBe('ascending');
+    categorySort.click();
+    fixture.detectChanges();
+    expect(
+      Array.from(fixture.nativeElement.querySelectorAll('tbody tr td:nth-child(2)')).map(
+        (cell) => (cell as HTMLElement).textContent?.trim(),
+      ),
+    ).toEqual(['Prędkość', 'Dystans', 'Czas']);
+    expect(categorySort.closest('th')?.getAttribute('aria-sort')).toBe('descending');
+    expect(api.getAll).toHaveBeenCalledTimes(1);
+  });
+
+  it('filters locally by each supported category', async () => {
+    await createPage(() => of([speedTest, inactiveTest, activeTest]));
+    showInactiveForTest();
+    const categoryFilter = 'select[aria-label="Filtruj według kategorii"]';
+
+    setSelect(categoryFilter, 'TIME');
+    expect(visibleTestNames()).toEqual(['Bieg na 40 m']);
+    expect(fixture.nativeElement.querySelector('tbody tr td:nth-child(2)')?.textContent).toContain(
+      'Czas',
+    );
+
+    setSelect(categoryFilter, 'DISTANCE');
+    expect(visibleTestNames()).toEqual(['Skok w dal']);
+    expect(fixture.nativeElement.querySelector('tbody tr td:nth-child(2)')?.textContent).toContain(
+      'Dystans',
+    );
+
+    setSelect(categoryFilter, 'SPEED');
+    expect(visibleTestNames()).toEqual(['Sprint']);
+    expect(fixture.nativeElement.querySelector('tbody tr td:nth-child(2)')?.textContent).toContain(
+      'Prędkość',
+    );
+    expect(api.getAll).toHaveBeenCalledTimes(1);
+  });
+
+  it('combines category filter, name search and inactive toggle without requests', async () => {
+    await createPage(() => of([speedTest, inactiveTest, activeTest]));
+    const categoryFilter = 'select[aria-label="Filtruj według kategorii"]';
+    setSelect(categoryFilter, 'DISTANCE');
+    setTextInput('input[type="search"]', ' skok ');
+    expect(visibleTestNames()).toEqual([]);
+
+    showInactiveForTest();
+    expect(visibleTestNames()).toEqual(['Skok w dal']);
+
+    setTextInput('input[type="search"]', 'niepasujące');
+    expect(visibleTestNames()).toEqual([]);
     expect(api.getAll).toHaveBeenCalledTimes(1);
   });
 

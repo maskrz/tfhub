@@ -29,6 +29,7 @@ Poniżej znajduje się obszar wyszukiwania i filtrowania, a następnie tabela te
 Obszar filtrów zawiera:
 
 - pole wyszukiwania z ikoną lupy i polskim tekstem pomocniczym, np. „Szukaj testu…”;
+- filtr kategorii z opcją „Wszystkie kategorie” oraz kategoriami „Czas”, „Dystans” i „Prędkość”;
 - przełącznik **Pokaż nieaktywne**.
 
 Zachowanie:
@@ -36,10 +37,14 @@ Zachowanie:
 - Domyślnie przełącznik jest wyłączony, a lista zawiera wyłącznie aktywne testy.
 - Po włączeniu przełącznika lista obejmuje aktywne i nieaktywne testy.
 - Wyszukiwanie po nazwie i filtr statusu działają łącznie.
+- Filtrowanie kategorii łączy się z wyszukiwaniem i filtrem statusu.
 - Lista wszystkich testów (aktywnych i nieaktywnych) jest pobierana raz przy wejściu do widoku przez istniejący `POST /api/tests/search` z pustym żądaniem.
 - Wyszukiwanie jest natychmiastowe i lokalne, bez rozróżniania wielkości liter; białe znaki na początku i końcu zapytania są pomijane.
-- Zmiana tekstu, wyczyszczenie wyszukiwania ani przełączenie **Pokaż nieaktywne** nie powoduje kolejnych żądań API.
-- Nie wprowadzać sortowania ani paginacji w UI jako nowego wymagania — obecna specyfikacja UC-103 ich nie definiuje.
+- Filtrowanie kategorii jest lokalne i nie powoduje kolejnych żądań API.
+- Zmiana tekstu, wyczyszczenie wyszukiwania, zmiana kategorii ani przełączenie **Pokaż nieaktywne** nie powoduje kolejnych żądań API.
+- Sortowanie jest lokalne; domyślnie nazwa jest sortowana rosnąco. Nagłówki nazwy i kategorii przełączają kierunek sortowania, pokazują subtelny wskaźnik i nie powodują dodatkowych żądań.
+- Nazwy i polskie etykiety kategorii są porównywane z użyciem polskich reguł językowych.
+- W UI nie wprowadzać paginacji.
 
 ## 4. Tabela testów
 
@@ -48,11 +53,14 @@ Na szerokim ekranie testy są prezentowane w białej, czytelnej tabeli z subteln
 | Kolumna | Zawartość |
 |---|---|
 | Nazwa testu | Nazwa testu |
+| Kategoria | Polska etykieta kategorii |
 | Akcja | Przyciski „Edytuj” i statusowy |
 
-Każdy wiersz ma dokładnie dwie kontrolki: przełącznik statusu oraz przycisk drugorzędny **Edytuj** po jego prawej stronie. Przełącznik pokazuje aktualny stan tekstem **Aktywny** lub **Nieaktywny**, a tor i pozycja białego wskaźnika przedstawiają ten sam stan. Jest dostępny jako przełącznik z etykietą i stanem ARIA; kliknięcie zmienia wyłącznie status. **Edytuj** otwiera wspólny modal i formularz w trybie EDIT (FE-TEST-003). Nie dodawać usuwania ani innych działań do wiersza.
+Nagłówki **Nazwa testu** i **Kategoria** są sortowalne. Kliknięcie aktywnego nagłówka przełącza kolejność rosnącą/malejącą; kliknięcie drugiego nagłówka sortuje rosnąco według niego. Aktywny nagłówek pokazuje kierunek sortowania. Sortowanie nazw i widocznych polskich etykiet kategorii używa polskiego porównywania językowego.
 
-Tabela pokazuje wyłącznie nazwę testu i akcje. Nie wyświetla pod nazwą kategorii ani statusu. Status pozostaje dostępny w danych i służy do filtrowania, stylowania wiersza oraz określenia etykiety akcji statusu.
+Każdy wiersz ma kategorię i dokładnie dwie kontrolki: przełącznik statusu oraz przycisk drugorzędny **Edytuj** po jego prawej stronie. Przełącznik pokazuje aktualny stan tekstem **Aktywny** lub **Nieaktywny**, a tor i pozycja białego wskaźnika przedstawiają ten sam stan. Jest dostępny jako przełącznik z etykietą i stanem ARIA; kliknięcie zmienia wyłącznie status. **Edytuj** otwiera wspólny modal i formularz w trybie EDIT (FE-TEST-003). Nie dodawać usuwania ani innych działań do wiersza.
+
+Tabela pokazuje nazwę, kategorię i akcje. Status nie jest osobną kolumną ani podtytułem; pozostaje dostępny w danych i służy do filtrowania, stylowania wiersza oraz określenia stanu przełącznika.
 
 ## 5. Wygląd statusów
 
@@ -64,7 +72,7 @@ Tabela pokazuje wyłącznie nazwę testu i akcje. Nie wyświetla pod nazwą kate
 
 Widok korzysta z istniejącego kontraktu wyszukiwania `POST /api/tests/search` i danych `TestResponse`. Nie zmienia reguł backendu:
 
-- Kategorie są wartościami `TIME`, `DISTANCE` i `SPEED`; warstwa prezentacji może pokazywać polskie etykiety, np. „Czas”, „Odległość” i „Szybkość”.
+- Kategorie są wartościami `TIME`, `DISTANCE` i `SPEED`, pokazywanymi jako „Czas”, „Dystans” i „Prędkość”.
 - Testy dezaktywuje się, a nie usuwa; historyczne wyniki pozostają dostępne.
 - Nieaktywnego testu nie można użyć do dodania ani aktualizacji wyniku.
 - Jeśli test ma wyniki, nie można zmienić jego jednostki ani kategorii, zgodnie z UC-104.
@@ -75,7 +83,7 @@ Widok korzysta z istniejącego kontraktu wyszukiwania `POST /api/tests/search` i
 - Błędy walidacji i API są prezentowane w modalu po polsku; modal pozostaje otwarty, a wprowadzone wartości są zachowywane.
 - Zrzut modalu jest odniesieniem wizualnym dla prezentacji; zakres pól i reguły wynikają z kontraktów backendu, a nie z przykładowego zrzutu.
 
-Zrzut referencyjny zawiera przykładową etykietę „Wysokość”, która nie odpowiada żadnej z kategorii backendu. To drobna niespójność materiału wizualnego, nie wymaganie dotyczące kategorii ani przeszkoda dla specyfikacji widoku. Nie wprowadzać tej wartości do UI jako obsługiwanej kategorii. Dla `SPEED` można użyć polskiej etykiety „Szybkość”.
+Zrzut referencyjny zawiera przykładową etykietę „Wysokość”, która nie odpowiada żadnej z kategorii backendu. To drobna niespójność materiału wizualnego, nie wymaganie dotyczące kategorii ani przeszkoda dla specyfikacji widoku. Nie wprowadzać tej wartości do UI jako obsługiwanej kategorii. Dla `SPEED` używana jest polska etykieta „Prędkość”.
 
 ## 7. Stany widoku
 
@@ -91,10 +99,9 @@ Pusta lista po filtrze jest prawidłowym wynikiem i nie powinna być przedstawia
 
 ## 8. Responsywność
 
-- Na komputerze i szerszym tablecie używać tabeli z nazwą testu w pierwszej kolumnie i akcją w ostatniej.
-- Na wąskim ekranie układać te same dane jako pionowe karty, bez poziomego przewijania całej strony.
-- Karta zawiera nazwę testu oraz przyciski „Edytuj” i statusowy.
-- Pole wyszukiwania powinno zajmować dostępną szerokość; przełącznik pozostaje czytelny i łatwy do obsługi dotykiem.
+- Na komputerze i szerszym tablecie używać tabeli z nazwą testu, kategorią i akcjami.
+- Na wąskim ekranie zachować czytelny dostęp do nazwy, kategorii i akcji bez poziomego przewijania całej strony.
+- Pole wyszukiwania i filtr kategorii powinny zajmować dostępną szerokość; przełącznik pozostaje czytelny i łatwy do obsługi dotykiem.
 - Akcja „Dodaj test” pozostaje widoczna i osiągalna w układzie mobilnym.
 - Nie dodawać innych akcji ani danych tylko dla wersji mobilnej.
 

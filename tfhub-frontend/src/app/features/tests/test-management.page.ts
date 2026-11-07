@@ -2,7 +2,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { Component, DestroyRef, OnInit, computed, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { EMPTY, catchError, finalize } from 'rxjs';
-import { TestResponse } from './test.model';
+import { TestCategory, TestResponse } from './test.model';
 import { TestsApiService } from './tests-api.service';
 import { TestFormModalComponent } from './test-form-modal.component';
 
@@ -18,6 +18,9 @@ export class TestManagementPage implements OnInit {
   readonly errorMessage = signal<string | null>(null);
   readonly query = signal('');
   readonly showInactive = signal(false);
+  readonly selectedCategory = signal<TestCategory | ''>('');
+  readonly sortColumn = signal<'name' | 'category'>('name');
+  readonly sortDirection = signal<'asc' | 'desc'>('asc');
   readonly formMode = signal<'CREATE' | 'EDIT'>('CREATE');
   readonly selectedTest = signal<TestResponse | null>(null);
   readonly isFormOpen = signal(false);
@@ -25,11 +28,22 @@ export class TestManagementPage implements OnInit {
   readonly statusError = signal<string | null>(null);
   readonly visibleTests = computed(() => {
     const query = this.query().trim().toLowerCase();
+    const category = this.selectedCategory();
+    const direction = this.sortDirection() === 'asc' ? 1 : -1;
     return this.allTests().filter(
       (test) =>
         (this.showInactive() || test.active) &&
-        (!query || test.name.toLowerCase().includes(query)),
-    );
+        (!query || test.name.toLowerCase().includes(query)) &&
+        (!category || test.category === category),
+    ).sort((left, right) => {
+      const leftValue = this.sortColumn() === 'name'
+        ? left.name
+        : this.categoryLabel(left.category);
+      const rightValue = this.sortColumn() === 'name'
+        ? right.name
+        : this.categoryLabel(right.category);
+      return leftValue.localeCompare(rightValue, 'pl', { sensitivity: 'base', numeric: true }) * direction;
+    });
   });
 
   private readonly api = inject(TestsApiService);
@@ -50,6 +64,36 @@ export class TestManagementPage implements OnInit {
     const input = event.target;
     if (input instanceof HTMLInputElement) {
       this.showInactive.set(input.checked);
+    }
+  }
+
+  onCategoryChange(event: Event): void {
+    const select = event.target;
+    if (select instanceof HTMLSelectElement) {
+      const value = select.value;
+      if (value === '' || value === 'TIME' || value === 'DISTANCE' || value === 'SPEED') {
+        this.selectedCategory.set(value);
+      }
+    }
+  }
+
+  sortBy(column: 'name' | 'category'): void {
+    if (this.sortColumn() === column) {
+      this.sortDirection.update((direction) => direction === 'asc' ? 'desc' : 'asc');
+      return;
+    }
+    this.sortColumn.set(column);
+    this.sortDirection.set('asc');
+  }
+
+  categoryLabel(category: TestCategory): string {
+    switch (category) {
+      case 'TIME':
+        return 'Czas';
+      case 'DISTANCE':
+        return 'Dystans';
+      case 'SPEED':
+        return 'Prędkość';
     }
   }
 

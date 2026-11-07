@@ -7,6 +7,7 @@
     <label for="test-name">Nazwa testu <span aria-hidden="true">*</span></label>
     <input
       id="test-name"
+      class="field-control"
       type="text"
       formControlName="name"
       maxlength="150"
@@ -25,6 +26,7 @@
     <label for="test-unit">Jednostka <span aria-hidden="true">*</span></label>
     <select
       id="test-unit"
+      class="field-control select-with-arrow"
       formControlName="unit"
       [attr.aria-invalid]="fieldError('unit') ? 'true' : null"
       aria-describedby="test-unit-error"
@@ -43,14 +45,15 @@
     <label for="test-category">Kategoria <span aria-hidden="true">*</span></label>
     <select
       id="test-category"
+      class="field-control select-with-arrow"
       formControlName="category"
       [attr.aria-invalid]="fieldError('category') ? 'true' : null"
       aria-describedby="test-category-error"
     >
       <option value="" disabled>Wybierz kategorię</option>
       <option value="TIME">Czas</option>
-      <option value="DISTANCE">Odległość</option>
-      <option value="SPEED">Szybkość</option>
+      <option value="DISTANCE">Dystans</option>
+      <option value="SPEED">Prędkość</option>
     </select>
     @if (fieldError('category'); as message) {
       <span class="field-error" id="test-category-error">{{ message }}</span>

@@ -39,20 +39,8 @@ h1 {
 }
 
 .search-field {
-  align-items: center;
-  background: #fff;
-  border: 1px solid #d6dce7;
-  border-radius: .8rem;
-  display: flex;
   flex: 0 1 33.5rem;
   gap: .8rem;
-  min-height: 4.2rem;
-  padding: 0 1.2rem;
-}
-
-.search-field:focus-within {
-  border-color: #399c66;
-  box-shadow: 0 0 0 3px rgb(57 156 102 / 14%);
 }
 
 .search-field svg {
@@ -68,10 +56,11 @@ h1 {
 .search-field input {
   background: transparent;
   border: 0;
-  color: #172033;
   font: inherit;
+  height: 100%;
   min-width: 0;
   outline: 0;
+  padding: 0;
   width: 100%;
 }
 

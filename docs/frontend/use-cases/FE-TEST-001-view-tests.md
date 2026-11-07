@@ -34,27 +34,33 @@ The user selects "Testy" from the main navigation or navigates directly to the T
    - Page title: "Testy"
    - Subtitle: "Zarządzaj testami sportowymi"
    - Search input with a search icon
+   - Category filter with "Wszystkie kategorie", "Czas", "Dystans", and "Prędkość"
    - Toggle: "Pokaż nieaktywne"
    - Test table
 5. The table displays the tests matching the current search and filter criteria.
-6. Each row displays the test name and the actions:
+6. Each row displays the test name, Polish category label, and the actions:
    - "Edytuj"
    - A status switch showing "Aktywny" or "Nieaktywny"
 7. The user can enter text in the search field to narrow down the locally stored tests by name.
 8. The user can enable "Pokaż nieaktywne" to include inactive tests; this filtering is local.
 9. The user can disable the toggle to return to displaying active tests only; this filtering is local.
-10. The user can select "Edytuj" to open the shared modal in EDIT mode (FE-TEST-003).
-11. The user can change a test's status using the row action described by FE-TEST-005. The list item is updated locally after success.
+10. The user can filter locally by category; category filtering works together with search and active status.
+11. The user can sort by name or category by selecting the respective table header. Selecting the active header reverses its direction; selecting the other header sorts it ascending.
+12. The user can select "Edytuj" to open the shared modal in EDIT mode (FE-TEST-003).
+13. The user can change a test's status using the row action described by FE-TEST-005. The list item is updated locally after success.
 
 ## 6. Business and UI rules
 
 - Only active tests are displayed by default.
 - Inactive tests are displayed only when "Pokaż nieaktywne" is enabled.
 - Search and inactive-test filtering must work together.
+- Category filtering works with search and inactive-test filtering.
+- Name and category headers sort locally, with name ascending as the default.
+- Search, category selection, status filtering and sorting do not trigger additional API requests.
 - Search must not change the active/inactive filter state.
 - Inactive tests must have a subtle light-red row background.
 - Active tests use the standard table background.
-- The table displays the test name and its actions; category and status subtitles are not shown.
+- The table displays the test name, Polish category label and its actions; no category or status subtitle is shown below the name.
 - Each row has exactly two controls: the status switch followed by the secondary "Edytuj" button.
 - The status switch communicates the current state visually, through its visible "Aktywny"/"Nieaktywny" label, and through accessible switch state.
 - Status changes are independent of the create/edit form and change no test definition fields.
@@ -110,6 +116,9 @@ Follow the authentication and session-handling rules in `docs/security.md` and t
 - [x] Disabling the toggle hides inactive tests again.
 - [x] Search filters tests by name.
 - [x] Search and inactive filtering work together.
+- [x] Category filtering works with search and inactive filtering.
+- [x] The name and category columns are sortable, defaulting to name ascending.
+- [x] All filtering and sorting is local and causes no additional list request.
 - [x] Active and inactive rows have the specified visual appearance.
 - [x] Each row contains the status switch and secondary "Edytuj" button.
 - [x] Loading, empty, no-results and API-error states are handled.
@@ -124,7 +133,7 @@ Follow the authentication and session-handling rules in `docs/security.md` and t
 - The complete response is stored separately in frontend state. The visible list is derived locally from that data and the current search text and inactive toggle.
 - Name matching is case-insensitive and trims leading and trailing whitespace. The default status filter displays only active tests; enabling "Pokaż nieaktywne" includes both statuses.
 - Typing, clearing the search, and changing the inactive toggle do not trigger additional API requests.
-- Responses use the existing `TestResponse` fields. The active status is retained for local filtering, row styling and the status switch state; category and status subtitles are not displayed.
+- Responses use the existing `TestResponse` fields. The active status is retained for local filtering, row styling and the status switch state. Categories display localized labels in the table and filter.
 - The Angular HttpClient XSRF configuration uses the documented `XSRF-TOKEN` cookie and `X-XSRF-TOKEN` header. Authentication itself remains planned; HTTP 401 and 403 errors are displayed as session/access errors without implementing a separate authentication flow here.
 - Status changes use `PATCH /api/tests/{id}/status` with `ChangeTestStatusRequest`; the returned `TestResponse` replaces the item in the local collection.
 - Add and edit open the same modal and Test Form component; see FE-TEST-002 and FE-TEST-003.
