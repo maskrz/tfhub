@@ -1,0 +1,64 @@
+<form id="test-definition-form" [formGroup]="form" (ngSubmit)="submit()" novalidate>
+  @if (errorMessage(); as message) {
+    <p class="form-error" role="alert">{{ message }}</p>
+  }
+
+  <div class="field">
+    <label for="test-name">Nazwa testu <span aria-hidden="true">*</span></label>
+    <input
+      id="test-name"
+      type="text"
+      formControlName="name"
+      maxlength="150"
+      placeholder="Wprowadź nazwę testu"
+      autocomplete="off"
+      autofocus
+      [attr.aria-invalid]="fieldError('name') ? 'true' : null"
+      aria-describedby="test-name-error"
+    />
+    @if (fieldError('name'); as message) {
+      <span class="field-error" id="test-name-error">{{ message }}</span>
+    }
+  </div>
+
+  <div class="field">
+    <label for="test-unit">Jednostka <span aria-hidden="true">*</span></label>
+    <select
+      id="test-unit"
+      formControlName="unit"
+      [attr.aria-invalid]="fieldError('unit') ? 'true' : null"
+      aria-describedby="test-unit-error"
+    >
+      <option value="" disabled>Wybierz jednostkę</option>
+      <option value="s">Sekundy (s)</option>
+      <option value="m">Metry (m)</option>
+      <option value="m/s">Metry na sekundę (m/s)</option>
+    </select>
+    @if (fieldError('unit'); as message) {
+      <span class="field-error" id="test-unit-error">{{ message }}</span>
+    }
+  </div>
+
+  <div class="field">
+    <label for="test-category">Kategoria <span aria-hidden="true">*</span></label>
+    <select
+      id="test-category"
+      formControlName="category"
+      [attr.aria-invalid]="fieldError('category') ? 'true' : null"
+      aria-describedby="test-category-error"
+    >
+      <option value="" disabled>Wybierz kategorię</option>
+      <option value="TIME">Czas</option>
+      <option value="DISTANCE">Odległość</option>
+      <option value="SPEED">Szybkość</option>
+    </select>
+    @if (fieldError('category'); as message) {
+      <span class="field-error" id="test-category-error">{{ message }}</span>
+    }
+  </div>
+
+  <label class="checkbox-field">
+    <input id="test-higher-is-better" type="checkbox" formControlName="higherIsBetter" />
+    <span>Wyższy wynik jest lepszy</span>
+  </label>
+</form>

@@ -4,17 +4,18 @@
       <h1 id="page-title">Testy</h1>
       <p>Zarządzaj testami sportowymi</p>
     </div>
+    <button type="button" class="button button--primary" (click)="openCreateForm()">Dodaj test</button>
   </div>
 
   <div class="filters">
     <label class="search-field">
-      <span class="visually-hidden">Szukaj testu</span>
       <svg viewBox="0 0 24 24" aria-hidden="true">
         <circle cx="10.8" cy="10.8" r="6.8"></circle>
         <path d="m16 16 5 5"></path>
       </svg>
       <input
         type="search"
+        aria-label="Szukaj testu"
         placeholder="Szukaj testu..."
         [value]="query()"
         (input)="onSearchInput($event)"
@@ -28,12 +29,16 @@
     </label>
   </div>
 
+  @if (statusError(); as message) {
+    <p class="feedback error status-error" role="alert">{{ message }}</p>
+  }
+
   @if (loading()) {
     <p class="feedback" role="status">Ładowanie testów...</p>
   } @else if (errorMessage(); as message) {
     <div class="feedback error" role="alert">
       <p>{{ message }}</p>
-      <button type="button" class="retry-button" (click)="retry()">Spróbuj ponownie</button>
+      <button type="button" class="button button--primary retry-button" (click)="retry()">Spróbuj ponownie</button>
     </div>
   } @else if (visibleTests().length === 0) {
     <p class="feedback" role="status">
@@ -45,22 +50,35 @@
         <thead>
           <tr>
             <th scope="col">Nazwa testu</th>
-            <th scope="col"><span class="visually-hidden">Akcja</span></th>
+            <th scope="col" aria-label="Akcja"></th>
           </tr>
         </thead>
         <tbody>
           @for (test of visibleTests(); track test.id) {
             <tr [class.inactive-row]="!test.active">
-              <td data-label="Test">
+              <td>
                 <strong>{{ test.name }}</strong>
               </td>
               <td class="action-cell">
-                <a class="edit-button" [routerLink]="['/tests', test.id, 'edit']">
+                <button
+                  type="button"
+                  class="status-toggle"
+                  role="switch"
+                  [attr.aria-label]="'Status testu: ' + test.name"
+                  [attr.aria-checked]="test.active"
+                  [attr.aria-busy]="statusUpdatingId() === test.id"
+                  [disabled]="statusUpdatingId() !== null"
+                  (click)="toggleStatus(test)"
+                >
+                  <span>{{ test.active ? 'Aktywny' : 'Nieaktywny' }}</span>
+                  <span class="status-toggle__track" aria-hidden="true"></span>
+                </button>
+                <button type="button" class="button button--secondary edit-button" (click)="openEditForm(test)">
                   <svg viewBox="0 0 24 24" aria-hidden="true">
                     <path d="m14 5 5 5M4 20l4.5-1 10-10a2.1 2.1 0 0 0-3-3l-10 10L4 20Z"></path>
                   </svg>
                   Edytuj
-                </a>
+                </button>
               </td>
             </tr>
           }
@@ -69,3 +87,12 @@
     </div>
   }
 </section>
+
+@if (isFormOpen()) {
+  <app-test-form-modal
+    [mode]="formMode()"
+    [test]="selectedTest()"
+    (saved)="onTestSaved($event)"
+    (cancelled)="closeForm()"
+  />
+}

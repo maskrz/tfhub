@@ -90,7 +90,29 @@ Cały tekst widoczny dla użytkownika — nawigacja, nagłówki, etykiety, akcje
 
 Stosować spójne polskie nazewnictwo i poprawne znaki diakrytyczne. Techniczne identyfikatory i nazwy komponentów, takie jak `AppShellComponent`, pozostają w języku angielskim.
 
-## 8. Otwarte kwestie
+## 8. Przyciski i akcje
+
+Przyciski o tej samej roli korzystają ze wspólnych stylów i tokenów z globalnego arkusza `src/styles.scss`. Stosować klasy współdzielone, zamiast definiować odrębne kolory, odstępy i stany dla każdej akcji.
+
+### Hierarchia
+
+- **Podstawowy (primary):** główna akcja w danym kontekście, np. „Dodaj test” lub „Zapisz”. Jednolite zielone tło, biały tekst i brak widocznego obramowania; po najechaniu tło staje się nieco ciemniejsze.
+- **Drugorzędny (secondary):** akcja wspierająca, np. „Edytuj” lub „Anuluj”. Białe lub bardzo jasne tło, subtelna neutralna ramka i ciemny grafitowy tekst; po najechaniu tło delikatnie się zmienia.
+- **Status aktywności:** kontrolka przełączająca, nie standardowy przycisk akcji. Zielony tor oznacza stan aktywny, szary — nieaktywny, a biały wskaźnik położeniem pokazuje bieżący stan. Tekst stanu i dostępne nazwy/stan ARIA muszą jednoznacznie przekazywać, czy element jest aktywny. Zmiana koloru lub położenia ma subtelne przejście. Czerwieni nie używa się dla zwykłej aktywacji ani dezaktywacji.
+
+Nie podkreślać wizualnie każdej akcji. Przycisk zamknięcia modalu może używać wariantu ikonowego drugorzędnego. Ponowienie operacji w stanie błędu może być podstawową akcją tego stanu.
+
+### Wspólne stany interakcji
+
+- **Domyślny:** konsekwentna wysokość, odstępy wewnętrzne, promień zaokrąglenia, krój pisma i wyrównanie. Elementy o tej samej roli mają ten sam wygląd.
+- **Hover:** subtelna zmiana tła lub odcienia; nie polegać wyłącznie na zmianie kursora.
+- **Focus-visible:** wyraźny obrys widoczny podczas nawigacji klawiaturą i z odpowiednim odstępem od kontrolki.
+- **Disabled:** kontrolka jest wizualnie przygaszona, nie reaguje na hover i nie uruchamia akcji.
+- **Loading:** jeśli operacja trwa, zapobiec ponownemu wysłaniu, wyłączyć kontrolkę i pokazać zrozumiały tekst ładowania, np. „Zapisywanie…”. Nie przedstawiać stanu oczekiwania jako sukcesu.
+
+Zachować czytelny kontrast tekstu oraz stanów. Animacje powinny być krótkie i respektować ustawienie ograniczenia ruchu systemowego. Kontrolki przełączające muszą obsługiwać klawiaturę i dostępny stan, np. `role="switch"` z `aria-checked`.
+
+## 9. Otwarte kwestie
 
 - Sposób zwijania głównej nawigacji na wąskich ekranach.
 - Konkretne breakpointy i szczegółowy system typografii, kolorów oraz ikon.

@@ -1,14 +1,14 @@
 # Widok: Zarządzanie testami
 
-**Status:** Specyfikacja UI; implementacja nie została wykonana
+**Status:** Implementacja zakończona
 **Język interfejsu:** Polski
-**Odniesienie wizualne:** [Zrzut ekranu widoku Testy](../screenshots/test-management.png)
+**Odniesienie wizualne:** [Zrzut ekranu widoku Testy](../screenshots/test-management.png); [modal testu](../screenshots/test-popup.png)
 
 Zrzut jest odniesieniem dla układu, hierarchii wizualnej, odstępów, kolorów, nawigacji, obszaru wyszukiwania, tabeli i widocznych akcji. Widoczne na nim nazwy testów, kategorie, statusy i inne wartości są wyłącznie ilustracyjne; o obsługiwanych danych i zachowaniu decydują istniejący model oraz kontrakty backendu.
 
 ## 1. Cel widoku
 
-Widok umożliwia trenerowi wyszukiwanie i przeglądanie definicji testów oraz przejście do dodawania lub edycji testu. Aktywacja i dezaktywacja odbywają się w formularzu dodawania/edycji, a nie bezpośrednio na liście.
+Widok umożliwia trenerowi wyszukiwanie i przeglądanie definicji testów, dodawanie i edycję przez wspólny formularz w modalu oraz zmianę statusu przyciskiem w wierszu.
 
 Widok jest renderowany przez wspólną powłokę aplikacji. Nie zawiera własnego nagłówka, stopki ani głównej nawigacji.
 
@@ -20,7 +20,7 @@ Na początku strony znajduje się obszar nagłówka widoku:
 - podtytuł: **Zarządzaj testami sportowymi**;
 - główna akcja: **Dodaj test**.
 
-Główna akcja prowadzi do formularza dodawania testu. Szczegóły tego formularza określa osobna specyfikacja; ten dokument nie dodaje mu pól ani zachowań.
+Główna akcja **Dodaj test** jest przyciskiem primary i otwiera wspólny modal oraz formularz w trybie CREATE (FE-TEST-002).
 
 Poniżej znajduje się obszar wyszukiwania i filtrowania, a następnie tabela testów.
 
@@ -35,9 +35,10 @@ Zachowanie:
 
 - Domyślnie przełącznik jest wyłączony, a lista zawiera wyłącznie aktywne testy.
 - Po włączeniu przełącznika lista obejmuje aktywne i nieaktywne testy.
-- Wyszukiwanie po nazwie i filtr statusu działają łącznie (AND).
-- Wyszukiwanie nazw korzysta z istniejącego backendowego wyszukiwania częściowego, bez rozróżniania wielkości liter; puste lub białe znaki nie stanowią kryterium.
-- Dla zgodności z `POST /api/tests/search`: przełącznik wyłączony oznacza filtr `active: true`; włączony oznacza pominięcie filtra `active`, ponieważ backend bez tego kryterium zwraca oba statusy.
+- Wyszukiwanie po nazwie i filtr statusu działają łącznie.
+- Lista wszystkich testów (aktywnych i nieaktywnych) jest pobierana raz przy wejściu do widoku przez istniejący `POST /api/tests/search` z pustym żądaniem.
+- Wyszukiwanie jest natychmiastowe i lokalne, bez rozróżniania wielkości liter; białe znaki na początku i końcu zapytania są pomijane.
+- Zmiana tekstu, wyczyszczenie wyszukiwania ani przełączenie **Pokaż nieaktywne** nie powoduje kolejnych żądań API.
 - Nie wprowadzać sortowania ani paginacji w UI jako nowego wymagania — obecna specyfikacja UC-103 ich nie definiuje.
 
 ## 4. Tabela testów
@@ -47,11 +48,11 @@ Na szerokim ekranie testy są prezentowane w białej, czytelnej tabeli z subteln
 | Kolumna | Zawartość |
 |---|---|
 | Nazwa testu | Nazwa testu |
-| Akcja | Przycisk „Edytuj” |
+| Akcja | Przyciski „Edytuj” i statusowy |
 
-Każdy wiersz ma dokładnie jedną widoczną akcję: **Edytuj**. Nie dodawać przycisku aktywacji/dezaktywacji, usuwania ani innych działań do wiersza. „Edytuj” prowadzi do formularza edycji testu.
+Każdy wiersz ma dokładnie dwie kontrolki: przełącznik statusu oraz przycisk drugorzędny **Edytuj** po jego prawej stronie. Przełącznik pokazuje aktualny stan tekstem **Aktywny** lub **Nieaktywny**, a tor i pozycja białego wskaźnika przedstawiają ten sam stan. Jest dostępny jako przełącznik z etykietą i stanem ARIA; kliknięcie zmienia wyłącznie status. **Edytuj** otwiera wspólny modal i formularz w trybie EDIT (FE-TEST-003). Nie dodawać usuwania ani innych działań do wiersza.
 
-Tabela pokazuje wyłącznie nazwę testu i akcję „Edytuj”. Nie wyświetla pod nazwą kategorii ani statusu. Status pozostaje dostępny w danych i służy do filtrowania oraz stylowania wiersza.
+Tabela pokazuje wyłącznie nazwę testu i akcje. Nie wyświetla pod nazwą kategorii ani statusu. Status pozostaje dostępny w danych i służy do filtrowania, stylowania wiersza oraz określenia etykiety akcji statusu.
 
 ## 5. Wygląd statusów
 
@@ -67,7 +68,12 @@ Widok korzysta z istniejącego kontraktu wyszukiwania `POST /api/tests/search` i
 - Testy dezaktywuje się, a nie usuwa; historyczne wyniki pozostają dostępne.
 - Nieaktywnego testu nie można użyć do dodania ani aktualizacji wyniku.
 - Jeśli test ma wyniki, nie można zmienić jego jednostki ani kategorii, zgodnie z UC-104.
-- Aktywacja/dezaktywacja należy do formularza testu, nie do tabeli.
+- Aktywacja/dezaktywacja odbywa się kontrolką statusu w wierszu, niezależnie od formularza definicji testu.
+- Zmiana statusu używa `PATCH /api/tests/{id}/status` z istniejącym `ChangeTestStatusRequest`; odpowiedź `TestResponse` aktualizuje element lokalnej kolekcji bez ponownego pobrania listy.
+- Dodawanie i edycja korzystają z jednego wspólnego komponentu formularza w modalnym oknie. Tytuł to „Dodaj test” lub „Edytuj test”, zależnie od trybu. Modal ma osobne sekcje nagłówka, treści i stopki z akcjami: drugorzędną „Anuluj” i podstawową „Zapisz”.
+- Formularz zawiera nazwę, jednostkę, kategorię i informację, czy wyższy wynik jest lepszy. W trybie CREATE nowy test jest aktywny zgodnie z backendem; status nie jest polem formularza. W trybie EDIT status również zmienia się poza formularzem przez akcję w wierszu.
+- Błędy walidacji i API są prezentowane w modalu po polsku; modal pozostaje otwarty, a wprowadzone wartości są zachowywane.
+- Zrzut modalu jest odniesieniem wizualnym dla prezentacji; zakres pól i reguły wynikają z kontraktów backendu, a nie z przykładowego zrzutu.
 
 Zrzut referencyjny zawiera przykładową etykietę „Wysokość”, która nie odpowiada żadnej z kategorii backendu. To drobna niespójność materiału wizualnego, nie wymaganie dotyczące kategorii ani przeszkoda dla specyfikacji widoku. Nie wprowadzać tej wartości do UI jako obsługiwanej kategorii. Dla `SPEED` można użyć polskiej etykiety „Szybkość”.
 
@@ -87,7 +93,7 @@ Pusta lista po filtrze jest prawidłowym wynikiem i nie powinna być przedstawia
 
 - Na komputerze i szerszym tablecie używać tabeli z nazwą testu w pierwszej kolumnie i akcją w ostatniej.
 - Na wąskim ekranie układać te same dane jako pionowe karty, bez poziomego przewijania całej strony.
-- Karta zawiera nazwę testu i ten sam pojedynczy przycisk „Edytuj”.
+- Karta zawiera nazwę testu oraz przyciski „Edytuj” i statusowy.
 - Pole wyszukiwania powinno zajmować dostępną szerokość; przełącznik pozostaje czytelny i łatwy do obsługi dotykiem.
 - Akcja „Dodaj test” pozostaje widoczna i osiągalna w układzie mobilnym.
 - Nie dodawać innych akcji ani danych tylko dla wersji mobilnej.
@@ -104,5 +110,4 @@ Pusta lista po filtrze jest prawidłowym wynikiem i nie powinna być przedstawia
 ## 10. Otwarte kwestie
 
 - Dokładny tekst i zachowanie stanu pustego oraz błędu pobierania.
-- Zachowanie i czas opóźnienia wyszukiwania podczas wpisywania; backend nie narzuca interakcji UI.
 - Szczegółowy wariant nawigacji mobilnej i breakpointy, zgodnie ze wspólnymi [wytycznymi UI](../ui-guidelines.md).

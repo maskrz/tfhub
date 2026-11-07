@@ -37,13 +37,14 @@ The user selects "Testy" from the main navigation or navigates directly to the T
    - Toggle: "Pokaż nieaktywne"
    - Test table
 5. The table displays the tests matching the current search and filter criteria.
-6. Each row displays:
-   - Test name
-   - "Edytuj" action
+6. Each row displays the test name and the actions:
+   - "Edytuj"
+   - A status switch showing "Aktywny" or "Nieaktywny"
 7. The user can enter text in the search field to narrow down the locally stored tests by name.
 8. The user can enable "Pokaż nieaktywne" to include inactive tests; this filtering is local.
 9. The user can disable the toggle to return to displaying active tests only; this filtering is local.
-10. The user can select "Edytuj" to navigate to the planned test editing route. The editing functionality is covered by FE-TEST-004 and is not part of this UC.
+10. The user can select "Edytuj" to open the shared modal in EDIT mode (FE-TEST-003).
+11. The user can change a test's status using the row action described by FE-TEST-005. The list item is updated locally after success.
 
 ## 6. Business and UI rules
 
@@ -53,9 +54,10 @@ The user selects "Testy" from the main navigation or navigates directly to the T
 - Search must not change the active/inactive filter state.
 - Inactive tests must have a subtle light-red row background.
 - Active tests use the standard table background.
-- The table displays only the test name and the "Edytuj" action; category and status subtitles are not shown.
-- Each row has exactly one visible action: "Edytuj".
-- There must be no Activate/Deactivate action in the table.
+- The table displays the test name and its actions; category and status subtitles are not shown.
+- Each row has exactly two controls: the status switch followed by the secondary "Edytuj" button.
+- The status switch communicates the current state visually, through its visible "Aktywny"/"Nieaktywny" label, and through accessible switch state.
+- Status changes are independent of the create/edit form and change no test definition fields.
 - The view must not contain summary/statistics cards.
 - The table is the main content of the page.
 - All user-facing text must be in Polish.
@@ -92,8 +94,7 @@ Follow the authentication and session-handling rules in `docs/security.md` and t
 ## 9. Out of scope
 
 - Adding a test (FE-TEST-002).
-- Editing a test (FE-TEST-004).
-- Activating or deactivating a test.
+- Editing a test (FE-TEST-003).
 - Deleting tests.
 - Test result management.
 - Dashboard statistics.
@@ -110,7 +111,7 @@ Follow the authentication and session-handling rules in `docs/security.md` and t
 - [x] Search filters tests by name.
 - [x] Search and inactive filtering work together.
 - [x] Active and inactive rows have the specified visual appearance.
-- [x] Each row contains exactly one "Edytuj" action.
+- [x] Each row contains the status switch and secondary "Edytuj" button.
 - [x] Loading, empty, no-results and API-error states are handled.
 - [x] Unauthorized responses follow the existing authentication rules.
 - [x] The view follows the approved screenshot and frontend UI guidelines.
@@ -123,8 +124,9 @@ Follow the authentication and session-handling rules in `docs/security.md` and t
 - The complete response is stored separately in frontend state. The visible list is derived locally from that data and the current search text and inactive toggle.
 - Name matching is case-insensitive and trims leading and trailing whitespace. The default status filter displays only active tests; enabling "Pokaż nieaktywne" includes both statuses.
 - Typing, clearing the search, and changing the inactive toggle do not trigger additional API requests.
-- Responses use the existing `TestResponse` fields. The active status is retained for local filtering and row styling; only the test name and edit action are displayed in each row.
+- Responses use the existing `TestResponse` fields. The active status is retained for local filtering, row styling and the status switch state; category and status subtitles are not displayed.
 - The Angular HttpClient XSRF configuration uses the documented `XSRF-TOKEN` cookie and `X-XSRF-TOKEN` header. Authentication itself remains planned; HTTP 401 and 403 errors are displayed as session/access errors without implementing a separate authentication flow here.
-- The editing route is registered as `/tests/:id/edit` with an informational placeholder only. The editing form is out of scope and remains part of FE-TEST-004.
+- Status changes use `PATCH /api/tests/{id}/status` with `ChangeTestStatusRequest`; the returned `TestResponse` replaces the item in the local collection.
+- Add and edit open the same modal and Test Form component; see FE-TEST-002 and FE-TEST-003.
 - No backend code, endpoint, DTO, or domain rule was changed.
 - Automated frontend verification is maintained alongside the implementation tests.

@@ -17,10 +17,9 @@ Katalog opisuje planowaną funkcjonalność interfejsu. Kontrakty API i reguły 
 | ID | Use case | Status |
 |---|---|---|
 | FE-TEST-001 | Wyświetlenie listy testów | Implemented |
-| FE-TEST-002 | Filtrowanie listy testów | Planowany |
-| FE-TEST-003 | Dodanie testu | Planowany |
-| FE-TEST-004 | Edycja testu | Planowany |
-| FE-TEST-005 | Aktywowanie lub dezaktywowanie testu | Planowany |
+| FE-TEST-002 | Dodanie testu | Implemented |
+| FE-TEST-003 | Edycja testu | Implemented |
+| FE-TEST-005 | Aktywowanie lub dezaktywowanie testu z listy | Implemented |
 
 ## Zawodnicy (`FE-ATHLETE`)
 
