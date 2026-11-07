@@ -6,6 +6,8 @@ Allow the user to add a single test result for an athlete.
 
 The result is created through a modal form opened from the Results view. After successful creation, the new result is added to the existing results list without reloading the page.
 
+The shared single-result form also supports EDIT mode for FE-RESULT-004. CREATE mode keeps the behavior described in this use case; EDIT mode prepopulates the same fields and calls the update endpoint.
+
 ## 2. Scope
 
 ### In scope

@@ -31,6 +31,7 @@ export class ResultsPage implements OnInit {
   readonly selectedType = signal<ResultType | ''>('');
   readonly sortDirection = signal<'asc' | 'desc'>('desc');
   readonly isCreateFormOpen = signal(false);
+  readonly selectedResult = signal<ResultRow | null>(null);
   readonly isMultipleCreateFormOpen = signal(false);
   readonly successMessage = signal<string | null>(null);
   readonly visibleResults = computed(() => {
@@ -148,15 +149,6 @@ export class ResultsPage implements OnInit {
     );
   }
 
-  clearFilters(): void {
-    this.query.set('');
-    this.selectedAthleteId.set('');
-    this.selectedTestId.set('');
-    this.fromDate.set('');
-    this.toDate.set('');
-    this.selectedType.set('');
-  }
-
   openCreateForm(): void {
     this.successMessage.set(null);
     this.isCreateFormOpen.set(true);
@@ -164,6 +156,26 @@ export class ResultsPage implements OnInit {
 
   closeCreateForm(): void {
     this.isCreateFormOpen.set(false);
+    this.selectedResult.set(null);
+  }
+
+  openEditForm(result: ResultRow): void {
+    this.successMessage.set(null);
+    this.selectedResult.set(result);
+    this.isCreateFormOpen.set(true);
+  }
+
+  onResultSaved(result: ResultResponse): void {
+    const [row] = this.joinResults([result], this.athletes(), this.tests());
+    const editing = this.selectedResult() !== null;
+    this.allResults.update((current) =>
+      editing
+        ? current.map((existing) => existing.id === row.id ? row : existing)
+        : [...current, row],
+    );
+    this.isCreateFormOpen.set(false);
+    this.selectedResult.set(null);
+    this.successMessage.set(editing ? 'Wynik został zaktualizowany.' : 'Wynik został dodany.');
   }
 
   openMultipleCreateForm(): void {
@@ -173,13 +185,6 @@ export class ResultsPage implements OnInit {
 
   closeMultipleCreateForm(): void {
     this.isMultipleCreateFormOpen.set(false);
-  }
-
-  onResultCreated(result: ResultResponse): void {
-    const [row] = this.joinResults([result], this.athletes(), this.tests());
-    this.allResults.update((current) => [...current, row]);
-    this.isCreateFormOpen.set(false);
-    this.successMessage.set('Wynik został dodany.');
   }
 
   onResultsCreated(response: CreateMultipleResultsResponse): void {

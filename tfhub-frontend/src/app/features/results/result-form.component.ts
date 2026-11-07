@@ -1,10 +1,16 @@
 import { HttpErrorResponse } from '@angular/common/http';
-import { Component, EventEmitter, Input, Output, computed, inject, signal } from '@angular/core';
+import { Component, EventEmitter, Input, OnInit, Output, computed, inject, signal } from '@angular/core';
 import { FormControl, FormGroup, ReactiveFormsModule, ValidatorFn, Validators } from '@angular/forms';
 import { EMPTY, catchError, finalize, take } from 'rxjs';
 import { AthleteResponse } from '../athletes/athlete.model';
 import { TestResponse } from '../tests/test.model';
-import { CreateResultRequest, ResultResponse, ResultType } from './result.model';
+import {
+  CreateResultRequest,
+  ResultFormMode,
+  ResultResponse,
+  ResultType,
+  UpdateResultRequest,
+} from './result.model';
 import { ResultsApiService } from './results-api.service';
 
 const resultTypes: ResultType[] = ['TRAINING', 'COMPETITION'];
@@ -39,18 +45,18 @@ const validDate: ValidatorFn = (control) => {
   templateUrl: './result-form.component.html',
   styleUrl: './result-form.component.scss',
 })
-export class ResultFormComponent {
+export class ResultFormComponent implements OnInit {
+  @Input({ required: true }) mode: ResultFormMode = 'CREATE';
   @Input({ required: true }) athletes: AthleteResponse[] = [];
   @Input({ required: true }) tests: TestResponse[] = [];
+  @Input() result: ResultResponse | null = null;
   @Output() saved = new EventEmitter<ResultResponse>();
   @Output() savingChange = new EventEmitter<boolean>();
 
   readonly saving = signal(false);
   readonly errorMessage = signal<string | null>(null);
   readonly selectedTestId = signal('');
-  readonly currentTest = computed(() =>
-    this.tests.find((test) => test.id === Number(this.selectedTestId()) && test.active) ?? null,
-  );
+  readonly currentTest = computed(() => this.tests.find((test) => test.id === Number(this.selectedTestId())) ?? null);
   readonly resultTypes = resultTypes;
   readonly form = new FormGroup({
     athleteId: new FormControl('', { nonNullable: true, validators: [Validators.required] }),
@@ -71,6 +77,19 @@ export class ResultFormComponent {
 
   private readonly api = inject(ResultsApiService);
 
+  ngOnInit(): void {
+    if (this.mode === 'EDIT' && this.result) {
+      this.form.setValue({
+        athleteId: String(this.result.athleteId),
+        testId: String(this.result.testId),
+        resultDate: this.result.resultDate,
+        value: String(this.result.value),
+        type: this.result.type,
+      });
+      this.selectedTestId.set(String(this.result.testId));
+    }
+  }
+
   onTestSelectionChange(event: Event): void {
     const select = event.target;
     if (select instanceof HTMLSelectElement) {
@@ -83,7 +102,7 @@ export class ResultFormComponent {
   }
 
   isActiveTest(test: TestResponse): boolean {
-    return test.active;
+    return test.active || (this.mode === 'EDIT' && test.id === this.result?.testId);
   }
 
   fieldError(field: 'athleteId' | 'testId' | 'resultDate' | 'value' | 'type'): string | null {
@@ -123,13 +142,22 @@ export class ResultFormComponent {
     if (
       this.form.invalid ||
       !this.isResultType(type) ||
-      !this.athletes.some((athlete) => athlete.id === Number(athleteId) && athlete.active) ||
-      !this.tests.some((test) => test.id === Number(testId) && test.active)
+      !this.athletes.some((athlete) =>
+        athlete.id === Number(athleteId) && (this.mode === 'EDIT' || athlete.active),
+      ) ||
+      !this.tests.some((test) =>
+        test.id === Number(testId) && (test.active || (this.mode === 'EDIT' && test.id === this.result?.testId)),
+      )
     ) {
       return;
     }
 
-    const request: CreateResultRequest = {
+    if (this.mode === 'EDIT' && !this.result) {
+      this.errorMessage.set('Nie można określić edytowanego wyniku.');
+      return;
+    }
+
+    const request = {
       athleteId: Number(athleteId),
       testId: Number(testId),
       resultDate,
@@ -138,8 +166,11 @@ export class ResultFormComponent {
     };
 
     this.setSaving(true);
-    this.api
-      .createResult(request)
+    const saveRequest = this.mode === 'CREATE'
+      ? this.api.createResult(request satisfies CreateResultRequest)
+      : this.api.updateResult(this.result!.id, request satisfies UpdateResultRequest);
+
+    saveRequest
       .pipe(
         take(1),
         catchError((error: unknown) => {
@@ -183,19 +214,29 @@ export class ResultFormComponent {
     if (error.status === 401) {
       this.errorMessage.set('Sesja wygasła lub użytkownik nie jest zalogowany.');
     } else if (error.status === 403) {
-      this.errorMessage.set('Brak dostępu do dodania wyniku.');
+      this.errorMessage.set(this.mode === 'CREATE' ? 'Brak dostępu do dodania wyniku.' : 'Brak dostępu do edycji wyniku.');
     } else if (error.status === 404 && body?.title === 'Athlete not found') {
       this.errorMessage.set('Nie znaleziono wybranego zawodnika.');
     } else if (error.status === 404 && body?.title === 'Test not found') {
       this.errorMessage.set('Nie znaleziono wybranego testu.');
+    } else if (error.status === 404 && this.mode === 'EDIT') {
+      this.errorMessage.set('Nie znaleziono wyniku do edycji.');
     } else if (error.status === 409 && body?.title === 'Athlete is inactive') {
       this.errorMessage.set('Nie można dodać wyniku zawodnikowi nieaktywnemu. Wybierz aktywnego zawodnika.');
     } else if (error.status === 409 && body?.title === 'Test is inactive') {
-      this.errorMessage.set('Wybrany test jest nieaktywny. Wybierz inny test.');
+      this.errorMessage.set(
+        this.mode === 'CREATE'
+          ? 'Wybrany test jest nieaktywny. Wybierz inny test.'
+          : 'Nie można przypisać wyniku do nieaktywnego testu. Wybierz aktywny test.',
+      );
     } else if (error.status === 400) {
       this.errorMessage.set('Sprawdź poprawność danych i spróbuj ponownie.');
     } else {
-      this.errorMessage.set('Nie udało się dodać wyniku. Spróbuj ponownie.');
+      this.errorMessage.set(
+        this.mode === 'CREATE'
+          ? 'Nie udało się dodać wyniku. Spróbuj ponownie.'
+          : 'Nie udało się zapisać zmian wyniku. Spróbuj ponownie.',
+      );
     }
   }
 }

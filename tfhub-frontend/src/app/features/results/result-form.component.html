@@ -3,10 +3,10 @@
     <p class="form-error" role="alert">{{ message }}</p>
   }
 
-  @if (!tests.some(isActiveTest)) {
+  @if (mode === 'CREATE' && !tests.some(isActiveTest)) {
     <p class="form-notice" role="status">Brak aktywnych testów, do których można dodać wynik.</p>
   }
-  @if (!athletes.some(isActiveAthlete)) {
+  @if (mode === 'CREATE' && !athletes.some(isActiveAthlete)) {
     <p class="form-notice" role="status">Brak aktywnych zawodników, którym można dodać wynik.</p>
   }
 
@@ -22,7 +22,7 @@
     >
       <option value="" disabled>Wybierz zawodnika</option>
       @for (athlete of athletes; track athlete.id) {
-        @if (athlete.active) {
+        @if (mode === 'EDIT' || athlete.active) {
           <option [value]="athlete.id">{{ athlete.firstName }} {{ athlete.lastName }}</option>
         }
       }
@@ -44,8 +44,8 @@
     >
       <option value="" disabled>Wybierz test</option>
       @for (test of tests; track test.id) {
-        @if (test.active) {
-          <option [value]="test.id">{{ test.name }}</option>
+        @if (isActiveTest(test)) {
+          <option [value]="test.id">{{ test.name }}{{ test.active ? '' : ' (nieaktywny)' }}</option>
         }
       }
     </select>

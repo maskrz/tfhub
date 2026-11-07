@@ -1,6 +1,6 @@
 <dialog #dialog class="modal" aria-labelledby="modal-title" (cancel)="onDialogCancel($event)">
   <div class="modal-header">
-    <h2 id="modal-title">Dodaj wynik</h2>
+    <h2 id="modal-title">{{ mode === 'CREATE' ? 'Dodaj wynik' : 'Edytuj wynik' }}</h2>
     <button
       type="button"
       class="button button--icon close-button"
@@ -14,8 +14,10 @@
 
   <div class="modal-content">
     <app-result-form
+      [mode]="mode"
       [athletes]="athletes"
       [tests]="tests"
+      [result]="result"
       (saved)="onSaved($event)"
       (savingChange)="saving.set($event)"
     />

@@ -2,7 +2,7 @@ import { AfterViewInit, Component, ElementRef, EventEmitter, Input, Output, View
 import { AthleteResponse } from '../athletes/athlete.model';
 import { TestResponse } from '../tests/test.model';
 import { ResultFormComponent } from './result-form.component';
-import { ResultResponse } from './result.model';
+import { ResultFormMode, ResultResponse } from './result.model';
 
 @Component({
   imports: [ResultFormComponent],
@@ -11,8 +11,10 @@ import { ResultResponse } from './result.model';
   styleUrl: './result-form-modal.component.scss',
 })
 export class ResultFormModalComponent implements AfterViewInit {
+  @Input({ required: true }) mode: ResultFormMode = 'CREATE';
   @Input({ required: true }) athletes: AthleteResponse[] = [];
   @Input({ required: true }) tests: TestResponse[] = [];
+  @Input() result: ResultResponse | null = null;
   @Output() saved = new EventEmitter<ResultResponse>();
   @Output() cancelled = new EventEmitter<void>();
   @ViewChild('dialog') private dialog!: ElementRef<HTMLDialogElement>;

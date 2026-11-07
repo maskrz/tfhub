@@ -76,12 +76,6 @@ h1 {
 
 .date-filter .filter-field { min-width: 8.5rem; }
 
-.filters-actions {
-  display: flex;
-  justify-content: flex-end;
-  margin: -1rem 0 1rem;
-}
-
 .table-surface {
   background: #fff;
   border: 1px solid #d8deea;
@@ -143,7 +137,6 @@ td strong { font-size: 1.02rem; font-weight: 650; }
 }
 .feedback p { margin: 0; }
 .retry-button { margin-top: 1rem; }
-.filters-actions .clear-button { min-height: 2.5rem; }
 
 @media (max-width: 1000px) {
   .filters { align-items: stretch; }

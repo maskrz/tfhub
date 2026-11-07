@@ -80,12 +80,6 @@
     </label>
   </div>
 
-  @if (hasActiveFilters()) {
-    <div class="filters-actions">
-      <button type="button" class="button button--secondary clear-button" (click)="clearFilters()">Wyczyść filtry</button>
-    </div>
-  }
-
   @if (loading()) {
     <p class="feedback" role="status">Ładowanie wyników...</p>
   } @else if (errorMessage(); as message) {
@@ -131,9 +125,8 @@
                 <button
                   type="button"
                   class="button button--secondary"
-                  disabled
-                  title="Edycja wyniku będzie dostępna w osobnej funkcji."
-                  [attr.aria-label]="'Edytuj wynik — niedostępne: ' + result.athleteName + ', ' + result.testName"
+                  [attr.aria-label]="'Edytuj wynik: ' + result.athleteName + ', ' + result.testName"
+                  (click)="openEditForm(result)"
                 >
                   Edytuj
                 </button>
@@ -157,9 +150,11 @@
 
 @if (isCreateFormOpen()) {
   <app-result-form-modal
+    [mode]="selectedResult() ? 'EDIT' : 'CREATE'"
     [athletes]="athletes()"
     [tests]="tests()"
-    (saved)="onResultCreated($event)"
+    [result]="selectedResult()"
+    (saved)="onResultSaved($event)"
     (cancelled)="closeCreateForm()"
   />
 }

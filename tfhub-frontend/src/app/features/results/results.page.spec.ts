@@ -31,6 +31,7 @@ describe('ResultsPage', () => {
   let resultsApi: {
     getAll: ReturnType<typeof vi.fn>;
     createResult: ReturnType<typeof vi.fn>;
+    updateResult: ReturnType<typeof vi.fn>;
     createMultipleResults: ReturnType<typeof vi.fn>;
   };
   let athletesApi: { getAll: ReturnType<typeof vi.fn> };
@@ -43,10 +44,13 @@ describe('ResultsPage', () => {
     createLoader: (request: object) => Observable<ResultResponse> = () => of(results[0]),
     multipleCreateLoader: (request: object) => Observable<CreateMultipleResultsResponse> = () =>
       of({ createdCount: 1, results: [results[0]] }),
+    updateLoader: (id: number, request: object) => Observable<ResultResponse> = (id, request) =>
+      of({ ...results[0], ...request, id }),
   ): Promise<void> {
     resultsApi = {
       getAll: vi.fn(resultLoader),
       createResult: vi.fn(createLoader),
+      updateResult: vi.fn(updateLoader),
       createMultipleResults: vi.fn(multipleCreateLoader),
     };
     athletesApi = { getAll: vi.fn(athleteLoader) };
@@ -94,6 +98,13 @@ describe('ResultsPage', () => {
 
   function openCreateForm(): void {
     (fixture.nativeElement.querySelector('.page-heading .button--primary') as HTMLButtonElement).click();
+    fixture.detectChanges();
+  }
+
+  function openEditForm(rowIndex: number): void {
+    const button = fixture.nativeElement.querySelectorAll('tbody tr')[rowIndex]
+      .querySelector('.action-cell button') as HTMLButtonElement;
+    button.click();
     fixture.detectChanges();
   }
 
@@ -202,7 +213,7 @@ describe('ResultsPage', () => {
     expectSingleLoad();
   });
 
-  it('combines all filters and can clear them without reloading data', async () => {
+  it('combines all filters locally without offering a separate clear-filters button', async () => {
     await createPage();
 
     setInput('input[type="search"]', 'skok');
@@ -214,9 +225,7 @@ describe('ResultsPage', () => {
     expect(rowTexts()).toHaveLength(1);
     expect(rowTexts()[0]).toContain('Anna Nowak');
 
-    (fixture.nativeElement.querySelector('.clear-button') as HTMLButtonElement | null)?.click();
-    fixture.detectChanges();
-    expect(rowTexts()).toHaveLength(3);
+    expect(fixture.nativeElement.querySelector('.clear-button')).toBeNull();
     expectSingleLoad();
   });
 
@@ -246,7 +255,7 @@ describe('ResultsPage', () => {
     await createPage();
     setInput('input[type="search"]', 'brak');
     expect(fixture.nativeElement.textContent).toContain('Nie znaleziono wyników pasujących do filtrów');
-    expect(fixture.nativeElement.querySelector('.clear-button')).toBeTruthy();
+    expect(fixture.nativeElement.querySelector('.clear-button')).toBeNull();
     expectSingleLoad();
   });
 
@@ -257,6 +266,7 @@ describe('ResultsPage', () => {
     resultsApi = {
       getAll: vi.fn(() => resultsSubject.asObservable()),
       createResult: vi.fn(() => of(results[0])),
+      updateResult: vi.fn((id: number) => of(results.find((result) => result.id === id) ?? results[0])),
       createMultipleResults: vi.fn(() => of({ createdCount: 1, results: [results[0]] })),
     };
     athletesApi = { getAll: vi.fn(() => athletesSubject.asObservable()) };
@@ -301,8 +311,8 @@ describe('ResultsPage', () => {
 
     const buttons = Array.from(fixture.nativeElement.querySelectorAll('.action-cell button')) as HTMLButtonElement[];
     expect(buttons.map((button) => button.textContent?.trim())).toEqual(['Edytuj', 'Usuń', 'Edytuj', 'Usuń', 'Edytuj', 'Usuń']);
-    expect(buttons.every((button) => button.disabled)).toBe(true);
-    expect(buttons[0].title).toContain('osobnej funkcji');
+    expect(buttons.filter((_, index) => index % 2 === 0).every((button) => !button.disabled)).toBe(true);
+    expect(buttons.filter((_, index) => index % 2 === 1).every((button) => button.disabled)).toBe(true);
   });
 
   it('opens and cancels the add-result modal with the correct fields and local date default', async () => {
@@ -659,6 +669,131 @@ describe('ResultsPage', () => {
     pending.complete();
     fixture.detectChanges();
     expect(fixture.nativeElement.querySelector('app-multiple-results-form-modal')).toBeNull();
+    expectSingleLoad();
+  });
+
+  it('opens the shared form for the selected row and prepopulates inactive linked records without an extra GET', async () => {
+    await createPage();
+    openEditForm(1);
+
+    expect(fixture.nativeElement.querySelector('#modal-title')?.textContent).toContain('Edytuj wynik');
+    expect((fixture.nativeElement.querySelector('#result-athlete') as HTMLSelectElement).value).toBe('2');
+    expect((fixture.nativeElement.querySelector('#result-test') as HTMLSelectElement).value).toBe('20');
+    expect((fixture.nativeElement.querySelector('#result-date') as HTMLInputElement).value).toBe('2025-02-01');
+    expect((fixture.nativeElement.querySelector('#result-value') as HTMLInputElement).value).toBe('4.5');
+    expect((fixture.nativeElement.querySelector('#result-type') as HTMLSelectElement).value).toBe('COMPETITION');
+    expect(fixture.nativeElement.querySelector('#result-test option[value="20"]')?.textContent).toContain('(nieaktywny)');
+    expect(fixture.nativeElement.querySelector('#result-value-unit')?.textContent).toContain('m');
+    expectSingleLoad();
+
+    (fixture.nativeElement.querySelector('.cancel-button') as HTMLButtonElement).click();
+    fixture.detectChanges();
+    expect(resultsApi.updateResult).not.toHaveBeenCalled();
+    expect(rowTexts()[1]).toContain('Skok w dal');
+  });
+
+  it('updates the selected result locally, retaining filters and sort without reloading', async () => {
+    const updateResult = vi.fn((id: number, request: object) =>
+      of({ ...results[1], ...request, id } as ResultResponse),
+    );
+    await createPage(undefined, undefined, undefined, undefined, undefined, updateResult);
+    setSelect('[aria-label="Filtruj według zawodnika"]', '2');
+    setSelect('[aria-label="Filtruj według rodzaju"]', 'COMPETITION');
+    (fixture.nativeElement.querySelector('.sort-button') as HTMLButtonElement).click();
+    fixture.detectChanges();
+    openEditForm(0);
+
+    expect((fixture.nativeElement.querySelector('#result-athlete') as HTMLSelectElement).value).toBe('2');
+    expect((fixture.nativeElement.querySelector('#result-test') as HTMLSelectElement).value).toBe('20');
+    setFormValue('#result-test', '10');
+    expect(fixture.nativeElement.querySelector('#result-value-unit')?.textContent).toContain('s');
+    setFormValue('#result-date', '2025-03-01');
+    setFormValue('#result-value', '4.125');
+    submitCreateForm();
+
+    expect(updateResult).toHaveBeenCalledTimes(1);
+    expect(updateResult).toHaveBeenCalledWith(2, {
+      athleteId: 2,
+      testId: 10,
+      resultDate: '2025-03-01',
+      value: 4.125,
+      type: 'COMPETITION',
+    });
+    expect(fixture.nativeElement.querySelector('app-result-form-modal')).toBeNull();
+    expect(fixture.nativeElement.textContent).toContain('Wynik został zaktualizowany.');
+    expect(rowTexts()).toHaveLength(1);
+    expect(rowTexts()[0]).toContain('Bieg na 40 m');
+    expect(rowTexts()[0]).toContain('4,125 s');
+    expectSingleLoad();
+  });
+
+  it('validates edit form values and does not call the update API for invalid data', async () => {
+    await createPage();
+    openEditForm(0);
+    for (const invalidValue of ['0', '-1', '1.2345', '1000000000', '1e3']) {
+      setFormValue('#result-value', invalidValue);
+      submitCreateForm();
+      expect(resultsApi.updateResult).not.toHaveBeenCalled();
+      expect(fixture.nativeElement.querySelector('#result-value-error')?.textContent).toBeTruthy();
+    }
+
+    setFormValue('#result-value', '1.234');
+    setFormValue('#result-athlete', '');
+    setFormValue('#result-test', '');
+    setFormValue('#result-date', '');
+    setFormValue('#result-type', '');
+    submitCreateForm();
+    expect(resultsApi.updateResult).not.toHaveBeenCalled();
+    expect(fixture.nativeElement.querySelector('#result-athlete-error')?.textContent).toContain('Wybierz zawodnika');
+    expect(fixture.nativeElement.querySelector('#result-test-error')?.textContent).toContain('Wybierz test');
+    expect(fixture.nativeElement.querySelector('#result-date-error')?.textContent).toContain('Wybierz datę');
+    expect(fixture.nativeElement.querySelector('#result-type-error')?.textContent).toContain('Wybierz rodzaj');
+  });
+
+  it('preserves form values and leaves the local collection unchanged after an update API error', async () => {
+    const updateResult = vi.fn(() =>
+      throwError(() => new HttpErrorResponse({ status: 409, error: { title: 'Test is inactive' } })),
+    );
+    await createPage(undefined, undefined, undefined, undefined, undefined, updateResult);
+    openEditForm(1);
+    setFormValue('#result-date', '2025-04-01');
+    setFormValue('#result-value', '8.125');
+    submitCreateForm();
+
+    expect(fixture.nativeElement.querySelector('app-result-form-modal')).toBeTruthy();
+    expect(fixture.nativeElement.textContent).toContain('Nie można przypisać wyniku do nieaktywnego testu');
+    expect(updateResult).toHaveBeenCalledWith(2, {
+      athleteId: 2,
+      testId: 20,
+      resultDate: '2025-04-01',
+      value: 8.125,
+      type: 'COMPETITION',
+    });
+    expect((fixture.nativeElement.querySelector('#result-test') as HTMLSelectElement).value).toBe('20');
+    expect((fixture.nativeElement.querySelector('#result-date') as HTMLInputElement).value).toBe('2025-04-01');
+    expect((fixture.nativeElement.querySelector('#result-value') as HTMLInputElement).value).toBe('8.125');
+    expect(rowTexts()).toHaveLength(3);
+    expect(rowTexts()[0]).toContain('6,125 s');
+    expectSingleLoad();
+  });
+
+  it('prevents duplicate update submissions while the request is pending', async () => {
+    const pending = new Subject<ResultResponse>();
+    const updateResult = vi.fn(() => pending.asObservable());
+    await createPage(undefined, undefined, undefined, undefined, undefined, updateResult);
+    openEditForm(0);
+    setFormValue('#result-value', '8.5');
+    submitCreateForm();
+    (fixture.nativeElement.querySelector('#result-create-form') as HTMLFormElement)
+      .dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+
+    expect(updateResult).toHaveBeenCalledTimes(1);
+    expect((fixture.nativeElement.querySelector('.save-button') as HTMLButtonElement).disabled).toBe(true);
+    expect((fixture.nativeElement.querySelector('.cancel-button') as HTMLButtonElement).disabled).toBe(true);
+    pending.next({ ...results[0], value: 8.5 });
+    pending.complete();
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('app-result-form-modal')).toBeNull();
     expectSingleLoad();
   });
 });

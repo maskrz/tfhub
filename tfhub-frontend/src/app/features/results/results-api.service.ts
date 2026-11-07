@@ -6,6 +6,7 @@ import {
   CreateMultipleResultsResponse,
   CreateResultRequest,
   ResultResponse,
+  UpdateResultRequest,
 } from './result.model';
 
 @Injectable({ providedIn: 'root' })
@@ -18,6 +19,10 @@ export class ResultsApiService {
 
   createResult(request: CreateResultRequest): Observable<ResultResponse> {
     return this.http.post<ResultResponse>('/api/results', request);
+  }
+
+  updateResult(id: number, request: UpdateResultRequest): Observable<ResultResponse> {
+    return this.http.put<ResultResponse>(`/api/results/${id}`, request);
   }
 
   createMultipleResults(request: CreateMultipleResultsRequest): Observable<CreateMultipleResultsResponse> {

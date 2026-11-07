@@ -6,6 +6,7 @@ import {
   CreateMultipleResultsResponse,
   CreateResultRequest,
   ResultResponse,
+  UpdateResultRequest,
 } from './result.model';
 import { ResultsApiService } from './results-api.service';
 
@@ -66,6 +67,27 @@ describe('ResultsApiService', () => {
     expect(request.request.method).toBe('POST');
     expect(request.request.body).toEqual(requestBody);
     request.flush(response, { status: 201, statusText: 'Created' });
+
+    expect(actual).toEqual(response);
+  });
+
+  it('updates a result using the backend request DTO and PUT endpoint', () => {
+    const requestBody: UpdateResultRequest = {
+      athleteId: 2,
+      testId: 3,
+      resultDate: '2025-02-01',
+      value: 7.25,
+      type: 'TRAINING',
+    };
+    const response: ResultResponse = { id: 8, ...requestBody };
+    let actual: ResultResponse | undefined;
+
+    service.updateResult(8, requestBody).subscribe((result) => (actual = result));
+
+    const request = httpTesting.expectOne('/api/results/8');
+    expect(request.request.method).toBe('PUT');
+    expect(request.request.body).toEqual(requestBody);
+    request.flush(response);
 
     expect(actual).toEqual(response);
   });

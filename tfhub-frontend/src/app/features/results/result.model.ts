@@ -17,6 +17,10 @@ export interface CreateResultRequest {
   type: ResultType;
 }
 
+export type UpdateResultRequest = CreateResultRequest;
+
+export type ResultFormMode = 'CREATE' | 'EDIT';
+
 export interface CreateMultipleResultsEntryRequest {
   athleteId: number;
   value: number;
