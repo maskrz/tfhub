@@ -13,6 +13,7 @@ import pl.tfhub.api.athlete.entity.Athlete;
 import pl.tfhub.api.athlete.exception.AthleteAlreadyExistsException;
 import pl.tfhub.api.athlete.exception.AthleteNotFoundException;
 import pl.tfhub.api.athlete.exception.InvalidAthleteIdException;
+import pl.tfhub.api.result.exception.InactiveAthleteException;
 import pl.tfhub.api.result.exception.InactiveTestException;
 import pl.tfhub.api.result.exception.InvalidResultIdException;
 import pl.tfhub.api.result.exception.InvalidResultSearchException;
@@ -66,6 +67,13 @@ public class ApiExceptionHandler {
 	public ProblemDetail handleInactiveTest(InactiveTestException exception) {
 		ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, exception.getMessage());
 		problem.setTitle("Test is inactive");
+		return problem;
+	}
+
+	@ExceptionHandler(InactiveAthleteException.class)
+	public ProblemDetail handleInactiveAthlete(InactiveAthleteException exception) {
+		ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, exception.getMessage());
+		problem.setTitle("Athlete is inactive");
 		return problem;
 	}
 

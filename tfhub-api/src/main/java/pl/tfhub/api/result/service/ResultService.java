@@ -19,6 +19,7 @@ import pl.tfhub.api.result.dto.response.CreateMultipleResultsResponse;
 import pl.tfhub.api.result.dto.response.ResultResponse;
 import pl.tfhub.api.result.entity.TestResult;
 import pl.tfhub.api.result.enums.ResultType;
+import pl.tfhub.api.result.exception.InactiveAthleteException;
 import pl.tfhub.api.result.exception.InactiveTestException;
 import pl.tfhub.api.result.exception.InvalidResultSearchException;
 import pl.tfhub.api.result.exception.MultipleResultsDuplicateAthleteException;
@@ -44,7 +45,7 @@ public class ResultService {
 
 	@Transactional
 	public ResultResponse createResult(CreateResultRequest request) {
-		athleteService.getAthlete(request.athleteId());
+		requireActiveAthlete(request.athleteId());
 		requireActiveTest(request.testId());
 
 		TestResult result = new TestResult(
@@ -137,7 +138,7 @@ public class ResultService {
 		}
 
 		for (CreateResultEntryRequest entry : request.results()) {
-			athleteService.getAthlete(entry.athleteId());
+			requireActiveAthlete(entry.athleteId());
 		}
 
 		List<TestResult> results = request.results().stream()
@@ -159,6 +160,12 @@ public class ResultService {
 	private void requireActiveTest(long testId) {
 		if (!testService.getTest(testId).active()) {
 			throw new InactiveTestException(testId);
+		}
+	}
+
+	private void requireActiveAthlete(long athleteId) {
+		if (!athleteService.getAthlete(athleteId).active()) {
+			throw new InactiveAthleteException(athleteId);
 		}
 	}
 }

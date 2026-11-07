@@ -1,7 +1,7 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
-import { ResultResponse } from './result.model';
+import { CreateResultRequest, ResultResponse } from './result.model';
 
 @Injectable({ providedIn: 'root' })
 export class ResultsApiService {
@@ -9,5 +9,9 @@ export class ResultsApiService {
 
   getAll(): Observable<ResultResponse[]> {
     return this.http.get<ResultResponse[]>('/api/results');
+  }
+
+  createResult(request: CreateResultRequest): Observable<ResultResponse> {
+    return this.http.post<ResultResponse>('/api/results', request);
   }
 }

@@ -1,0 +1,112 @@
+<form id="result-create-form" [formGroup]="form" (ngSubmit)="submit()" novalidate>
+  @if (errorMessage(); as message) {
+    <p class="form-error" role="alert">{{ message }}</p>
+  }
+
+  @if (!tests.some(isActiveTest)) {
+    <p class="form-notice" role="status">Brak aktywnych testów, do których można dodać wynik.</p>
+  }
+  @if (!athletes.some(isActiveAthlete)) {
+    <p class="form-notice" role="status">Brak aktywnych zawodników, którym można dodać wynik.</p>
+  }
+
+  <div class="field">
+    <label for="result-athlete">Zawodnik <span aria-hidden="true">*</span></label>
+    <select
+      id="result-athlete"
+      class="field-control select-with-arrow"
+      formControlName="athleteId"
+      autofocus
+      [attr.aria-invalid]="fieldError('athleteId') ? 'true' : null"
+      aria-describedby="result-athlete-error"
+    >
+      <option value="" disabled>Wybierz zawodnika</option>
+      @for (athlete of athletes; track athlete.id) {
+        @if (athlete.active) {
+          <option [value]="athlete.id">{{ athlete.firstName }} {{ athlete.lastName }}</option>
+        }
+      }
+    </select>
+    @if (fieldError('athleteId'); as message) {
+      <span class="field-error" id="result-athlete-error">{{ message }}</span>
+    }
+  </div>
+
+  <div class="field">
+    <label for="result-test">Test <span aria-hidden="true">*</span></label>
+    <select
+      id="result-test"
+      class="field-control select-with-arrow"
+      formControlName="testId"
+      (change)="onTestSelectionChange($event)"
+      [attr.aria-invalid]="fieldError('testId') ? 'true' : null"
+      aria-describedby="result-test-error"
+    >
+      <option value="" disabled>Wybierz test</option>
+      @for (test of tests; track test.id) {
+        @if (test.active) {
+          <option [value]="test.id">{{ test.name }}</option>
+        }
+      }
+    </select>
+    @if (fieldError('testId'); as message) {
+      <span class="field-error" id="result-test-error">{{ message }}</span>
+    }
+  </div>
+
+  <div class="field">
+    <label for="result-date">Data <span aria-hidden="true">*</span></label>
+    <input
+      id="result-date"
+      class="field-control"
+      type="date"
+      formControlName="resultDate"
+      [attr.aria-invalid]="fieldError('resultDate') ? 'true' : null"
+      aria-describedby="result-date-error"
+    />
+    @if (fieldError('resultDate'); as message) {
+      <span class="field-error" id="result-date-error">{{ message }}</span>
+    }
+  </div>
+
+  <div class="field">
+    <label for="result-value">Wynik <span aria-hidden="true">*</span></label>
+    <div class="value-input">
+      <input
+        id="result-value"
+        class="field-control"
+        type="text"
+        inputmode="decimal"
+        autocomplete="off"
+        formControlName="value"
+        placeholder="0,000"
+        [attr.aria-invalid]="fieldError('value') ? 'true' : null"
+        aria-describedby="result-value-error result-value-unit"
+      />
+      <span class="value-unit" id="result-value-unit">
+        {{ currentTest()?.unit ?? 'Jednostka' }}
+      </span>
+    </div>
+    @if (fieldError('value'); as message) {
+      <span class="field-error" id="result-value-error">{{ message }}</span>
+    }
+  </div>
+
+  <div class="field">
+    <label for="result-type">Rodzaj <span aria-hidden="true">*</span></label>
+    <select
+      id="result-type"
+      class="field-control select-with-arrow"
+      formControlName="type"
+      [attr.aria-invalid]="fieldError('type') ? 'true' : null"
+      aria-describedby="result-type-error"
+    >
+      <option value="" disabled>Wybierz rodzaj</option>
+      <option value="TRAINING">Trening</option>
+      <option value="COMPETITION">Zawody</option>
+    </select>
+    @if (fieldError('type'); as message) {
+      <span class="field-error" id="result-type-error">{{ message }}</span>
+    }
+  </div>
+</form>

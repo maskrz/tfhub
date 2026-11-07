@@ -27,7 +27,10 @@ const results: ResultResponse[] = [
 
 describe('ResultsPage', () => {
   let fixture: ComponentFixture<ResultsPage>;
-  let resultsApi: { getAll: ReturnType<typeof vi.fn> };
+  let resultsApi: {
+    getAll: ReturnType<typeof vi.fn>;
+    createResult: ReturnType<typeof vi.fn>;
+  };
   let athletesApi: { getAll: ReturnType<typeof vi.fn> };
   let testsApi: { getAll: ReturnType<typeof vi.fn> };
 
@@ -35,8 +38,9 @@ describe('ResultsPage', () => {
     resultLoader: () => Observable<ResultResponse[]> = () => of(results),
     athleteLoader: () => Observable<AthleteResponse[]> = () => of(athletes),
     testLoader: () => Observable<TestResponse[]> = () => of(tests),
+    createLoader: (request: object) => Observable<ResultResponse> = () => of(results[0]),
   ): Promise<void> {
-    resultsApi = { getAll: vi.fn(resultLoader) };
+    resultsApi = { getAll: vi.fn(resultLoader), createResult: vi.fn(createLoader) };
     athletesApi = { getAll: vi.fn(athleteLoader) };
     testsApi = { getAll: vi.fn(testLoader) };
 
@@ -78,6 +82,23 @@ describe('ResultsPage', () => {
     expect(resultsApi.getAll).toHaveBeenCalledTimes(1);
     expect(athletesApi.getAll).toHaveBeenCalledTimes(1);
     expect(testsApi.getAll).toHaveBeenCalledTimes(1);
+  }
+
+  function openCreateForm(): void {
+    (fixture.nativeElement.querySelector('.page-heading .button--primary') as HTMLButtonElement).click();
+    fixture.detectChanges();
+  }
+
+  function setFormValue(selector: string, value: string): void {
+    const control = fixture.nativeElement.querySelector(selector) as HTMLInputElement | HTMLSelectElement;
+    control.value = value;
+    control.dispatchEvent(new Event(control instanceof HTMLSelectElement ? 'change' : 'input'));
+    fixture.detectChanges();
+  }
+
+  function submitCreateForm(): void {
+    (fixture.nativeElement.querySelector('.save-button') as HTMLButtonElement).click();
+    fixture.detectChanges();
   }
 
   it('loads the results and lookup collections once and shows date-descending results by default', async () => {
@@ -202,7 +223,10 @@ describe('ResultsPage', () => {
     const resultsSubject = new Subject<ResultResponse[]>();
     const athletesSubject = new Subject<AthleteResponse[]>();
     const testsSubject = new Subject<TestResponse[]>();
-    resultsApi = { getAll: vi.fn(() => resultsSubject.asObservable()) };
+    resultsApi = {
+      getAll: vi.fn(() => resultsSubject.asObservable()),
+      createResult: vi.fn(() => of(results[0])),
+    };
     athletesApi = { getAll: vi.fn(() => athletesSubject.asObservable()) };
     testsApi = { getAll: vi.fn(() => testsSubject.asObservable()) };
 
@@ -247,5 +271,187 @@ describe('ResultsPage', () => {
     expect(buttons.map((button) => button.textContent?.trim())).toEqual(['Edytuj', 'Usuń', 'Edytuj', 'Usuń', 'Edytuj', 'Usuń']);
     expect(buttons.every((button) => button.disabled)).toBe(true);
     expect(buttons[0].title).toContain('osobnej funkcji');
+  });
+
+  it('opens and cancels the add-result modal with the correct fields and local date default', async () => {
+    await createPage();
+    openCreateForm();
+
+    expect(fixture.nativeElement.querySelector('#modal-title')?.textContent).toContain('Dodaj wynik');
+    expect(fixture.nativeElement.querySelector('#result-athlete')).toBeTruthy();
+    expect(fixture.nativeElement.querySelector('#result-test')).toBeTruthy();
+    expect(fixture.nativeElement.querySelector('#result-date')).toBeTruthy();
+    expect(fixture.nativeElement.querySelector('#result-value')).toBeTruthy();
+    expect(fixture.nativeElement.querySelector('#result-type')).toBeTruthy();
+
+    const now = new Date();
+    const expectedDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    expect((fixture.nativeElement.querySelector('#result-date') as HTMLInputElement).value).toBe(expectedDate);
+
+    (fixture.nativeElement.querySelector('.cancel-button') as HTMLButtonElement).click();
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('app-result-form-modal')).toBeNull();
+    expect(resultsApi.createResult).not.toHaveBeenCalled();
+    expect(rowTexts()).toHaveLength(3);
+    expectSingleLoad();
+  });
+
+  it('offers only active athletes and tests, result types, and selected test unit', async () => {
+    await createPage();
+    openCreateForm();
+
+    const athleteOptions = Array.from(
+      fixture.nativeElement.querySelectorAll('#result-athlete option'),
+      (option) => (option as HTMLOptionElement).textContent?.trim(),
+    );
+    const testOptions = Array.from(
+      fixture.nativeElement.querySelectorAll('#result-test option'),
+      (option) => (option as HTMLOptionElement).textContent?.trim(),
+    );
+    expect(athleteOptions).not.toContain('Anna Nowak (nieaktywny)');
+    expect(athleteOptions).not.toContain('Anna Nowak');
+    expect(athleteOptions).toEqual(['Wybierz zawodnika', 'Jan Kowalski']);
+    expect(testOptions).toEqual(['Wybierz test', 'Bieg na 40 m']);
+
+    setFormValue('#result-test', '10');
+    expect(fixture.nativeElement.querySelector('#result-value-unit')?.textContent?.trim()).toBe('s');
+    expect(fixture.nativeElement.querySelector('#result-type option[value="TRAINING"]')?.textContent).toContain('Trening');
+    expect(fixture.nativeElement.querySelector('#result-type option[value="COMPETITION"]')?.textContent).toContain('Zawody');
+    expectSingleLoad();
+  });
+
+  it('validates required fields, positive values, decimal precision, and database range', async () => {
+    const createResult = vi.fn(() => of(results[0]));
+    await createPage(undefined, undefined, undefined, createResult);
+    openCreateForm();
+    submitCreateForm();
+    expect(resultsApi.createResult).not.toHaveBeenCalled();
+    expect(fixture.nativeElement.querySelectorAll('.field-error').length).toBe(4);
+
+    setFormValue('#result-athlete', '1');
+    setFormValue('#result-test', '10');
+    setFormValue('#result-date', '2025-02-01');
+    setFormValue('#result-type', 'TRAINING');
+
+    for (const invalidValue of ['0', '-1', '1.2345', '1000000000', '1e3']) {
+      setFormValue('#result-value', invalidValue);
+      submitCreateForm();
+      expect(resultsApi.createResult).not.toHaveBeenCalled();
+      expect(fixture.nativeElement.querySelector('#result-value-error')).toBeTruthy();
+    }
+
+    setFormValue('#result-value', '1,234');
+    submitCreateForm();
+    expect(resultsApi.createResult).toHaveBeenCalledWith({
+      athleteId: 1,
+      testId: 10,
+      resultDate: '2025-02-01',
+      value: 1.234,
+      type: 'TRAINING',
+    });
+  });
+
+  it('adds a created result locally while preserving active filters and sort direction', async () => {
+    const createdResult: ResultResponse = {
+      id: 4,
+      athleteId: 1,
+      testId: 10,
+      resultDate: '2025-03-01',
+      value: 6.01,
+      type: 'TRAINING',
+    };
+    const createResult = vi.fn(() => of(createdResult));
+    await createPage(undefined, undefined, undefined, createResult);
+    setSelect('[aria-label="Filtruj według zawodnika"]', '1');
+    setSelect('[aria-label="Filtruj według rodzaju"]', 'TRAINING');
+    (fixture.nativeElement.querySelector('.sort-button') as HTMLButtonElement).click();
+    fixture.detectChanges();
+    openCreateForm();
+
+    setFormValue('#result-athlete', '1');
+    setFormValue('#result-test', '10');
+    setFormValue('#result-date', createdResult.resultDate);
+    setFormValue('#result-value', '6.01');
+    setFormValue('#result-type', 'TRAINING');
+    submitCreateForm();
+    fixture.detectChanges();
+
+    expect(createResult).toHaveBeenCalledWith({
+      athleteId: 1,
+      testId: 10,
+      resultDate: '2025-03-01',
+      value: 6.01,
+      type: 'TRAINING',
+    });
+    expect(fixture.nativeElement.querySelector('app-result-form-modal')).toBeNull();
+    expect(fixture.nativeElement.textContent).toContain('Wynik został dodany.');
+    expect(rowTexts()).toHaveLength(2);
+    expect(rowTexts()[0]).toContain('01.02.2025');
+    expect(rowTexts()[1]).toContain('01.03.2025');
+    expectSingleLoad();
+  });
+
+  it('keeps the form open with entered values after an API error', async () => {
+    const createResult = vi.fn(() =>
+      throwError(() => new HttpErrorResponse({ status: 409, error: { title: 'Test is inactive' } })),
+    );
+    await createPage(undefined, undefined, undefined, createResult);
+    openCreateForm();
+    setFormValue('#result-athlete', '1');
+    setFormValue('#result-test', '10');
+    setFormValue('#result-date', '2025-02-01');
+    setFormValue('#result-value', '4.125');
+    setFormValue('#result-type', 'COMPETITION');
+    submitCreateForm();
+
+    expect(fixture.nativeElement.querySelector('app-result-form-modal')).toBeTruthy();
+    expect(fixture.nativeElement.textContent).toContain('Wybrany test jest nieaktywny');
+    expect((fixture.nativeElement.querySelector('#result-athlete') as HTMLSelectElement).value).toBe('1');
+    expect((fixture.nativeElement.querySelector('#result-value') as HTMLInputElement).value).toBe('4.125');
+    expect((fixture.nativeElement.querySelector('#result-type') as HTMLSelectElement).value).toBe('COMPETITION');
+    expect(rowTexts()).toHaveLength(3);
+    expectSingleLoad();
+  });
+
+  it('explains backend rejection of an inactive athlete and preserves the form', async () => {
+    const createResult = vi.fn(() =>
+      throwError(() => new HttpErrorResponse({ status: 409, error: { title: 'Athlete is inactive' } })),
+    );
+    await createPage(undefined, undefined, undefined, createResult);
+    openCreateForm();
+    setFormValue('#result-athlete', '1');
+    setFormValue('#result-test', '10');
+    setFormValue('#result-date', '2025-02-01');
+    setFormValue('#result-value', '4.125');
+    setFormValue('#result-type', 'COMPETITION');
+    submitCreateForm();
+
+    expect(fixture.nativeElement.textContent).toContain('Nie można dodać wyniku zawodnikowi nieaktywnemu');
+    expect((fixture.nativeElement.querySelector('#result-athlete') as HTMLSelectElement).value).toBe('1');
+    expect(fixture.nativeElement.querySelector('app-result-form-modal')).toBeTruthy();
+  });
+
+  it('prevents duplicate submissions while the create request is pending', async () => {
+    const pending = new Subject<ResultResponse>();
+    const createResult = vi.fn(() => pending.asObservable());
+    await createPage(undefined, undefined, undefined, createResult);
+    openCreateForm();
+    setFormValue('#result-athlete', '1');
+    setFormValue('#result-test', '10');
+    setFormValue('#result-date', '2025-02-01');
+    setFormValue('#result-value', '7.5');
+    setFormValue('#result-type', 'TRAINING');
+    submitCreateForm();
+    (fixture.nativeElement.querySelector('#result-create-form') as HTMLFormElement)
+      .dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+
+    expect(createResult).toHaveBeenCalledTimes(1);
+    expect((fixture.nativeElement.querySelector('.save-button') as HTMLButtonElement).disabled).toBe(true);
+    expect((fixture.nativeElement.querySelector('.cancel-button') as HTMLButtonElement).disabled).toBe(true);
+    pending.next(results[0]);
+    pending.complete();
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('app-result-form-modal')).toBeNull();
+    expectSingleLoad();
   });
 });

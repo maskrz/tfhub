@@ -238,7 +238,7 @@ No separate Competition entity is required initially.
 - Results must reference an existing athlete and test.
 - Results must use the canonical unit of the selected test.
 - Results must be positive numbers.
-- Results can be recorded for inactive athletes when historical data needs to be supplemented.
+- New results can be recorded only for active athletes. Existing historical results for deactivated athletes remain accessible.
 - New results should normally be recorded only for active tests.
 - Multiple results for the same athlete, test and date are technically allowed.
 - The application does not enforce uniqueness of `(athlete_id, test_id, result_date)`.

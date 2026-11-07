@@ -1,0 +1,32 @@
+:host { display: block; }
+
+form { display: grid; gap: 1.15rem; }
+.field { display: grid; gap: .45rem; }
+.field > label { color: #20283a; font-weight: 650; }
+.field > label span { color: #bd3434; }
+.field-error { color: #a12e2e; font-size: .88rem; }
+
+.form-error,
+.form-notice {
+  border: 1px solid #eccaca;
+  border-radius: .55rem;
+  margin: 0;
+  padding: .75rem .85rem;
+}
+
+.form-error { background: #fff1f1; color: #8d2929; }
+.form-notice { background: #f5f6f8; border-color: #d8deea; color: #526078; }
+
+.value-input {
+  align-items: center;
+  display: flex;
+  gap: .75rem;
+}
+
+.value-input input { flex: 1; min-width: 0; }
+.value-unit { color: #526078; font-weight: 650; min-width: 2rem; }
+
+@media (max-width: 520px) {
+  form { gap: .9rem; }
+  .value-input { gap: .5rem; }
+}

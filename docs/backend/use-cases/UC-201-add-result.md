@@ -41,8 +41,8 @@ All fields are required.
 
 ### Athlete
 - The athlete must exist.
-- Both active and inactive athletes are allowed.
-- A result can be added for an inactive athlete to supplement historical data.
+- The athlete must be active.
+- Inactive athletes cannot be selected for new results; historical results for them remain accessible.
 
 ### Test
 - The test must exist.
@@ -71,7 +71,7 @@ Allowed values:
 ## 5. Business Rules
 
 1. The result must reference an existing athlete and an existing active test.
-2. Inactive athletes are allowed.
+2. The referenced athlete must be active.
 3. Inactive tests are not allowed for new results.
 4. Multiple results for the same athlete, test and date are allowed.
 5. The result ID is generated automatically.
@@ -106,6 +106,7 @@ Do not expose JPA entities through the API.
 | Invalid result type | 400 Bad Request |
 | Invalid or non-positive athlete/test ID | 400 Bad Request |
 | Athlete does not exist | 404 Not Found |
+| Athlete exists but is inactive | 409 Conflict |
 | Test does not exist | 404 Not Found |
 | Test is inactive | 409 Conflict |
 | Malformed JSON | 400 Bad Request |

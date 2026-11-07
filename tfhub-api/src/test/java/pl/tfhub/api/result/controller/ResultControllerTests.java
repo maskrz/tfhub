@@ -18,6 +18,7 @@ import pl.tfhub.api.result.dto.request.UpdateResultRequest;
 import pl.tfhub.api.result.dto.response.CreateMultipleResultsResponse;
 import pl.tfhub.api.result.dto.response.ResultResponse;
 import pl.tfhub.api.result.enums.ResultType;
+import pl.tfhub.api.result.exception.InactiveAthleteException;
 import pl.tfhub.api.result.exception.InactiveTestException;
 import pl.tfhub.api.result.exception.InvalidResultSearchException;
 import pl.tfhub.api.result.exception.MultipleResultsDuplicateAthleteException;
@@ -409,6 +410,11 @@ class ResultControllerTests {
 		mockMvc.perform(post("/api/results").contentType(MediaType.APPLICATION_JSON).content(validBody()))
 				.andExpect(status().isNotFound())
 				.andExpect(jsonPath("$.title").value("Test not found"));
+
+		doThrow(new InactiveAthleteException(1)).when(resultService).createResult(request);
+		mockMvc.perform(post("/api/results").contentType(MediaType.APPLICATION_JSON).content(validBody()))
+				.andExpect(status().isConflict())
+				.andExpect(jsonPath("$.title").value("Athlete is inactive"));
 
 		doThrow(new InactiveTestException(2)).when(resultService).createResult(request);
 		mockMvc.perform(post("/api/results").contentType(MediaType.APPLICATION_JSON).content(validBody()))

@@ -24,6 +24,7 @@ import pl.tfhub.api.result.dto.response.CreateMultipleResultsResponse;
 import pl.tfhub.api.result.dto.response.ResultResponse;
 import pl.tfhub.api.result.entity.TestResult;
 import pl.tfhub.api.result.enums.ResultType;
+import pl.tfhub.api.result.exception.InactiveAthleteException;
 import pl.tfhub.api.result.exception.InactiveTestException;
 import pl.tfhub.api.result.exception.InvalidResultSearchException;
 import pl.tfhub.api.result.exception.MultipleResultsDuplicateAthleteException;
@@ -262,10 +263,22 @@ class ResultServiceTests {
 	}
 
 	@Test
-	void createsResultForAnInactiveAthleteAndActiveTest() {
+	void rejectsInactiveAthleteWhenCreatingResult() {
 		CreateResultRequest request = request();
 		when(athleteService.getAthlete(1L))
 				.thenReturn(new AthleteResponse(1L, "A", "B", 2000, Gender.MALE, false));
+		assertThrows(InactiveAthleteException.class, () -> resultService.createResult(request));
+		verify(athleteService).getAthlete(1L);
+		verify(testService, never()).getTest(anyLong());
+		verify(resultRepository, never()).saveAndFlush(any(TestResult.class));
+		verifyNoMoreInteractions(athleteService, testService, resultRepository);
+	}
+
+	@Test
+	void createsResultForAnActiveAthleteAndActiveTest() {
+		CreateResultRequest request = request();
+		when(athleteService.getAthlete(1L))
+				.thenReturn(new AthleteResponse(1L, "A", "B", 2000, Gender.MALE, true));
 		when(testService.getTest(2L))
 				.thenReturn(new TestResponse(2L, "Sprint", "s", TestCategory.TIME, false, true));
 		when(resultRepository.saveAndFlush(any(TestResult.class))).thenAnswer(invocation -> {
@@ -335,14 +348,14 @@ class ResultServiceTests {
 	}
 
 	@Test
-	void createsBatchForActiveAndInactiveAthletesAndReturnsResultsInRequestOrder() {
+	void createsBatchForActiveAthletesAndReturnsResultsInRequestOrder() {
 		CreateMultipleResultsRequest request = batchRequest();
 		when(testService.getTest(2L))
 				.thenReturn(new TestResponse(2L, "Sprint", "s", TestCategory.TIME, false, true));
 		when(athleteService.getAthlete(7L))
 				.thenReturn(new AthleteResponse(7L, "A", "B", 2000, Gender.MALE, true));
 		when(athleteService.getAthlete(3L))
-				.thenReturn(new AthleteResponse(3L, "C", "D", 2001, Gender.FEMALE, false));
+				.thenReturn(new AthleteResponse(3L, "C", "D", 2001, Gender.FEMALE, true));
 		when(resultRepository.saveAllAndFlush(any(Iterable.class))).thenAnswer(invocation -> {
 			Iterable<TestResult> saved = invocation.getArgument(0);
 			List<TestResult> persisted = new ArrayList<>();
@@ -390,6 +403,20 @@ class ResultServiceTests {
 		when(athleteService.getAthlete(3L)).thenThrow(new AthleteNotFoundException(3));
 
 		assertThrows(AthleteNotFoundException.class, () -> resultService.createMultipleResults(batchRequest()));
+		verify(resultRepository, never()).saveAllAndFlush(any(Iterable.class));
+	}
+
+	@Test
+	void rejectsInactiveAthleteWithoutSavingAnyBatchResults() {
+		when(testService.getTest(2L))
+				.thenReturn(new TestResponse(2L, "Sprint", "s", TestCategory.TIME, false, true));
+		when(athleteService.getAthlete(7L))
+				.thenReturn(new AthleteResponse(7L, "A", "B", 2000, Gender.MALE, true));
+		when(athleteService.getAthlete(3L))
+				.thenReturn(new AthleteResponse(3L, "C", "D", 2001, Gender.FEMALE, false));
+
+		assertThrows(InactiveAthleteException.class, () -> resultService.createMultipleResults(batchRequest()));
+
 		verify(resultRepository, never()).saveAllAndFlush(any(Iterable.class));
 	}
 

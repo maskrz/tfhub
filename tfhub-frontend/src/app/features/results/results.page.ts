@@ -8,8 +8,10 @@ import { TestResponse } from '../tests/test.model';
 import { TestsApiService } from '../tests/tests-api.service';
 import { ResultResponse, ResultRow, ResultType } from './result.model';
 import { ResultsApiService } from './results-api.service';
+import { ResultFormModalComponent } from './result-form-modal.component';
 
 @Component({
+  imports: [ResultFormModalComponent],
   selector: 'app-results-page',
   styleUrl: './results.page.scss',
   templateUrl: './results.page.html',
@@ -27,6 +29,8 @@ export class ResultsPage implements OnInit {
   readonly toDate = signal('');
   readonly selectedType = signal<ResultType | ''>('');
   readonly sortDirection = signal<'asc' | 'desc'>('desc');
+  readonly isCreateFormOpen = signal(false);
+  readonly successMessage = signal<string | null>(null);
   readonly visibleResults = computed(() => {
     const terms = this.query().trim().toLocaleLowerCase('pl-PL').split(/\s+/).filter(Boolean);
     const athleteId = this.selectedAthleteId();
@@ -149,6 +153,22 @@ export class ResultsPage implements OnInit {
     this.fromDate.set('');
     this.toDate.set('');
     this.selectedType.set('');
+  }
+
+  openCreateForm(): void {
+    this.successMessage.set(null);
+    this.isCreateFormOpen.set(true);
+  }
+
+  closeCreateForm(): void {
+    this.isCreateFormOpen.set(false);
+  }
+
+  onResultCreated(result: ResultResponse): void {
+    const [row] = this.joinResults([result], this.athletes(), this.tests());
+    this.allResults.update((current) => [...current, row]);
+    this.isCreateFormOpen.set(false);
+    this.successMessage.set('Wynik został dodany.');
   }
 
   private loadResults(): void {

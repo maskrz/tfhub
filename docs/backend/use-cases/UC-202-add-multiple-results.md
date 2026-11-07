@@ -46,6 +46,7 @@ Each element in `results` contains:
 - `results` must contain no more than 100 elements.
 - Every `athleteId` must be a positive integer.
 - Every `athleteId` must be unique within the request.
+- Every referenced athlete must be active.
 - Every `value` must be greater than zero.
 - Every `value` must have no more than 3 decimal places.
 - Every `value` must fit the database column `NUMERIC(12,3)`.
@@ -55,8 +56,7 @@ Each element in `results` contains:
 
 1. The referenced test must exist.
 2. The referenced test must be active. Results cannot be created for inactive tests.
-3. Every referenced athlete must exist.
-4. Both active and inactive athletes are allowed. This supports adding historical results.
+3. Every referenced athlete must exist and be active.
 5. Each athlete can appear only once in a single batch request.
 6. The same athlete can still have multiple results for the same test and date through separate requests, as defined in UC-201.
 7. All results share the `testId`, `resultDate`, and `type` provided at the top level.
@@ -89,7 +89,7 @@ Each result uses the response structure defined in UC-201:
 - `201 Created` – all results were successfully created.
 - `400 Bad Request` – invalid request, missing fields, invalid values, empty list, more than 100 entries, or duplicate athlete IDs within the request.
 - `404 Not Found` – referenced test or at least one referenced athlete does not exist.
-- `409 Conflict` – referenced test exists but is inactive.
+- `409 Conflict` – referenced test or athlete exists but is inactive.
 
 Use the existing API error response structure and conventions.
 

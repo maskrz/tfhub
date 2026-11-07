@@ -1,0 +1,37 @@
+<dialog #dialog class="modal" aria-labelledby="modal-title" (cancel)="onDialogCancel($event)">
+  <div class="modal-header">
+    <h2 id="modal-title">Dodaj wynik</h2>
+    <button
+      type="button"
+      class="button button--icon close-button"
+      aria-label="Anuluj i zamknij okno"
+      [disabled]="saving()"
+      (click)="cancel()"
+    >
+      ×
+    </button>
+  </div>
+
+  <div class="modal-content">
+    <app-result-form
+      [athletes]="athletes"
+      [tests]="tests"
+      (saved)="onSaved($event)"
+      (savingChange)="saving.set($event)"
+    />
+  </div>
+
+  <footer class="modal-footer">
+    <button type="button" class="button button--secondary cancel-button" [disabled]="saving()" (click)="cancel()">
+      Anuluj
+    </button>
+    <button
+      type="submit"
+      form="result-create-form"
+      class="button button--primary save-button"
+      [disabled]="saving()"
+    >
+      {{ saving() ? 'Zapisywanie...' : 'Zapisz' }}
+    </button>
+  </footer>
+</dialog>
