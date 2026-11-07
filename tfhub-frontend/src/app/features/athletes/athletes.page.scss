@@ -64,6 +64,23 @@ h1 {
   width: 100%;
 }
 
+.gender-filter,
+.birth-year-filter {
+  align-items: center;
+  display: inline-flex;
+  gap: .55rem;
+}
+
+.gender-filter select {
+  min-width: 10rem;
+  padding-left: .75rem;
+}
+
+.birth-year-filter input {
+  max-width: 7rem;
+  padding: .5rem .65rem;
+}
+
 .inactive-toggle {
   align-items: center;
   cursor: pointer;
@@ -122,10 +139,32 @@ table {
 th, td { border-bottom: 1px solid #dce1ea; padding: 1.2rem 1.5rem; }
 th { color: #20283a; font-size: 1rem; font-weight: 650; }
 td { font-size: 1.05rem; }
+.sort-button {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  color: inherit;
+  cursor: pointer;
+  display: inline-flex;
+  font: inherit;
+  font-weight: inherit;
+  gap: .45rem;
+  padding: 0;
+}
+.sort-button:focus-visible { outline: 3px solid #86d4a0; outline-offset: 2px; }
+.sort-indicator { color: #929baa; font-size: .9rem; }
+.sort-indicator.active { color: #188c55; font-weight: 700; }
 tbody tr:last-child td { border-bottom: 0; }
 tbody tr.inactive-row { background: #fff0f0; }
 td strong { display: block; font-size: 1.08rem; font-weight: 650; }
 .edit-button { min-width: 6rem; }
+.action-cell {
+  align-items: center;
+  display: flex;
+  gap: .8rem;
+  justify-content: flex-end;
+  white-space: nowrap;
+}
 
 .feedback {
   background: #fff;
@@ -145,6 +184,12 @@ td strong { display: block; font-size: 1.08rem; font-weight: 650; }
   .page-heading { margin-bottom: 1.5rem; }
   .filters { align-items: stretch; gap: .75rem; }
   .search-field { flex-basis: 100%; }
+  .gender-filter,
+  .birth-year-filter { justify-content: space-between; }
+  .gender-filter { flex: 1 1 100%; }
+  .gender-filter select { flex: 1; }
+  .birth-year-filter { flex: 1 1 100%; }
+  .birth-year-filter input { flex: 1; max-width: none; }
   .table-surface { background: transparent; border: 0; border-radius: 0; overflow: visible; }
   table, tbody { display: block; }
   thead { clip: rect(0, 0, 0, 0); clip-path: inset(50%); height: 1px; overflow: hidden; position: absolute; width: 1px; }
@@ -162,4 +207,5 @@ td strong { display: block; font-size: 1.08rem; font-weight: 650; }
   td { border: 0; display: grid; gap: .2rem; padding: 0; }
   td::before { color: #59667e; content: attr(data-label); font-size: .78rem; font-weight: 650; }
   td:first-child, td:last-child { grid-column: 1 / -1; }
+  .action-cell { justify-content: flex-start; }
 }

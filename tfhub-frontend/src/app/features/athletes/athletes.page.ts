@@ -16,18 +16,50 @@ export class AthletesPage implements OnInit {
   readonly errorMessage = signal<string | null>(null);
   readonly query = signal('');
   readonly showInactive = signal(false);
+  readonly selectedGender = signal<Gender | ''>('');
+  readonly birthYearFrom = signal('');
+  readonly birthYearTo = signal('');
+  readonly sortColumn = signal<'name' | 'birthYear' | 'gender'>('name');
+  readonly sortDirection = signal<'asc' | 'desc'>('asc');
   readonly statusUpdatingId = signal<number | null>(null);
   readonly statusError = signal<string | null>(null);
   readonly visibleAthletes = computed(() => {
     const terms = this.query().trim().toLowerCase().split(/\s+/).filter(Boolean);
-    return this.allAthletes().filter((athlete) => {
-      if (!this.showInactive() && !athlete.active) {
-        return false;
-      }
+    const gender = this.selectedGender();
+    const yearFrom = this.parseYear(this.birthYearFrom());
+    const yearTo = this.parseYear(this.birthYearTo());
+    const direction = this.sortDirection() === 'asc' ? 1 : -1;
 
+    return this.allAthletes().filter((athlete) => {
+      if (!this.showInactive() && !athlete.active) return false;
+      if (gender && athlete.gender !== gender) return false;
+      if (yearFrom !== null && athlete.birthYear < yearFrom) return false;
+      if (yearTo !== null && athlete.birthYear > yearTo) return false;
       const firstName = athlete.firstName.toLowerCase();
       const lastName = athlete.lastName.toLowerCase();
-      return terms.every((term) => firstName.includes(term) || lastName.includes(term));
+      return terms.every(
+        (term) =>
+          firstName.includes(term) ||
+          lastName.includes(term) ||
+          this.genderLabel(athlete.gender).toLowerCase().includes(term),
+      );
+    }).sort((left, right) => {
+      if (this.sortColumn() === 'birthYear') {
+        return (left.birthYear - right.birthYear) * direction;
+      }
+
+      const leftValue = this.sortColumn() === 'name'
+        ? left.lastName
+        : this.genderLabel(left.gender);
+      const rightValue = this.sortColumn() === 'name'
+        ? right.lastName
+        : this.genderLabel(right.gender);
+      const comparison = leftValue.localeCompare(rightValue, 'pl', { sensitivity: 'base' });
+      if (comparison !== 0 || this.sortColumn() !== 'name') {
+        return comparison * direction;
+      }
+
+      return left.firstName.localeCompare(right.firstName, 'pl', { sensitivity: 'base' }) * direction;
     });
   });
 
@@ -50,6 +82,36 @@ export class AthletesPage implements OnInit {
     if (input instanceof HTMLInputElement) {
       this.showInactive.set(input.checked);
     }
+  }
+
+  onGenderChange(event: Event): void {
+    const select = event.target;
+    if (select instanceof HTMLSelectElement) {
+      const value = select.value;
+      if (value === '' || value === 'MALE' || value === 'FEMALE') {
+        this.selectedGender.set(value);
+      }
+    }
+  }
+
+  onBirthYearChange(event: Event, bound: 'from' | 'to'): void {
+    const input = event.target;
+    if (input instanceof HTMLInputElement) {
+      if (bound === 'from') {
+        this.birthYearFrom.set(input.value);
+      } else {
+        this.birthYearTo.set(input.value);
+      }
+    }
+  }
+
+  sortBy(column: 'name' | 'birthYear' | 'gender'): void {
+    if (this.sortColumn() === column) {
+      this.sortDirection.update((direction) => direction === 'asc' ? 'desc' : 'asc');
+      return;
+    }
+    this.sortColumn.set(column);
+    this.sortDirection.set('asc');
   }
 
   retry(): void {
@@ -85,7 +147,18 @@ export class AthletesPage implements OnInit {
   }
 
   get hasSearchQuery(): boolean {
-    return this.query().trim().length > 0;
+    return (
+      this.query().trim().length > 0 ||
+      this.selectedGender() !== '' ||
+      this.birthYearFrom().trim().length > 0 ||
+      this.birthYearTo().trim().length > 0
+    );
+  }
+
+  private parseYear(value: string): number | null {
+    if (!value.trim()) return null;
+    const year = Number(value);
+    return Number.isInteger(year) ? year : null;
   }
 
   private loadAthletes(): void {

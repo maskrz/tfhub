@@ -65,6 +65,27 @@ describe('AthletesPage', () => {
     fixture.detectChanges();
   }
 
+  function setGender(value: string): void {
+    const select = fixture.nativeElement.querySelector('.gender-filter select') as HTMLSelectElement;
+    select.value = value;
+    select.dispatchEvent(new Event('change'));
+    fixture.detectChanges();
+  }
+
+  function setBirthYear(bound: 'from' | 'to', value: string): void {
+    const input = fixture.nativeElement.querySelector(
+      bound === 'from' ? '[aria-label="Od roku urodzenia"]' : '[aria-label="Do roku urodzenia"]',
+    ) as HTMLInputElement;
+    input.value = value;
+    input.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+  }
+
+  function rowNames(): string[] {
+    const rows = fixture.nativeElement.querySelectorAll('tbody tr') as NodeListOf<HTMLTableRowElement>;
+    return Array.from(rows, (row) => row.querySelector('td strong')?.textContent?.trim() ?? '');
+  }
+
   it('loads all athletes once and displays active athletes by default', async () => {
     await createPage();
 
@@ -107,6 +128,60 @@ describe('AthletesPage', () => {
     fixture.detectChanges();
 
     expect(fixture.nativeElement.textContent).toContain('Nie znaleziono zawodników');
+    expect(api.getAll).toHaveBeenCalledTimes(1);
+  });
+
+  it('filters by gender and birth-year range together with name and active status locally', async () => {
+    await createPage();
+    showInactive();
+    setGender('FEMALE');
+    setBirthYear('from', '2011');
+    setBirthYear('to', '2011');
+    setSearch('anna');
+
+    expect(rowNames()).toEqual(['Anna Nowak']);
+    expect(api.getAll).toHaveBeenCalledTimes(1);
+
+    setGender('MALE');
+    expect(fixture.nativeElement.textContent).toContain('Nie znaleziono zawodników');
+    expect(api.getAll).toHaveBeenCalledTimes(1);
+  });
+
+  it('supports searching by the Polish gender label', async () => {
+    await createPage();
+    showInactive();
+    setSearch('kobieta');
+
+    expect(rowNames()).toEqual(['Anna Nowak']);
+    expect(api.getAll).toHaveBeenCalledTimes(1);
+  });
+
+  it('sorts by name ascending by default and toggles the active header direction', async () => {
+    await createPage();
+    showInactive();
+    expect(rowNames()).toEqual(['Jan Kowalski', 'Anna Nowak']);
+
+    (fixture.nativeElement.querySelector('.sort-button') as HTMLButtonElement).click();
+    fixture.detectChanges();
+
+    expect(rowNames()).toEqual(['Anna Nowak', 'Jan Kowalski']);
+    expect(api.getAll).toHaveBeenCalledTimes(1);
+  });
+
+  it('sorts by birth year and gender using local sorting', async () => {
+    await createPage();
+    showInactive();
+
+    const sortButtons = Array.from(
+      fixture.nativeElement.querySelectorAll('.sort-button'),
+    ) as HTMLButtonElement[];
+    sortButtons[1].click();
+    fixture.detectChanges();
+    expect(rowNames()).toEqual(['Jan Kowalski', 'Anna Nowak']);
+
+    sortButtons[2].click();
+    fixture.detectChanges();
+    expect(rowNames()).toEqual(['Anna Nowak', 'Jan Kowalski']);
     expect(api.getAll).toHaveBeenCalledTimes(1);
   });
 
@@ -229,14 +304,19 @@ describe('AthletesPage', () => {
     expect(fixture.nativeElement.textContent).toContain('Jan Kowalski');
   });
 
-  it('renders all five required columns and leaves add/edit as unavailable entry points', async () => {
+  it('renders the four required columns and keeps the status switch beside the edit action', async () => {
     await createPage();
 
     const headings = Array.from(
       fixture.nativeElement.querySelectorAll('thead th'),
-    ).map((heading) => (heading as HTMLTableCellElement).textContent?.trim());
-    expect(headings).toEqual(['Zawodnik', 'Rok urodzenia', 'Płeć', 'Status', 'Akcje']);
-    expect(fixture.nativeElement.querySelectorAll('tbody tr:first-child td')).toHaveLength(5);
+    ).map((heading) =>
+      (heading as HTMLTableCellElement).querySelector('.sort-button')?.childNodes[0]?.textContent?.trim()
+      ?? '',
+    );
+    expect(headings).toEqual(['Zawodnik', 'Rok urodzenia', 'Płeć', '']);
+    expect(fixture.nativeElement.querySelectorAll('tbody tr:first-child td')).toHaveLength(4);
+    expect(fixture.nativeElement.querySelector('tbody tr:first-child td:last-child .status-toggle')).toBeTruthy();
+    expect(fixture.nativeElement.querySelector('tbody tr:first-child td:last-child .edit-button')).toBeTruthy();
     expect(fixture.nativeElement.querySelector('.button--primary')?.textContent).toContain(
       'Dodaj zawodnika',
     );

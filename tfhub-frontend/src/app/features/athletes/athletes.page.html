@@ -31,6 +31,44 @@
       />
     </label>
 
+    <label class="gender-filter">
+      <span>Płeć</span>
+      <select
+        class="field-control select-with-arrow"
+        aria-label="Filtruj według płci"
+        [value]="selectedGender()"
+        (change)="onGenderChange($event)"
+      >
+        <option value="">Wszystkie</option>
+        <option value="MALE">Mężczyzna</option>
+        <option value="FEMALE">Kobieta</option>
+      </select>
+    </label>
+
+    <div class="birth-year-filter" role="group" aria-label="Filtruj według roku urodzenia">
+      <span>Rok urodzenia</span>
+      <input
+        class="field-control"
+        type="number"
+        inputmode="numeric"
+        step="1"
+        placeholder="Od"
+        aria-label="Od roku urodzenia"
+        [value]="birthYearFrom()"
+        (input)="onBirthYearChange($event, 'from')"
+      />
+      <input
+        class="field-control"
+        type="number"
+        inputmode="numeric"
+        step="1"
+        placeholder="Do"
+        aria-label="Do roku urodzenia"
+        [value]="birthYearTo()"
+        (input)="onBirthYearChange($event, 'to')"
+      />
+    </div>
+
     <label class="inactive-toggle">
       <input type="checkbox" [checked]="showInactive()" (change)="onInactiveToggle($event)" />
       <span class="switch" aria-hidden="true"></span>
@@ -60,11 +98,31 @@
       <table>
         <thead>
           <tr>
-            <th scope="col">Zawodnik</th>
-            <th scope="col">Rok urodzenia</th>
-            <th scope="col">Płeć</th>
-            <th scope="col">Status</th>
-            <th scope="col">Akcje</th>
+            <th scope="col" [attr.aria-sort]="sortColumn() === 'name' ? (sortDirection() === 'asc' ? 'ascending' : 'descending') : 'none'">
+              <button type="button" class="sort-button" (click)="sortBy('name')">
+                Zawodnik
+                <span class="sort-indicator" [class.active]="sortColumn() === 'name'" aria-hidden="true">
+                  {{ sortColumn() === 'name' ? (sortDirection() === 'asc' ? '↑' : '↓') : '↕' }}
+                </span>
+              </button>
+            </th>
+            <th scope="col" [attr.aria-sort]="sortColumn() === 'birthYear' ? (sortDirection() === 'asc' ? 'ascending' : 'descending') : 'none'">
+              <button type="button" class="sort-button" (click)="sortBy('birthYear')">
+                Rok urodzenia
+                <span class="sort-indicator" [class.active]="sortColumn() === 'birthYear'" aria-hidden="true">
+                  {{ sortColumn() === 'birthYear' ? (sortDirection() === 'asc' ? '↑' : '↓') : '↕' }}
+                </span>
+              </button>
+            </th>
+            <th scope="col" [attr.aria-sort]="sortColumn() === 'gender' ? (sortDirection() === 'asc' ? 'ascending' : 'descending') : 'none'">
+              <button type="button" class="sort-button" (click)="sortBy('gender')">
+                Płeć
+                <span class="sort-indicator" [class.active]="sortColumn() === 'gender'" aria-hidden="true">
+                  {{ sortColumn() === 'gender' ? (sortDirection() === 'asc' ? '↑' : '↓') : '↕' }}
+                </span>
+              </button>
+            </th>
+            <th scope="col" aria-label="Akcja"></th>
           </tr>
         </thead>
         <tbody>
@@ -75,7 +133,7 @@
               </td>
               <td data-label="Rok urodzenia">{{ athlete.birthYear }}</td>
               <td data-label="Płeć">{{ genderLabel(athlete.gender) }}</td>
-              <td data-label="Status">
+              <td data-label="Akcje" class="action-cell">
                 <button
                   type="button"
                   class="status-toggle"
@@ -89,8 +147,6 @@
                   <span>{{ athlete.active ? 'Aktywny' : 'Nieaktywny' }}</span>
                   <span class="status-toggle__track" aria-hidden="true"></span>
                 </button>
-              </td>
-              <td data-label="Akcje" class="action-cell">
                 <button
                   type="button"
                   class="button button--secondary edit-button"
