@@ -1,6 +1,6 @@
 # UC-001 – Add Athlete
 
-**Status:** Approved  
+**Status:** Implemented<br>
 **Version:** 1.0  
 **Module:** Athlete  
 **Priority:** High

@@ -26,6 +26,8 @@ Główne obszary aplikacji:
 - **Uwierzytelnianie** – logowanie i wylogowanie.
 - **Dashboard** – główny punkt wejścia do aplikacji; zakres i zawartość wskaźników są TBD.
 
+Uwierzytelnianie należy do początkowego zakresu publicznie dostępnej aplikacji, ale nie jest jeszcze zaimplementowane. Docelowy przepływ sesji i kontrakt API opisuje [architektura bezpieczeństwa](../security.md).
+
 Frontend odwzorowuje istniejące kontrakty API oraz reguły określone w [dokumentacji backendu](../backend/README.md) i [use case'ach backendu](../backend/use-cases/README.md). Backend pozostaje źródłem prawdy dla danych, walidacji i reguł biznesowych. Frontend może zapewniać walidację dla wygody użytkownika, ale nie może zastępować walidacji serwerowej.
 
 ## 4. Poza zakresem początkowego wydania

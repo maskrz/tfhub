@@ -8,18 +8,27 @@
 
 This document describes the data model used by TFHub.
 
-The initial database consists of three main entities:
+The application data model consists of three business entities and a small authentication account table:
 
 - `Athlete` – an athlete managed by the coach.
 - `Test` – a definition of an athletic performance test.
 - `TestResult` – a recorded result of an athlete performing a test.
+- `users` – credentials for the single authorized application account.
 
-The model is designed for a single coach. Multi-user support is outside the current scope.
+The initial release has exactly one authorized user account. The `users` table supports authentication only; it does not imply a user-management module or user CRUD API. Multi-user support and per-user ownership are outside the current scope.
 
 ## 2. Entity Relationship Diagram
 
 ```mermaid
 erDiagram
+    USERS {
+        bigint id PK
+        varchar username UK
+        varchar password_hash
+        timestamptz created_at
+        timestamptz password_changed_at
+    }
+
     ATHLETES ||--o{ TEST_RESULTS : has
     TESTS ||--o{ TEST_RESULTS : measures
 
@@ -51,11 +60,27 @@ erDiagram
     }
 ```
 
-## 3. Athlete
+## 3. Authentication Account
+
+The `users` table stores the single account used to authenticate to TFHub. It has no relationship to athletes, tests, or results.
+
+| Field | Database type | Required | Description |
+|---|---|---|---|
+| id | BIGINT | Yes | Primary key, generated automatically |
+| username | VARCHAR | Yes | Unique login name |
+| password_hash | VARCHAR | Yes | Argon2id password hash; never a plaintext password |
+| created_at | TIMESTAMP WITH TIME ZONE | Yes | Account creation time |
+| password_changed_at | TIMESTAMP WITH TIME ZONE | Yes | Time the password was last changed |
+
+The unique constraint on `username` prevents duplicate accounts. The initial account is created through a controlled local initialization procedure. Password changes and resets use local administrative procedures. No registration, user CRUD endpoints, roles, permissions, or account-management UI are part of the initial release.
+
+The username's maximum length and case-normalization rules must be defined when the schema migration is prepared. The plaintext password must not be stored in PostgreSQL, configuration, environment variables, or logs.
+
+## 4. Athlete
 
 Represents an athlete whose performance is tracked by the application.
 
-### 3.1 Fields
+### 4.1 Fields
 
 | Field | Database type | Required | Description |
 |---|---|---|---|
@@ -66,7 +91,7 @@ Represents an athlete whose performance is tracked by the application.
 | gender | VARCHAR(20) | Yes | Athlete's gender |
 | active | BOOLEAN | Yes | Indicates whether the athlete is active |
 
-### 3.2 Gender
+### 4.2 Gender
 
 Stored as a string in the database.
 
@@ -75,13 +100,13 @@ Allowed Java enum values:
 - `MALE`
 - `FEMALE`
 
-### 3.3 Constraints
+### 4.3 Constraints
 
 - Primary key: `id`.
 - Unique constraint: `(first_name, last_name, birth_year)`.
 - `active` defaults to `true`.
 
-### 3.4 Business rules
+### 4.4 Business rules
 
 - Athlete information can be edited.
 - Athletes should not be physically deleted.
@@ -92,7 +117,7 @@ Allowed Java enum values:
 
 Birth year is used instead of a full date of birth. Age-related statistics are based on the athlete's birth year.
 
-## 4. Test
+## 5. Test
 
 Represents a definition of an athletic performance test.
 
@@ -101,7 +126,7 @@ Examples:
 - 40-meter sprint.
 - Medicine ball throw.
 
-### 4.1 Fields
+### 5.1 Fields
 
 | Field | Database type | Required | Description |
 |---|---|---|---|
@@ -112,7 +137,7 @@ Examples:
 | higher_is_better | BOOLEAN | Yes | Indicates whether a higher result is better |
 | active | BOOLEAN | Yes | Indicates whether the test is active |
 
-### 4.2 Categories
+### 5.2 Categories
 
 Stored as strings in the database.
 
@@ -124,7 +149,7 @@ Allowed Java enum values:
 
 Category describes the measurement type.
 
-### 4.3 Units
+### 5.3 Units
 
 Only the following canonical units are supported initially:
 
@@ -145,7 +170,7 @@ Time formatting is a frontend responsibility.
 
 For example, a result of 2 minutes and 15 seconds is stored as `135.000` seconds, not as a formatted string.
 
-### 4.4 Constraints
+### 5.4 Constraints
 
 - Primary key: `id`.
 - Test name must be unique case-insensitively after trimming leading and trailing whitespace, including inactive tests. PostgreSQL enforces this with a unique index on `lower(trim(name))`.
@@ -156,7 +181,7 @@ Examples:
 - Sprint time: `higher_is_better = false`.
 - Jump distance: `higher_is_better = true`.
 
-### 4.5 Business rules
+### 5.5 Business rules
 
 - Test definitions can be edited.
 - Test names are unique across active and inactive tests, ignoring leading and trailing whitespace and letter casing.
@@ -167,13 +192,13 @@ Examples:
 
 Changing a test's unit or category after results have been recorded requires special care because it may change the interpretation of historical data. Such changes should be prevented unless a deliberate data migration or correction is performed.
 
-## 5. TestResult
+## 6. TestResult
 
 Represents an individual result achieved by an athlete.
 
 A result can originate from a training session or a competition.
 
-### 5.1 Fields
+### 6.1 Fields
 
 | Field | Database type | Required | Description |
 |---|---|---|---|
@@ -184,7 +209,7 @@ A result can originate from a training session or a competition.
 | value | NUMERIC(12,3) | Yes | Numeric result in the test's canonical unit |
 | type | VARCHAR(30) | Yes | Result origin |
 
-### 5.2 Result types
+### 6.2 Result types
 
 Stored as strings in the database.
 
@@ -199,7 +224,7 @@ Allowed Java enum values:
 
 No separate Competition entity is required initially.
 
-### 5.3 Constraints
+### 6.3 Constraints
 
 - Primary key: `id`.
 - Foreign key: `athlete_id` references `athletes.id`.
@@ -207,7 +232,7 @@ No separate Competition entity is required initially.
 - `value` must be greater than zero.
 - `result_date` stores a calendar date without time or timezone.
 
-### 5.4 Business rules
+### 6.4 Business rules
 
 - Results can be created, edited and deleted.
 - Results must reference an existing athlete and test.
@@ -218,9 +243,9 @@ No separate Competition entity is required initially.
 - Multiple results for the same athlete, test and date are technically allowed.
 - The application does not enforce uniqueness of `(athlete_id, test_id, result_date)`.
 
-## 6. Relationships
+## 7. Relationships
 
-### 6.1 Athlete – TestResult
+### 7.1 Athlete – TestResult
 
 One athlete can have multiple test results.
 
@@ -228,7 +253,7 @@ Each test result belongs to exactly one athlete.
 
 Deleting an athlete with existing results must be prevented.
 
-### 6.2 Test – TestResult
+### 7.2 Test – TestResult
 
 One test can have multiple results.
 
@@ -236,15 +261,15 @@ Each test result belongs to exactly one test.
 
 Deleting a test with existing results must be prevented.
 
-### 6.3 Referential integrity
+### 7.3 Referential integrity
 
 Foreign key constraints are enforced by PostgreSQL.
 
 The database uses `ON DELETE RESTRICT` for both relationships.
 
-## 7. Data Types and Precision
+## 8. Data Types and Precision
 
-### 7.1 Numeric values
+### 8.1 Numeric values
 
 Test results use `NUMERIC(12,3)`.
 
@@ -259,7 +284,7 @@ Examples:
 
 The application must not store formatted values such as `2:15.00`.
 
-### 7.2 Dates
+### 8.2 Dates
 
 Results use PostgreSQL `DATE`.
 
@@ -267,7 +292,7 @@ The corresponding Java type should be `LocalDate`.
 
 No time or timezone information is stored.
 
-### 7.3 Enumerations
+### 8.3 Enumerations
 
 Enum-like values are stored as VARCHAR columns.
 
@@ -275,9 +300,9 @@ Java enums provide application-level type safety.
 
 Database columns are not PostgreSQL native enum types.
 
-## 8. Database Schema Management
+## 9. Database Schema Management
 
-The initial database schema is created by Flyway migration:
+The current athlete, test, and result schema is created by Flyway migration:
 
 `V1__create_initial_schema.sql`
 
@@ -287,17 +312,17 @@ The migration creates:
 - `tests`
 - `test_results`
 
-All future database modifications must be introduced through new Flyway migrations.
+The authentication `users` table is planned and must be introduced through a new Flyway migration; do not alter an already-applied migration. All future database modifications must be introduced through new Flyway migrations.
 
 Existing applied migrations must not be modified.
 
 Hibernate uses schema validation and must not modify the schema automatically.
 
-## 9. Explicitly Excluded Entities
+## 10. Explicitly Excluded Entities and Capabilities
 
-The following entities are not part of the initial model:
+The following entities and capabilities are not part of the initial model:
 
-- User
+- A full user-management domain module or user CRUD API (the authentication-only `users` table is defined above)
 - TrainingGroup
 - TrainingSession
 - Competition
@@ -305,7 +330,7 @@ The following entities are not part of the initial model:
 
 They may be introduced later when supported by actual application requirements.
 
-## 10. Future Extensions
+## 11. Future Extensions
 
 Potential future improvements include:
 

@@ -33,7 +33,6 @@ tfhub/
 ├── docker-compose.yml
 ├── tfhub-api/          # Spring Boot REST API
 ├── tfhub-frontend/     # Angular application
-├── infrastructure/     # Infrastructure configuration
 └── docs/
     ├── backend/        # Backend architecture, data model, and use cases
     ├── frontend/       # Frontend requirements, design, architecture, and use cases
@@ -75,6 +74,8 @@ POSTGRES_PASSWORD=your_password
 ```
 
 Do not commit `.env` or any other files containing secrets.
+
+The development Compose file publishes PostgreSQL on host port `5432` without restricting the host interface. This is not the production exposure model; restricting the development binding to `127.0.0.1:5432` is a separate configuration improvement.
 
 ### 3. Start PostgreSQL
 

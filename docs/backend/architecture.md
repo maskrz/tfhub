@@ -19,9 +19,9 @@ The application allows a coach to:
 
 ### 1.1 Current scope
 
-The application is initially designed for a single coach.
+The application is initially designed for a single coach and one authorized user account. Authentication is part of the initial public-facing application scope and is expected to be enforced by the backend; it is planned and not yet implemented.
 
-The architecture should allow future expansion to multiple users, but multi-user support, authentication, authorization and data ownership are explicitly outside the initial scope.
+Public registration, multi-user management, role management, and per-user data ownership are outside the initial scope. The security architecture and implementation requirements are defined in [`docs/security.md`](../security.md).
 
 ### 1.2 Technology stack
 
@@ -226,6 +226,10 @@ Modules must not directly access another module's repository. Cross-module
 operations should use the other module's public service layer.
 
 Avoid circular dependencies between modules.
+
+### 3.4 Authentication boundary
+
+Authentication is application-wide infrastructure, not a business user-management module. The single account is stored in the `users` table described in `docs/backend/data-model.md` and is provisioned or reset through local administrative procedures. Do not add user CRUD endpoints, registration, roles, permissions, or a user-management UI. Place Spring Security configuration with application-wide configuration; authentication endpoints must not expose the stored password hash.
 
 ## 4. Frontend Architecture
 
@@ -451,7 +455,7 @@ Rules:
 
 ## 10. Logging and Monitoring
 
-Use Spring Boot Actuator for basic application health monitoring.
+Spring Boot Actuator may be used for local or internal health checks. Do not expose Actuator endpoints publicly through Cloudflare or Nginx. Local Docker health checks or other internal checks are acceptable; do not add a public health endpoint without a concrete requirement.
 
 Use structured and meaningful application logs.
 
@@ -513,8 +517,8 @@ GitHub Copilot should follow these rules:
 
 The architecture should remain open to future expansion:
 
-- Multiple coaches and user accounts.
-- Authentication and authorization.
+- Multiple coaches, user accounts, and per-user data ownership.
+- Role and permission management.
 - Athlete groups.
 - Training plans and training sessions.
 - Advanced performance analytics.
