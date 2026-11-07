@@ -2,10 +2,12 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { Component, DestroyRef, OnInit, computed, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { EMPTY, catchError, finalize } from 'rxjs';
-import { AthleteResponse, Gender } from './athlete.model';
+import { AthleteFormMode, AthleteResponse, Gender } from './athlete.model';
 import { AthletesApiService } from './athletes-api.service';
+import { AthleteFormModalComponent } from './athlete-form-modal.component';
 
 @Component({
+  imports: [AthleteFormModalComponent],
   selector: 'app-athletes-page',
   styleUrl: './athletes.page.scss',
   templateUrl: './athletes.page.html',
@@ -23,6 +25,10 @@ export class AthletesPage implements OnInit {
   readonly sortDirection = signal<'asc' | 'desc'>('asc');
   readonly statusUpdatingId = signal<number | null>(null);
   readonly statusError = signal<string | null>(null);
+  readonly isFormOpen = signal(false);
+  readonly formMode = signal<AthleteFormMode>('CREATE');
+  readonly selectedAthlete = signal<AthleteResponse | null>(null);
+  readonly successMessage = signal<string | null>(null);
   readonly visibleAthletes = computed(() => {
     const terms = this.query().trim().toLowerCase().split(/\s+/).filter(Boolean);
     const gender = this.selectedGender();
@@ -112,6 +118,46 @@ export class AthletesPage implements OnInit {
     }
     this.sortColumn.set(column);
     this.sortDirection.set('asc');
+  }
+
+  openCreateForm(): void {
+    this.successMessage.set(null);
+    this.formMode.set('CREATE');
+    this.selectedAthlete.set(null);
+    this.isFormOpen.set(true);
+  }
+
+  openEditForm(athlete: AthleteResponse): void {
+    this.successMessage.set(null);
+    this.formMode.set('EDIT');
+    this.selectedAthlete.set(athlete);
+    this.isFormOpen.set(true);
+  }
+
+  closeForm(): void {
+    this.isFormOpen.set(false);
+  }
+
+  onAthleteCreated(athlete: AthleteResponse): void {
+    this.allAthletes.update((athletes) => [...athletes, athlete]);
+    this.isFormOpen.set(false);
+    this.successMessage.set('Zawodnik został dodany.');
+  }
+
+  onAthleteSaved(athlete: AthleteResponse): void {
+    this.allAthletes.update((athletes) =>
+      athletes.map((current) => (current.id === athlete.id ? athlete : current)),
+    );
+    this.isFormOpen.set(false);
+    this.successMessage.set('Zmiany zawodnika zostały zapisane.');
+  }
+
+  onFormSaved(athlete: AthleteResponse): void {
+    if (this.formMode() === 'CREATE') {
+      this.onAthleteCreated(athlete);
+      return;
+    }
+    this.onAthleteSaved(athlete);
   }
 
   retry(): void {

@@ -7,13 +7,15 @@
     <button
       type="button"
       class="button button--primary"
-      disabled
-      title="Dodawanie zawodników będzie dostępne w FE-ATHLETE-002"
-      aria-label="Dodaj zawodnika — funkcja będzie dostępna w przyszłości"
+      (click)="openCreateForm()"
     >
       Dodaj zawodnika
     </button>
   </div>
+
+  @if (successMessage(); as message) {
+    <p class="feedback success" role="status" aria-live="polite">{{ message }}</p>
+  }
 
   <div class="filters">
     <label class="search-field field-control-shell">
@@ -150,9 +152,8 @@
                 <button
                   type="button"
                   class="button button--secondary edit-button"
-                  disabled
-                  [title]="'Edycja zawodnika ' + athlete.firstName + ' ' + athlete.lastName + ' będzie dostępna w FE-ATHLETE-003'"
-                  [attr.aria-label]="'Edytuj ' + athlete.firstName + ' ' + athlete.lastName + ' — funkcja będzie dostępna w przyszłości'"
+                  [attr.aria-label]="'Edytuj ' + athlete.firstName + ' ' + athlete.lastName"
+                  (click)="openEditForm(athlete)"
                 >
                   Edytuj
                 </button>
@@ -164,3 +165,12 @@
     </div>
   }
 </section>
+
+@if (isFormOpen()) {
+  <app-athlete-form-modal
+    [mode]="formMode()"
+    [athlete]="selectedAthlete()"
+    (saved)="onFormSaved($event)"
+    (cancelled)="closeForm()"
+  />
+}

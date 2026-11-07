@@ -12,3 +12,19 @@ export interface AthleteResponse {
 export interface ChangeAthleteStatusRequest {
   active: boolean;
 }
+
+export interface CreateAthleteRequest {
+  firstName: string;
+  lastName: string;
+  birthYear: number;
+  gender: Gender;
+}
+
+export interface UpdateAthleteRequest {
+  firstName: string;
+  lastName: string;
+  birthYear: number;
+  gender: Gender;
+}
+
+export type AthleteFormMode = 'CREATE' | 'EDIT';

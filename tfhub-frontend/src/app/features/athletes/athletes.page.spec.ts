@@ -1,7 +1,7 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { Observable, Subject, of, throwError } from 'rxjs';
-import { AthleteResponse } from './athlete.model';
+import { AthleteResponse, CreateAthleteRequest, UpdateAthleteRequest } from './athlete.model';
 import { AthletesApiService } from './athletes-api.service';
 import { AthletesPage } from './athletes.page';
 
@@ -23,10 +23,29 @@ const inactiveAthlete: AthleteResponse = {
   active: false,
 };
 
+const createdAthlete: AthleteResponse = {
+  id: 3,
+  firstName: 'Ala',
+  lastName: 'Zielińska',
+  birthYear: 2008,
+  gender: 'FEMALE',
+  active: true,
+};
+
+const updatedAthlete: AthleteResponse = {
+  ...activeAthlete,
+  firstName: 'Janusz',
+  lastName: 'Nowak',
+  birthYear: 2012,
+  gender: 'MALE',
+};
+
 describe('AthletesPage', () => {
   let fixture: ComponentFixture<AthletesPage>;
   let api: {
     getAll: ReturnType<typeof vi.fn>;
+    createAthlete: ReturnType<typeof vi.fn>;
+    updateAthlete: ReturnType<typeof vi.fn>;
     changeStatus: ReturnType<typeof vi.fn>;
   };
 
@@ -36,6 +55,8 @@ describe('AthletesPage', () => {
   ): Promise<void> {
     api = {
       getAll: vi.fn(getAll),
+      createAthlete: vi.fn((_request: CreateAthleteRequest) => of(createdAthlete)),
+      updateAthlete: vi.fn((_id: number, _request: UpdateAthleteRequest) => of(updatedAthlete)),
       changeStatus: vi.fn((_id: number, request: { active: boolean }) =>
         of(request.active ? activeAthlete : inactiveAthlete),
       ),
@@ -84,6 +105,38 @@ describe('AthletesPage', () => {
   function rowNames(): string[] {
     const rows = fixture.nativeElement.querySelectorAll('tbody tr') as NodeListOf<HTMLTableRowElement>;
     return Array.from(rows, (row) => row.querySelector('td strong')?.textContent?.trim() ?? '');
+  }
+
+  function openCreate(): void {
+    (fixture.nativeElement.querySelector('.page-heading .button--primary') as HTMLButtonElement).click();
+    fixture.detectChanges();
+  }
+
+  function openEdit(athleteName = 'Jan Kowalski'): void {
+    const row = Array.from(fixture.nativeElement.querySelectorAll('tbody tr')).find((candidate) =>
+      (candidate as HTMLElement).textContent?.includes(athleteName),
+    ) as HTMLElement | undefined;
+    (row?.querySelector('.edit-button') as HTMLButtonElement).click();
+    fixture.detectChanges();
+  }
+
+  function setTextInput(selector: string, value: string): void {
+    const input = fixture.nativeElement.querySelector(selector) as HTMLInputElement;
+    input.value = value;
+    input.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+  }
+
+  function setFormSelect(selector: string, value: string): void {
+    const select = fixture.nativeElement.querySelector(selector) as HTMLSelectElement;
+    select.value = value;
+    select.dispatchEvent(new Event('change'));
+    fixture.detectChanges();
+  }
+
+  function submitAthleteForm(): void {
+    (fixture.nativeElement.querySelector('.save-button') as HTMLButtonElement).click();
+    fixture.detectChanges();
   }
 
   it('loads all athletes once and displays active athletes by default', async () => {
@@ -320,12 +373,327 @@ describe('AthletesPage', () => {
     expect(fixture.nativeElement.querySelector('.button--primary')?.textContent).toContain(
       'Dodaj zawodnika',
     );
-    expect((fixture.nativeElement.querySelector('.button--primary') as HTMLButtonElement).disabled).toBe(
-      true,
-    );
-    expect((fixture.nativeElement.querySelector('.edit-button') as HTMLButtonElement).disabled).toBe(
-      true,
-    );
+    expect((fixture.nativeElement.querySelector('.button--primary') as HTMLButtonElement).disabled).toBe(false);
+    expect((fixture.nativeElement.querySelector('.edit-button') as HTMLButtonElement).disabled).toBe(false);
     expect(fixture.nativeElement.textContent).toContain('Mężczyzna');
+  });
+
+  it('opens the shared create form without an additional athlete list request', async () => {
+    await createPage();
+    openCreate();
+
+    expect(fixture.nativeElement.querySelector('app-athlete-form-modal')).toBeTruthy();
+    expect(fixture.nativeElement.querySelector('#modal-title')?.textContent).toContain('Dodaj zawodnika');
+    expect(fixture.nativeElement.querySelectorAll('#athlete-form .field-control')).toHaveLength(4);
+    expect(fixture.nativeElement.querySelector('#athlete-gender')).toBeTruthy();
+    expect(fixture.nativeElement.querySelector('[formControlName="active"]')).toBeNull();
+    expect(api.getAll).toHaveBeenCalledTimes(1);
+    expect(api.createAthlete).not.toHaveBeenCalled();
+  });
+
+  it('shows validation messages without submitting invalid values', async () => {
+    await createPage();
+    openCreate();
+    submitAthleteForm();
+
+    expect(api.createAthlete).not.toHaveBeenCalled();
+    expect(fixture.nativeElement.querySelectorAll('.field-error').length).toBeGreaterThan(0);
+    expect(fixture.nativeElement.querySelector('app-athlete-form-modal')).toBeTruthy();
+  });
+
+  it('creates an active athlete and updates the local list without refetching', async () => {
+    await createPage();
+    openCreate();
+    setTextInput('#athlete-first-name', '  Ala ');
+    setTextInput('#athlete-last-name', ' Zielińska  ');
+    setTextInput('#athlete-birth-year', '2008');
+    setFormSelect('#athlete-gender', 'FEMALE');
+    submitAthleteForm();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(api.createAthlete).toHaveBeenCalledWith({
+      firstName: 'Ala',
+      lastName: 'Zielińska',
+      birthYear: 2008,
+      gender: 'FEMALE',
+    });
+    expect(fixture.nativeElement.querySelector('app-athlete-form-modal')).toBeNull();
+    expect(fixture.nativeElement.textContent).toContain('Ala Zielińska');
+    expect(fixture.nativeElement.textContent).toContain('Zawodnik został dodany.');
+    expect(api.getAll).toHaveBeenCalledTimes(1);
+  });
+
+  it('preserves local query and sorting state after creating an athlete', async () => {
+    await createPage();
+    showInactive();
+    const sortButtons = fixture.nativeElement.querySelectorAll('.sort-button') as NodeListOf<HTMLButtonElement>;
+    sortButtons[1].click();
+    fixture.detectChanges();
+    sortButtons[1].click();
+    fixture.detectChanges();
+    setSearch('Kow');
+    openCreate();
+    setTextInput('#athlete-first-name', 'Ala');
+    setTextInput('#athlete-last-name', 'Zielińska');
+    setTextInput('#athlete-birth-year', '2008');
+    setFormSelect('#athlete-gender', 'FEMALE');
+    submitAthleteForm();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(rowNames()).toEqual(['Jan Kowalski']);
+    expect(fixture.componentInstance.showInactive()).toBe(true);
+    expect(fixture.componentInstance.sortColumn()).toBe('birthYear');
+    expect(fixture.componentInstance.sortDirection()).toBe('desc');
+    expect(api.getAll).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows the duplicate athlete error and retains entered values', async () => {
+    const createAthlete = vi.fn(() =>
+      throwError(
+        () =>
+          new HttpErrorResponse({
+            status: 409,
+            error: { title: 'Athlete already exists' },
+          }),
+      ),
+    );
+    await createPage(undefined, { createAthlete });
+    openCreate();
+    setTextInput('#athlete-first-name', 'Jan');
+    setTextInput('#athlete-last-name', 'Kowalski');
+    setTextInput('#athlete-birth-year', '2010');
+    setFormSelect('#athlete-gender', 'MALE');
+    submitAthleteForm();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelector('app-athlete-form-modal')).toBeTruthy();
+    expect((fixture.nativeElement.querySelector('#athlete-first-name') as HTMLInputElement).value).toBe('Jan');
+    expect(fixture.nativeElement.querySelector('[role="alert"]')?.textContent).toContain(
+      'Zawodnik o tym imieniu, nazwisku i roku urodzenia już istnieje.',
+    );
+  });
+
+  it('shows field validation errors returned by the API and keeps values', async () => {
+    const createAthlete = vi.fn(() =>
+      throwError(
+        () =>
+          new HttpErrorResponse({
+            status: 400,
+            error: { title: 'Invalid request', errors: { firstName: 'must not be blank' } },
+          }),
+      ),
+    );
+    await createPage(undefined, { createAthlete });
+    openCreate();
+    setTextInput('#athlete-first-name', 'Jan');
+    setTextInput('#athlete-last-name', 'Kowalski');
+    setTextInput('#athlete-birth-year', '2010');
+    setFormSelect('#athlete-gender', 'MALE');
+    submitAthleteForm();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelector('#athlete-first-name-error')?.textContent).toContain(
+      'Wpisz od 1 do 100 znaków.',
+    );
+    expect((fixture.nativeElement.querySelector('#athlete-last-name') as HTMLInputElement).value).toBe(
+      'Kowalski',
+    );
+    expect(fixture.nativeElement.querySelector('app-athlete-form-modal')).toBeTruthy();
+  });
+
+  it('keeps the modal open and entered values after a general API failure', async () => {
+    const createAthlete = vi.fn(() =>
+      throwError(() => new HttpErrorResponse({ status: 500 })),
+    );
+    await createPage(undefined, { createAthlete });
+    openCreate();
+    setTextInput('#athlete-first-name', 'Jan');
+    setTextInput('#athlete-last-name', 'Kowalski');
+    setTextInput('#athlete-birth-year', '2010');
+    setFormSelect('#athlete-gender', 'MALE');
+    submitAthleteForm();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelector('app-athlete-form-modal')).toBeTruthy();
+    expect((fixture.nativeElement.querySelector('#athlete-last-name') as HTMLInputElement).value).toBe(
+      'Kowalski',
+    );
+    expect(fixture.nativeElement.querySelector('[role="alert"]')?.textContent).toContain(
+      'Nie udało się dodać zawodnika.',
+    );
+  });
+
+  it('cancels without saving or making another API request', async () => {
+    await createPage();
+    openCreate();
+    setTextInput('#athlete-first-name', 'Niezapisany');
+    (fixture.nativeElement.querySelector('.cancel-button') as HTMLButtonElement).click();
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelector('app-athlete-form-modal')).toBeNull();
+    expect(api.createAthlete).not.toHaveBeenCalled();
+    expect(api.getAll).toHaveBeenCalledTimes(1);
+  });
+
+  it('opens the shared form in EDIT mode with selected athlete values and does not fetch details', async () => {
+    await createPage();
+    openEdit();
+
+    expect(fixture.nativeElement.querySelector('#modal-title')?.textContent).toContain('Edytuj zawodnika');
+    expect((fixture.nativeElement.querySelector('#athlete-first-name') as HTMLInputElement).value).toBe(
+      'Jan',
+    );
+    expect((fixture.nativeElement.querySelector('#athlete-last-name') as HTMLInputElement).value).toBe(
+      'Kowalski',
+    );
+    expect((fixture.nativeElement.querySelector('#athlete-birth-year') as HTMLInputElement).value).toBe(
+      '2010',
+    );
+    expect((fixture.nativeElement.querySelector('#athlete-gender') as HTMLSelectElement).value).toBe(
+      'MALE',
+    );
+    expect(fixture.nativeElement.querySelector('#athlete-form')).toBeTruthy();
+    expect(api.getAll).toHaveBeenCalledTimes(1);
+    expect(api.updateAthlete).not.toHaveBeenCalled();
+  });
+
+  it('updates the selected athlete locally and shows success without reloading', async () => {
+    await createPage();
+    openEdit();
+    setTextInput('#athlete-first-name', 'Janusz');
+    setTextInput('#athlete-last-name', 'Nowak');
+    setTextInput('#athlete-birth-year', '2012');
+    submitAthleteForm();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(api.updateAthlete).toHaveBeenCalledWith(activeAthlete.id, {
+      firstName: 'Janusz',
+      lastName: 'Nowak',
+      birthYear: 2012,
+      gender: 'MALE',
+    });
+    expect(fixture.nativeElement.querySelector('app-athlete-form-modal')).toBeNull();
+    expect(fixture.nativeElement.textContent).toContain('Janusz Nowak');
+    expect(fixture.nativeElement.textContent).toContain('Zmiany zawodnika zostały zapisane.');
+    expect(api.getAll).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows local validation errors in EDIT mode without sending an update', async () => {
+    await createPage();
+    openEdit();
+    setTextInput('#athlete-first-name', '   ');
+    submitAthleteForm();
+
+    expect(api.updateAthlete).not.toHaveBeenCalled();
+    expect(fixture.nativeElement.querySelector('#athlete-first-name-error')?.textContent).toContain(
+      'To pole jest wymagane.',
+    );
+    expect(fixture.nativeElement.querySelector('app-athlete-form-modal')).toBeTruthy();
+  });
+
+  it('shows backend duplicate error and preserves edit values', async () => {
+    const updateAthlete = vi.fn(() =>
+      throwError(
+        () =>
+          new HttpErrorResponse({
+            status: 409,
+            error: { title: 'Athlete already exists' },
+          }),
+      ),
+    );
+    await createPage(undefined, { updateAthlete });
+    showInactive();
+    openEdit();
+    setTextInput('#athlete-first-name', 'Anna');
+    setTextInput('#athlete-last-name', 'Nowak');
+    setTextInput('#athlete-birth-year', '2011');
+    setFormSelect('#athlete-gender', 'FEMALE');
+    submitAthleteForm();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelector('app-athlete-form-modal')).toBeTruthy();
+    expect((fixture.nativeElement.querySelector('#athlete-first-name') as HTMLInputElement).value).toBe(
+      'Anna',
+    );
+    expect(fixture.nativeElement.querySelector('[role="alert"]')?.textContent).toContain(
+      'Zawodnik o tym imieniu, nazwisku i roku urodzenia już istnieje.',
+    );
+  });
+
+  it('keeps form open and values after update API failure', async () => {
+    const updateAthlete = vi.fn(() =>
+      throwError(() => new HttpErrorResponse({ status: 500 })),
+    );
+    await createPage(undefined, { updateAthlete });
+    openEdit();
+    setTextInput('#athlete-first-name', 'Janusz');
+    submitAthleteForm();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelector('app-athlete-form-modal')).toBeTruthy();
+    expect((fixture.nativeElement.querySelector('#athlete-first-name') as HTMLInputElement).value).toBe(
+      'Janusz',
+    );
+    expect(fixture.nativeElement.querySelector('[role="alert"]')?.textContent).toContain(
+      'Nie udało się zapisać zmian zawodnika.',
+    );
+  });
+
+  it('canceling an edit does not save or change the athlete', async () => {
+    await createPage();
+    openEdit();
+    setTextInput('#athlete-first-name', 'Unsaved');
+    (fixture.nativeElement.querySelector('.cancel-button') as HTMLButtonElement).click();
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelector('app-athlete-form-modal')).toBeNull();
+    expect(fixture.nativeElement.textContent).toContain('Jan Kowalski');
+    expect(api.updateAthlete).not.toHaveBeenCalled();
+    expect(api.getAll).toHaveBeenCalledTimes(1);
+  });
+
+  it('preserves search, inactive filter, and sorting after successful edit', async () => {
+    await createPage();
+    showInactive();
+    const sortButtons = fixture.nativeElement.querySelectorAll('.sort-button') as NodeListOf<HTMLButtonElement>;
+    sortButtons[1].click();
+    fixture.detectChanges();
+    setSearch('Kow');
+    openEdit();
+    setTextInput('#athlete-first-name', 'Janusz');
+    setTextInput('#athlete-last-name', 'Nowak');
+    submitAthleteForm();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(rowNames()).toEqual([]);
+    expect(fixture.nativeElement.textContent).toContain('Nie znaleziono zawodników');
+    expect(fixture.componentInstance.query()).toBe('Kow');
+    expect(fixture.componentInstance.showInactive()).toBe(true);
+    expect(fixture.componentInstance.sortColumn()).toBe('birthYear');
+    expect(api.getAll).toHaveBeenCalledTimes(1);
+  });
+
+  it('prevents duplicate edit submissions while the request is pending', async () => {
+    const pending = new Subject<AthleteResponse>();
+    const updateAthlete = vi.fn(() => pending);
+    await createPage(undefined, { updateAthlete });
+    openEdit();
+    submitAthleteForm();
+    fixture.detectChanges();
+
+    const saveButton = fixture.nativeElement.querySelector('.save-button') as HTMLButtonElement;
+    expect(updateAthlete).toHaveBeenCalledTimes(1);
+    expect(saveButton.disabled).toBe(true);
+    saveButton.click();
+    expect(updateAthlete).toHaveBeenCalledTimes(1);
   });
 });

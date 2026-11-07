@@ -26,8 +26,8 @@ Katalog opisuje planowaną funkcjonalność interfejsu. Kontrakty API i reguły 
 | ID | Use case | Status |
 |---|---|---|
 | FE-ATHLETE-001 | Wyświetlenie listy zawodników | Implemented |
-| FE-ATHLETE-002 | Dodanie zawodnika | Planowany |
-| FE-ATHLETE-003 | Edycja zawodnika | Planowany |
+| FE-ATHLETE-002 | Dodanie zawodnika | Implemented |
+| FE-ATHLETE-003 | Edycja zawodnika | Implemented |
 | FE-ATHLETE-004 | Aktywowanie lub dezaktywowanie zawodnika | Implemented |
 
 ## Wyniki (`FE-RESULT`)

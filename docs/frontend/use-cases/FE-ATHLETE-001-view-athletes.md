@@ -31,7 +31,8 @@ The user selects "Zawodnicy" from the main application navigation.
 8. The user can enable "Pokaż nieaktywnych" to include inactive athletes.
 9. Search, gender, birth-year range, and active-status filtering work together.
 10. The user can sort by athlete name, birth year, or gender using the table headers.
-11. Each row provides a status toggle and a disabled "Edytuj" entry point for FE-ATHLETE-003.
+11. The "Dodaj zawodnika" action opens FE-ATHLETE-002.
+12. Each row provides a status toggle and an "Edytuj" action that opens FE-ATHLETE-003.
 
 ## Table Columns
 
@@ -40,7 +41,7 @@ The user selects "Zawodnicy" from the main application navigation.
 | Zawodnik | First name and last name |
 | Rok urodzenia | Athlete's birth year |
 | Płeć | Athlete's gender |
-| Akcje | Active/inactive status toggle and disabled "Edytuj" entry point |
+| Akcje | Active/inactive status toggle and "Edytuj" action |
 
 The name, birth-year, and gender headers are sortable. The initial order is athlete surname ascending, then first name ascending; selecting the active header reverses the order. Name and gender use Polish locale-aware comparison.
 
@@ -75,9 +76,8 @@ If the API cannot provide all required data in a single initial request, report 
 - Do not physically delete athletes.
 
 ## Add and Edit Entry Points
-- "Dodaj zawodnika" and "Edytuj" are visible but disabled entry points until their respective use cases are implemented.
-- These actions do not pretend to create or edit an athlete in this use case.
-- Actual modal and form implementation belongs to FE-ATHLETE-002 and FE-ATHLETE-003.
+- "Dodaj zawodnika" opens the CREATE modal and shared form defined in FE-ATHLETE-002.
+- "Edytuj" opens the selected athlete in the shared EDIT modal defined in FE-ATHLETE-003.
 
 ## API Contract
 
@@ -128,6 +128,6 @@ The table structure should remain compatible with a future athlete profile entry
 - Each athlete has an activation/deactivation toggle.
 - Status changes use the existing backend API.
 - Failed status changes do not leave the UI in an incorrect state.
-- Add and edit entry points are present but unavailable until their use cases are implemented.
+- Add opens the FE-ATHLETE-002 modal; Edit opens the FE-ATHLETE-003 modal.
 - Loading, empty, error, and no-results states are supported.
 - No athlete profile or performance functionality is introduced.

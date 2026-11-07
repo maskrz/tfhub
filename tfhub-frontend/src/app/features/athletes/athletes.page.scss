@@ -176,6 +176,12 @@ td strong { display: block; font-size: 1.08rem; font-weight: 650; }
 }
 
 .feedback.error { color: #8d2929; }
+.feedback.success {
+  background: #edf8f0;
+  border-color: #b8dfc3;
+  color: #236b3a;
+  margin-bottom: 1rem;
+}
 .status-error { margin-bottom: 1rem; }
 .feedback p { margin: 0; }
 .retry-button { margin-top: 1rem; }

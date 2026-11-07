@@ -1,7 +1,7 @@
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
-import { AthleteResponse } from './athlete.model';
+import { AthleteResponse, CreateAthleteRequest, UpdateAthleteRequest } from './athlete.model';
 import { AthletesApiService } from './athletes-api.service';
 
 describe('AthletesApiService', () => {
@@ -47,5 +47,37 @@ describe('AthletesApiService', () => {
     expect(request.request.method).toBe('PATCH');
     expect(request.request.body).toEqual({ active: false });
     request.flush({ ...athlete, active: false });
+  });
+
+  it('creates an athlete using the existing endpoint and request fields', () => {
+    const body: CreateAthleteRequest = {
+      firstName: 'Jan',
+      lastName: 'Kowalski',
+      birthYear: 2010,
+      gender: 'MALE',
+    };
+
+    service.createAthlete(body).subscribe();
+
+    const request = httpTesting.expectOne('/api/athletes');
+    expect(request.request.method).toBe('POST');
+    expect(request.request.body).toEqual(body);
+    request.flush(athlete);
+  });
+
+  it('updates an athlete using the existing endpoint and request fields', () => {
+    const body: UpdateAthleteRequest = {
+      firstName: 'Jan',
+      lastName: 'Nowak',
+      birthYear: 2011,
+      gender: 'MALE',
+    };
+
+    service.updateAthlete(athlete.id, body).subscribe();
+
+    const request = httpTesting.expectOne('/api/athletes/8');
+    expect(request.request.method).toBe('PUT');
+    expect(request.request.body).toEqual(body);
+    request.flush({ ...athlete, ...body });
   });
 });

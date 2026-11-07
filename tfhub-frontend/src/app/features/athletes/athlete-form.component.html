@@ -1,0 +1,73 @@
+<form id="athlete-form" [formGroup]="form" (ngSubmit)="submit()" novalidate>
+  @if (errorMessage(); as message) {
+    <p class="form-error" role="alert">{{ message }}</p>
+  }
+
+  <div class="field">
+    <label for="athlete-first-name">Imię <span aria-hidden="true">*</span></label>
+    <input
+      id="athlete-first-name"
+      class="field-control"
+      type="text"
+      formControlName="firstName"
+      autocomplete="given-name"
+      autofocus
+      [attr.aria-invalid]="fieldError('firstName') ? 'true' : null"
+      aria-describedby="athlete-first-name-error"
+    />
+    @if (fieldError('firstName'); as message) {
+      <span class="field-error" id="athlete-first-name-error">{{ message }}</span>
+    }
+  </div>
+
+  <div class="field">
+    <label for="athlete-last-name">Nazwisko <span aria-hidden="true">*</span></label>
+    <input
+      id="athlete-last-name"
+      class="field-control"
+      type="text"
+      formControlName="lastName"
+      autocomplete="family-name"
+      [attr.aria-invalid]="fieldError('lastName') ? 'true' : null"
+      aria-describedby="athlete-last-name-error"
+    />
+    @if (fieldError('lastName'); as message) {
+      <span class="field-error" id="athlete-last-name-error">{{ message }}</span>
+    }
+  </div>
+
+  <div class="field">
+    <label for="athlete-birth-year">Rok urodzenia <span aria-hidden="true">*</span></label>
+    <input
+      id="athlete-birth-year"
+      class="field-control"
+      type="number"
+      inputmode="numeric"
+      step="1"
+      formControlName="birthYear"
+      [attr.aria-invalid]="fieldError('birthYear') ? 'true' : null"
+      aria-describedby="athlete-birth-year-error"
+    />
+    @if (fieldError('birthYear'); as message) {
+      <span class="field-error" id="athlete-birth-year-error">{{ message }}</span>
+    }
+  </div>
+
+  <div class="field">
+    <label for="athlete-gender">Płeć <span aria-hidden="true">*</span></label>
+    <select
+      id="athlete-gender"
+      class="field-control select-with-arrow"
+      formControlName="gender"
+      [attr.aria-invalid]="fieldError('gender') ? 'true' : null"
+      aria-describedby="athlete-gender-error"
+    >
+      <option value="" disabled>Wybierz płeć</option>
+      <option value="MALE">Mężczyzna</option>
+      <option value="FEMALE">Kobieta</option>
+    </select>
+    @if (fieldError('gender'); as message) {
+      <span class="field-error" id="athlete-gender-error">{{ message }}</span>
+    }
+  </div>
+</form>
