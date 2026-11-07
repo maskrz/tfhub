@@ -46,20 +46,18 @@ Na szerokim ekranie testy są prezentowane w białej, czytelnej tabeli z subteln
 
 | Kolumna | Zawartość |
 |---|---|
-| Test | Nazwa testu; pod nazwą tekstowy status „Aktywny” albo „Nieaktywny” |
-| Kategoria | Kategoria testu |
+| Nazwa testu | Nazwa testu |
 | Akcja | Przycisk „Edytuj” |
 
 Każdy wiersz ma dokładnie jedną widoczną akcję: **Edytuj**. Nie dodawać przycisku aktywacji/dezaktywacji, usuwania ani innych działań do wiersza. „Edytuj” prowadzi do formularza edycji testu.
 
-Status musi być opisany tekstem, nie tylko kolorem. Kategoria powinna być pokazana raz w osobnej kolumnie, zgodnie z modelem danych; przykłady w zrzucie ekranu nie dodają kolejnej kategorii ani kolumny.
+Tabela pokazuje wyłącznie nazwę testu i akcję „Edytuj”. Nie wyświetla pod nazwą kategorii ani statusu. Status pozostaje dostępny w danych i służy do filtrowania oraz stylowania wiersza.
 
 ## 5. Wygląd statusów
 
 - Aktywne wiersze używają standardowego jasnego tła.
 - Nieaktywne wiersze mają subtelne, jasnoczerwone tło, które nie dominuje nad treścią.
-- Status „Nieaktywny” musi być widoczny tekstowo również wtedy, gdy użytkownik nie rozpoznaje koloru.
-- Kontrast tekstu i kontrolek musi pozostać czytelny na obu tłach.
+- Kontrast nazwy testu i akcji musi pozostać czytelny na obu tłach.
 
 ## 6. Reguły backendu i zakres
 
@@ -87,9 +85,9 @@ Pusta lista po filtrze jest prawidłowym wynikiem i nie powinna być przedstawia
 
 ## 8. Responsywność
 
-- Na komputerze i szerszym tablecie używać tabeli z nazwą i statusem w pierwszej kolumnie, kategorią w drugiej oraz akcją w ostatniej.
+- Na komputerze i szerszym tablecie używać tabeli z nazwą testu w pierwszej kolumnie i akcją w ostatniej.
 - Na wąskim ekranie układać te same dane jako pionowe karty, bez poziomego przewijania całej strony.
-- Karta zawiera nazwę testu, status tekstowy, kategorię i ten sam pojedynczy przycisk „Edytuj”.
+- Karta zawiera nazwę testu i ten sam pojedynczy przycisk „Edytuj”.
 - Pole wyszukiwania powinno zajmować dostępną szerokość; przełącznik pozostaje czytelny i łatwy do obsługi dotykiem.
 - Akcja „Dodaj test” pozostaje widoczna i osiągalna w układzie mobilnym.
 - Nie dodawać innych akcji ani danych tylko dla wersji mobilnej.

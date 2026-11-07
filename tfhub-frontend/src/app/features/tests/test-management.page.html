@@ -1,0 +1,71 @@
+<section class="page" aria-labelledby="page-title">
+  <div class="page-heading">
+    <div>
+      <h1 id="page-title">Testy</h1>
+      <p>Zarządzaj testami sportowymi</p>
+    </div>
+  </div>
+
+  <div class="filters">
+    <label class="search-field">
+      <span class="visually-hidden">Szukaj testu</span>
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <circle cx="10.8" cy="10.8" r="6.8"></circle>
+        <path d="m16 16 5 5"></path>
+      </svg>
+      <input
+        type="search"
+        placeholder="Szukaj testu..."
+        [value]="query()"
+        (input)="onSearchInput($event)"
+      />
+    </label>
+
+    <label class="inactive-toggle">
+      <input type="checkbox" [checked]="showInactive()" (change)="onInactiveToggle($event)" />
+      <span class="switch" aria-hidden="true"></span>
+      <span>Pokaż nieaktywne</span>
+    </label>
+  </div>
+
+  @if (loading()) {
+    <p class="feedback" role="status">Ładowanie testów...</p>
+  } @else if (errorMessage(); as message) {
+    <div class="feedback error" role="alert">
+      <p>{{ message }}</p>
+      <button type="button" class="retry-button" (click)="retry()">Spróbuj ponownie</button>
+    </div>
+  } @else if (visibleTests().length === 0) {
+    <p class="feedback" role="status">
+      {{ hasSearchQuery ? 'Nie znaleziono testów pasujących do wyszukiwania.' : 'Brak testów do wyświetlenia.' }}
+    </p>
+  } @else {
+    <div class="table-surface">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">Nazwa testu</th>
+            <th scope="col"><span class="visually-hidden">Akcja</span></th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (test of visibleTests(); track test.id) {
+            <tr [class.inactive-row]="!test.active">
+              <td data-label="Test">
+                <strong>{{ test.name }}</strong>
+              </td>
+              <td class="action-cell">
+                <a class="edit-button" [routerLink]="['/tests', test.id, 'edit']">
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="m14 5 5 5M4 20l4.5-1 10-10a2.1 2.1 0 0 0-3-3l-10 10L4 20Z"></path>
+                  </svg>
+                  Edytuj
+                </a>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  }
+</section>

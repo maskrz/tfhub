@@ -1,6 +1,6 @@
 # Katalog use case'ów frontendu
 
-**Status:** Planowany katalog; szczegółowe specyfikacje nie zostały jeszcze uzgodnione
+**Status:** Katalog use case'ów frontendu; statusy poszczególnych przypadków określają ich implementację
 **Konwencja ID:** `FE-<OBSZAR>-<NNN>`, np. `FE-AUTH-001`. Prefiks `FE` odróżnia przypadki użycia interfejsu od identyfikatorów backendu (`UC-001`, `UC-101`, `UC-201` itd.).
 
 Katalog opisuje planowaną funkcjonalność interfejsu. Kontrakty API i reguły biznesowe pozostają zgodne z dokumentacją backendu. Nie należy dopisywać szczegółowych wymagań ekranów ani zmieniać reguł backendu bez uzgodnienia.
@@ -16,7 +16,7 @@ Katalog opisuje planowaną funkcjonalność interfejsu. Kontrakty API i reguły 
 
 | ID | Use case | Status |
 |---|---|---|
-| FE-TEST-001 | Wyświetlenie listy testów | Planowany |
+| FE-TEST-001 | Wyświetlenie listy testów | Implemented |
 | FE-TEST-002 | Filtrowanie listy testów | Planowany |
 | FE-TEST-003 | Dodanie testu | Planowany |
 | FE-TEST-004 | Edycja testu | Planowany |
