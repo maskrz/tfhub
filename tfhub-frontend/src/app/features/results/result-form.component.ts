@@ -4,6 +4,7 @@ import { FormControl, FormGroup, ReactiveFormsModule, ValidatorFn, Validators } 
 import { EMPTY, catchError, finalize, take } from 'rxjs';
 import { AthleteResponse } from '../athletes/athlete.model';
 import { TestResponse } from '../tests/test.model';
+import { SearchableSelectComponent, SearchableSelectOption } from './searchable-select.component';
 import {
   CreateResultRequest,
   ResultFormMode,
@@ -40,7 +41,7 @@ const validDate: ValidatorFn = (control) => {
 };
 
 @Component({
-  imports: [ReactiveFormsModule],
+  imports: [ReactiveFormsModule, SearchableSelectComponent],
   selector: 'app-result-form',
   templateUrl: './result-form.component.html',
   styleUrl: './result-form.component.scss',
@@ -90,11 +91,26 @@ export class ResultFormComponent implements OnInit {
     }
   }
 
-  onTestSelectionChange(event: Event): void {
-    const select = event.target;
-    if (select instanceof HTMLSelectElement) {
-      this.selectedTestId.set(select.value);
-    }
+  get athleteOptions(): SearchableSelectOption[] {
+    return this.athletes
+      .filter((athlete) => this.mode === 'EDIT' || athlete.active)
+      .map((athlete) => ({
+        value: String(athlete.id),
+        label: `${athlete.firstName} ${athlete.lastName}${athlete.active ? '' : ' (nieaktywny)'}`,
+      }));
+  }
+
+  get testOptions(): SearchableSelectOption[] {
+    return this.tests
+      .filter((test) => this.isActiveTest(test))
+      .map((test) => ({
+        value: String(test.id),
+        label: `${test.name}${test.active ? '' : ' (nieaktywny)'}`,
+      }));
+  }
+
+  onTestSelected(testId: string): void {
+    this.selectedTestId.set(testId);
   }
 
   isActiveAthlete(athlete: AthleteResponse): boolean {

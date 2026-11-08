@@ -10,9 +10,10 @@ import { CreateMultipleResultsResponse, ResultResponse, ResultRow, ResultType } 
 import { ResultsApiService } from './results-api.service';
 import { ResultFormModalComponent } from './result-form-modal.component';
 import { MultipleResultsFormModalComponent } from './multiple-results-form-modal.component';
+import { DeleteResultConfirmationComponent } from './delete-result-confirmation.component';
 
 @Component({
-  imports: [ResultFormModalComponent, MultipleResultsFormModalComponent],
+  imports: [ResultFormModalComponent, MultipleResultsFormModalComponent, DeleteResultConfirmationComponent],
   selector: 'app-results-page',
   styleUrl: './results.page.scss',
   templateUrl: './results.page.html',
@@ -32,6 +33,7 @@ export class ResultsPage implements OnInit {
   readonly sortDirection = signal<'asc' | 'desc'>('desc');
   readonly isCreateFormOpen = signal(false);
   readonly selectedResult = signal<ResultRow | null>(null);
+  readonly resultPendingDelete = signal<ResultRow | null>(null);
   readonly isMultipleCreateFormOpen = signal(false);
   readonly successMessage = signal<string | null>(null);
   readonly visibleResults = computed(() => {
@@ -163,6 +165,21 @@ export class ResultsPage implements OnInit {
     this.successMessage.set(null);
     this.selectedResult.set(result);
     this.isCreateFormOpen.set(true);
+  }
+
+  openDeleteConfirmation(result: ResultRow): void {
+    this.successMessage.set(null);
+    this.resultPendingDelete.set(result);
+  }
+
+  closeDeleteConfirmation(): void {
+    this.resultPendingDelete.set(null);
+  }
+
+  onResultDeleted(resultId: number): void {
+    this.allResults.update((current) => current.filter((result) => result.id !== resultId));
+    this.resultPendingDelete.set(null);
+    this.successMessage.set('Wynik został usunięty.');
   }
 
   onResultSaved(result: ResultResponse): void {

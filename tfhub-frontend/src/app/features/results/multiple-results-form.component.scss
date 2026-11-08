@@ -21,6 +21,7 @@ form { display: grid; gap: 1.25rem; }
 .form-notice { background: #f5f6f8; border-color: #d8deea; color: #526078; }
 
 .athlete-results { border-top: 1px solid #dce1ea; padding-top: 1rem; }
+.athlete-filter { margin-bottom: .75rem; max-width: 24rem; }
 .list-heading { align-items: baseline; display: flex; flex-wrap: wrap; gap: .5rem 1rem; justify-content: space-between; margin-bottom: .65rem; }
 .list-heading h3 { color: #20283a; font-size: 1.05rem; margin: 0; }
 .list-heading span { color: #59667e; font-size: .88rem; }

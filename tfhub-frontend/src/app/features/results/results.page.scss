@@ -34,8 +34,8 @@ h1 {
 
 .filters {
   align-items: end;
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: 1rem;
   margin-bottom: 1.7rem;
 }
@@ -44,7 +44,8 @@ h1 {
   gap: .8rem;
 }
 
-.search-filter { flex: 1 1 20rem; min-width: 16rem; }
+.search-filter { grid-column: span 2; min-width: 0; }
+.filters > .filter-field { min-width: 0; }
 
 .search-field svg {
   fill: none;
@@ -71,10 +72,12 @@ h1 {
 
 .date-filter {
   display: flex;
+  grid-column: span 2;
   gap: .6rem;
+  min-width: 0;
 }
 
-.date-filter .filter-field { min-width: 8.5rem; }
+.date-filter .filter-field { flex: 1; min-width: 0; }
 
 .table-surface {
   background: #fff;
@@ -139,20 +142,19 @@ td strong { font-size: 1.02rem; font-weight: 650; }
 .retry-button { margin-top: 1rem; }
 
 @media (max-width: 1000px) {
-  .filters { align-items: stretch; }
-  .search-filter { flex-basis: 100%; }
-  .filter-field { flex: 1 1 12rem; }
-  .date-filter { flex: 1 1 20rem; }
-  .date-filter .filter-field { flex: 1; }
+  .filters { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .search-filter,
+  .date-filter { grid-column: 1 / -1; }
+  .filters > .filter-field { grid-column: span 2; }
 }
 
 @media (max-width: 760px) {
   .page-heading { margin-bottom: 1.5rem; }
   .page-actions { width: 100%; }
-  .filters { gap: .75rem; }
-  .search-filter { flex-basis: 100%; }
-  .filter-field { flex-basis: 100%; }
-  .date-filter { flex-basis: 100%; }
+  .filters { gap: .75rem; grid-template-columns: minmax(0, 1fr); }
+  .search-filter,
+  .filters > .filter-field,
+  .date-filter { grid-column: 1; }
   .table-surface { background: transparent; border: 0; border-radius: 0; overflow: visible; }
   table, tbody { display: block; }
   thead { clip: rect(0, 0, 0, 0); clip-path: inset(50%); height: 1px; overflow: hidden; position: absolute; width: 1px; }

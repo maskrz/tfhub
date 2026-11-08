@@ -28,4 +28,8 @@ export class ResultsApiService {
   createMultipleResults(request: CreateMultipleResultsRequest): Observable<CreateMultipleResultsResponse> {
     return this.http.post<CreateMultipleResultsResponse>('/api/results/batch', request);
   }
+
+  deleteResult(id: number): Observable<void> {
+    return this.http.delete<void>(`/api/results/${id}`);
+  }
 }

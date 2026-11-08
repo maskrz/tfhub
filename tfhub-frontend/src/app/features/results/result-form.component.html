@@ -12,21 +12,15 @@
 
   <div class="field">
     <label for="result-athlete">Zawodnik <span aria-hidden="true">*</span></label>
-    <select
-      id="result-athlete"
-      class="field-control select-with-arrow"
+    <app-searchable-select
+      inputId="result-athlete"
+      ariaLabel="Wybierz lub wyszukaj zawodnika"
+      placeholder="Wybierz lub wpisz nazwę zawodnika"
+      [options]="athleteOptions"
       formControlName="athleteId"
-      autofocus
-      [attr.aria-invalid]="fieldError('athleteId') ? 'true' : null"
-      aria-describedby="result-athlete-error"
-    >
-      <option value="" disabled>Wybierz zawodnika</option>
-      @for (athlete of athletes; track athlete.id) {
-        @if (mode === 'EDIT' || athlete.active) {
-          <option [value]="athlete.id">{{ athlete.firstName }} {{ athlete.lastName }}</option>
-        }
-      }
-    </select>
+      [ariaInvalid]="fieldError('athleteId') ? 'true' : null"
+      describedBy="result-athlete-error"
+    />
     @if (fieldError('athleteId'); as message) {
       <span class="field-error" id="result-athlete-error">{{ message }}</span>
     }
@@ -34,21 +28,16 @@
 
   <div class="field">
     <label for="result-test">Test <span aria-hidden="true">*</span></label>
-    <select
-      id="result-test"
-      class="field-control select-with-arrow"
+    <app-searchable-select
+      inputId="result-test"
+      ariaLabel="Wybierz lub wyszukaj test"
+      placeholder="Wybierz lub wpisz nazwę testu"
+      [options]="testOptions"
       formControlName="testId"
-      (change)="onTestSelectionChange($event)"
-      [attr.aria-invalid]="fieldError('testId') ? 'true' : null"
-      aria-describedby="result-test-error"
-    >
-      <option value="" disabled>Wybierz test</option>
-      @for (test of tests; track test.id) {
-        @if (isActiveTest(test)) {
-          <option [value]="test.id">{{ test.name }}{{ test.active ? '' : ' (nieaktywny)' }}</option>
-        }
-      }
-    </select>
+      (selected)="onTestSelected($event)"
+      [ariaInvalid]="fieldError('testId') ? 'true' : null"
+      describedBy="result-test-error"
+    />
     @if (fieldError('testId'); as message) {
       <span class="field-error" id="result-test-error">{{ message }}</span>
     }

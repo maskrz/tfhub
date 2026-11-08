@@ -92,6 +92,19 @@ describe('ResultsApiService', () => {
     expect(actual).toEqual(response);
   });
 
+  it('deletes a result using the backend DELETE endpoint and expects no response body', () => {
+    let completed = false;
+
+    service.deleteResult(12).subscribe(() => (completed = true));
+
+    const request = httpTesting.expectOne('/api/results/12');
+    expect(request.request.method).toBe('DELETE');
+    expect(request.request.body).toBeNull();
+    request.flush(null, { status: 204, statusText: 'No Content' });
+
+    expect(completed).toBe(true);
+  });
+
   it('creates multiple results in one request using the batch endpoint and DTO', () => {
     const requestBody: CreateMultipleResultsRequest = {
       testId: 3,

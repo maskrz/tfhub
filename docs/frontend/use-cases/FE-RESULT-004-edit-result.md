@@ -51,6 +51,8 @@ All fields should initially contain the selected result's current values.
 
 Display the selected test's unit clearly.
 
+The athlete and test dropdowns filter their options as the user types, using the already-loaded data. When the form opens, preserve the current athlete and test—including an inactive linked record—without changing the existing result. Typing in a dropdown replaces its current selection until an option is selected.
+
 ## 5. Selection rules
 
 Follow the actual backend Update Result rules (Backend UC-205).
@@ -151,4 +153,5 @@ Deleting results will be implemented separately in FE-RESULT-005 – Delete Resu
 - The existing single-result form and modal are shared between CREATE and EDIT modes; edit state is passed from the selected Results row, with no additional result GET request.
 - Updates use `PUT /api/results/{id}` with `UpdateResultRequest` and receive the updated `ResultResponse`.
 - In EDIT mode all loaded athletes are selectable because UC-205 permits active and inactive athletes. The currently linked inactive test remains selected and visible so opening the form does not silently alter the historical result. UC-205 requires the test on an update to be active; selecting an inactive test is therefore rejected by the backend with HTTP 409. Active tests remain selectable.
+- Athlete and test filtering is integrated into the dropdown controls. The current athlete and test, including an inactive linked test, remain selected when the form opens; typing starts a new selection and filters options in place.
 - Successful updates replace only the result with the matching ID in the local collection. Filters and sorting stay intact; the Results collection is not reloaded.

@@ -44,8 +44,8 @@ Fields:
 
 | Field | Description |
 |---|---|
-| Zawodnik | Dropdown for selecting an athlete |
-| Test | Dropdown for selecting a test |
+| Zawodnik | Searchable dropdown for selecting an athlete |
+| Test | Searchable dropdown for selecting a test |
 | Data | Result date, defaulting to today's date |
 | Wynik | Positive numeric value |
 | Rodzaj | Dropdown: Trening / Zawody |
@@ -58,6 +58,8 @@ The selected test's unit should be displayed next to the result input or otherwi
 - Only active athletes and active tests can be selected for a new result.
 - Do not allow selection of tests that cannot accept new results according to backend rules.
 - Display athlete and test names clearly in dropdowns.
+- Typing in either dropdown control filters options locally by athlete or test name; do not use separate search fields or additional API requests.
+- Typing replaces the current selection until a matching option is selected.
 - Reuse existing frontend data sources and services where appropriate.
 
 ## 5. Validation
@@ -149,3 +151,5 @@ Multiple-result entry will be implemented separately in FE-RESULT-003 – Add Mu
 ## Implementation note
 
 The eligibility rule was confirmed to exclude inactive athletes as well as inactive tests. The Add Result modal therefore offers only active athletes and tests, and the backend rejects inactive references with HTTP 409. The same active-athlete rule is enforced by the existing batch creation endpoint to prevent bypassing the single-result rule. Historical results remain available.
+
+Athlete and test filtering is integrated into the dropdown controls; typing filters visible options without separate search fields.

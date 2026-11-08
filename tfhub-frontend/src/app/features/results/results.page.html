@@ -132,10 +132,9 @@
                 </button>
                 <button
                   type="button"
-                  class="button button--secondary"
-                  disabled
-                  title="Usuwanie wyniku będzie dostępne w osobnej funkcji."
-                  [attr.aria-label]="'Usuń wynik — niedostępne: ' + result.athleteName + ', ' + result.testName"
+                  class="button button--danger"
+                  [attr.aria-label]="'Usuń wynik: ' + result.athleteName + ', ' + result.testName"
+                  (click)="openDeleteConfirmation(result)"
                 >
                   Usuń
                 </button>
@@ -165,5 +164,16 @@
     [tests]="tests()"
     (saved)="onResultsCreated($event)"
     (cancelled)="closeMultipleCreateForm()"
+  />
+}
+
+@if (resultPendingDelete(); as result) {
+  <app-delete-result-confirmation
+    [result]="result"
+    [formattedDate]="formatDate(result.resultDate)"
+    [formattedValue]="formatValue(result.value)"
+    [resultType]="resultTypeLabel(result.type)"
+    (deleted)="onResultDeleted($event)"
+    (cancelled)="closeDeleteConfirmation()"
   />
 }

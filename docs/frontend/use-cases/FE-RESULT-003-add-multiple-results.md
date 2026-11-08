@@ -44,15 +44,17 @@ Title: `Dodaj wiele wyników`
 
 | Field | Description |
 |---|---|
-| Test | Dropdown for selecting a test |
+| Test | Searchable dropdown for selecting a test |
 | Data | Result date, defaulting to today's date |
 | Rodzaj | Dropdown: Trening / Zawody |
 
-The selected test's unit must be clearly visible.
+The selected test's unit must be clearly visible. Require a test selection before batch submission.
+
+The test dropdown filters its options as the user types. Above the athlete rows, provide a local text filter that initially shows every eligible athlete and hides nonmatching rows as the user types. Filtering the list must not clear values already entered for temporarily hidden athletes.
 
 ### Athlete results list
 
-After selecting a test, display a list of eligible athletes.
+Display all eligible athletes when the modal opens, even before a test is selected. The athlete filter initially starts empty, so every eligible athlete is visible.
 
 Each row should contain:
 
@@ -181,5 +183,6 @@ Editing and deleting individual results will be implemented separately in FE-RES
 - Results are submitted in one `POST /api/results/batch` request using `CreateMultipleResultsRequest`; the response is `CreateMultipleResultsResponse`, containing `createdCount` and the created `ResultResponse` items.
 - Empty athlete values are excluded from the payload. The form validates positive values, up to three decimal places and the database's maximum of nine integer digits, and rejects batches larger than 100 before submission.
 - Changing the selected test clears all entered athlete values and announces that they were cleared, so values cannot be submitted accidentally under a different test.
+- Test searching is integrated into the test dropdown. The athlete list filter matches first and last names; filtering does not discard values entered for hidden athletes.
 - On success, the returned results are joined to the already-loaded athlete and test data and appended locally; current filters and sorting remain unchanged. No follow-up GET request is made.
 - The backend additionally enforces active-athlete and active-test eligibility and processes the batch transactionally. A backend failure leaves the modal open and does not change the local collection.

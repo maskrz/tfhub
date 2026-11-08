@@ -1,10 +1,10 @@
 import { HttpErrorResponse } from '@angular/common/http';
-import { Component, DestroyRef, EventEmitter, Input, OnInit, Output, computed, inject, signal } from '@angular/core';
-import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { Component, EventEmitter, Input, OnInit, Output, computed, inject, signal } from '@angular/core';
 import { FormControl, FormGroup, FormRecord, ReactiveFormsModule, ValidatorFn, Validators } from '@angular/forms';
 import { EMPTY, catchError, finalize, take } from 'rxjs';
 import { AthleteResponse } from '../athletes/athlete.model';
 import { TestResponse } from '../tests/test.model';
+import { SearchableSelectComponent, SearchableSelectOption } from './searchable-select.component';
 import {
   CreateMultipleResultsRequest,
   CreateMultipleResultsResponse,
@@ -39,7 +39,7 @@ const validDate: ValidatorFn = (control) => {
 };
 
 @Component({
-  imports: [ReactiveFormsModule],
+  imports: [ReactiveFormsModule, SearchableSelectComponent],
   selector: 'app-multiple-results-form',
   templateUrl: './multiple-results-form.component.html',
   styleUrl: './multiple-results-form.component.scss',
@@ -54,6 +54,14 @@ export class MultipleResultsFormComponent implements OnInit {
   readonly errorMessage = signal<string | null>(null);
   readonly formMessage = signal<string | null>(null);
   readonly selectedTestId = signal('');
+  private readonly lastSelectedTestId = signal('');
+  readonly athleteSearch = signal('');
+  readonly visibleAthletes = computed(() => {
+    const search = this.athleteSearch().trim().toLocaleLowerCase('pl-PL');
+    return this.activeAthletes().filter((athlete) =>
+      `${athlete.firstName} ${athlete.lastName}`.toLocaleLowerCase('pl-PL').includes(search),
+    );
+  });
   readonly currentTest = computed(() =>
     this.tests.find((test) => test.id === Number(this.selectedTestId()) && test.active) ?? null,
   );
@@ -79,24 +87,6 @@ export class MultipleResultsFormComponent implements OnInit {
   });
 
   private readonly api = inject(ResultsApiService);
-  private readonly destroyRef = inject(DestroyRef);
-
-  constructor() {
-    this.form.controls.testId.valueChanges
-      .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe((testId) => {
-        const previousTestId = this.selectedTestId();
-        this.selectedTestId.set(testId);
-        this.formMessage.set(null);
-        if (previousTestId && previousTestId !== testId) {
-          for (const control of Object.values(this.resultValues.controls)) {
-            control.reset('');
-          }
-          this.formMessage.set('Po zmianie testu wpisane wyniki zostały wyczyszczone.');
-        }
-      });
-
-  }
 
   ngOnInit(): void {
     for (const athlete of this.activeAthletes()) {
@@ -107,8 +97,35 @@ export class MultipleResultsFormComponent implements OnInit {
     }
   }
 
+  get testOptions(): SearchableSelectOption[] {
+    return this.tests
+      .filter((test) => test.active)
+      .map((test) => ({ value: String(test.id), label: test.name }));
+  }
+
+  onTestSelected(testId: string): void {
+    this.selectedTestId.set(testId);
+    if (!testId) return;
+
+    const previousTestId = this.lastSelectedTestId();
+    this.lastSelectedTestId.set(testId);
+    if (previousTestId && previousTestId !== testId) {
+      for (const control of Object.values(this.resultValues.controls)) {
+        control.reset('');
+      }
+      this.formMessage.set('Po zmianie testu wpisane wyniki zostały wyczyszczone.');
+    } else {
+      this.formMessage.set(null);
+    }
+  }
+
   isActiveTest(test: TestResponse): boolean {
     return test.active;
+  }
+
+  onAthleteSearch(event: Event): void {
+    const input = event.target;
+    if (input instanceof HTMLInputElement) this.athleteSearch.set(input.value);
   }
 
   resultControl(athleteId: number): FormControl<string> {

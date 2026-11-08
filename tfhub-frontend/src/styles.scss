@@ -3,6 +3,8 @@
 :root {
   --button-primary: #188c55;
   --button-primary-hover: #137848;
+  --button-danger: #b63838;
+  --button-danger-hover: #962d2d;
   --button-secondary-text: #253147;
   --button-border: #cbd3df;
   --button-hover: #f2f4f8;
@@ -122,6 +124,13 @@ button, input { font: inherit; }
 }
 
 .button--primary:hover:not(:disabled) { background: var(--button-primary-hover); }
+
+.button--danger {
+  background: var(--button-danger);
+  color: #fff;
+}
+
+.button--danger:hover:not(:disabled) { background: var(--button-danger-hover); }
 
 .button--secondary {
   background: #fff;
