@@ -1,5 +1,7 @@
 package pl.tfhub.api.athlete.controller;
 
+import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.Year;
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -18,6 +20,12 @@ import pl.tfhub.api.athlete.enums.Gender;
 import pl.tfhub.api.athlete.exception.AthleteAlreadyExistsException;
 import pl.tfhub.api.athlete.exception.AthleteNotFoundException;
 import pl.tfhub.api.athlete.service.AthleteService;
+import pl.tfhub.api.result.dto.response.AthleteResultHistoryResponse;
+import pl.tfhub.api.result.enums.ResultType;
+import pl.tfhub.api.result.exception.InvalidResultSearchException;
+import pl.tfhub.api.result.service.ResultService;
+import pl.tfhub.api.test.dto.response.TestResponse;
+import pl.tfhub.api.test.enums.TestCategory;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
@@ -39,6 +47,86 @@ class AthleteControllerTests {
 
 	@MockitoBean
 	private AthleteService athleteService;
+
+	@MockitoBean
+	private ResultService resultService;
+
+	@Test
+	void retrievesTestsWithResultsAsResponseDtos() throws Exception {
+		when(resultService.getTestsWithResultsForAthlete(42L)).thenReturn(List.of(
+				new TestResponse(10L, "40 m sprint", "s", TestCategory.TIME, false, true),
+				new TestResponse(11L, "Long jump", "m", TestCategory.DISTANCE, true, false)));
+
+		mockMvc.perform(get("/api/athletes/42/tests"))
+				.andExpect(status().isOk())
+				.andExpect(content().json("""
+						[
+						  {"id":10,"name":"40 m sprint","unit":"s","category":"TIME",
+						   "higherIsBetter":false,"active":true},
+						  {"id":11,"name":"Long jump","unit":"m","category":"DISTANCE",
+						   "higherIsBetter":true,"active":false}
+						]
+						""", true))
+				.andExpect(jsonPath("$[0].class").doesNotExist());
+
+		verify(resultService).getTestsWithResultsForAthlete(42L);
+	}
+
+	@Test
+	void retrievesFilteredAthleteResultsAsResponseDtos() throws Exception {
+		LocalDate date = LocalDate.parse("2025-03-01");
+		List<Long> testIds = List.of(10L, 11L);
+		when(resultService.getAthleteResultHistory(42L, testIds, date, date)).thenReturn(List.of(
+				new AthleteResultHistoryResponse(
+						101L, 10L, "40 m sprint", "s", date, new BigDecimal("5.420"), ResultType.TRAINING),
+				new AthleteResultHistoryResponse(
+						102L, 10L, "40 m sprint", "s", date, new BigDecimal("5.300"), ResultType.COMPETITION)));
+
+		mockMvc.perform(get("/api/athletes/42/results")
+						.queryParam("testIds", "10", "11")
+						.queryParam("fromDate", "2025-03-01")
+						.queryParam("toDate", "2025-03-01"))
+				.andExpect(status().isOk())
+				.andExpect(content().json("""
+						[
+						  {"id":101,"testId":10,"testName":"40 m sprint","testUnit":"s",
+						   "resultDate":"2025-03-01","value":5.420,"type":"TRAINING"},
+						  {"id":102,"testId":10,"testName":"40 m sprint","testUnit":"s",
+						   "resultDate":"2025-03-01","value":5.300,"type":"COMPETITION"}
+						]
+						""", true))
+				.andExpect(jsonPath("$[0].athlete").doesNotExist())
+				.andExpect(jsonPath("$[0].class").doesNotExist());
+
+		verify(resultService).getAthleteResultHistory(42L, testIds, date, date);
+	}
+
+	@Test
+	void rejectsInvalidAthleteProfileSearchParameters() throws Exception {
+		mockMvc.perform(get("/api/athletes/42/results").queryParam("testIds", "0"))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.title").value("Invalid result search"));
+		mockMvc.perform(get("/api/athletes/42/results").queryParam("testIds", "not-a-number"))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.title").value("Invalid result search"));
+		mockMvc.perform(get("/api/athletes/42/results").queryParam("fromDate", "not-a-date"))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.title").value("Invalid result search"));
+	}
+
+	@Test
+	void mapsMissingAthleteAndRejectsInvalidAthleteIdForProfileOperations() throws Exception {
+		when(resultService.getTestsWithResultsForAthlete(404L))
+				.thenThrow(new AthleteNotFoundException(404L));
+		mockMvc.perform(get("/api/athletes/404/tests"))
+				.andExpect(status().isNotFound())
+				.andExpect(jsonPath("$.title").value("Athlete not found"));
+		mockMvc.perform(get("/api/athletes/0/results"))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.title").value("Invalid athlete ID"));
+		mockMvc.perform(get("/api/athletes/not-a-number/tests"))
+				.andExpect(status().isBadRequest());
+	}
 
 	@Test
 	void updatesAthleteAndReturnsAllUpdatedFields() throws Exception {

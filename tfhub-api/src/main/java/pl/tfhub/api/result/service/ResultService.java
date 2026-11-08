@@ -1,8 +1,8 @@
 package pl.tfhub.api.result.service;
 
 import jakarta.persistence.criteria.Predicate;
-import java.util.ArrayList;
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -15,6 +15,7 @@ import pl.tfhub.api.result.dto.request.CreateMultipleResultsRequest;
 import pl.tfhub.api.result.dto.request.CreateResultEntryRequest;
 import pl.tfhub.api.result.dto.request.CreateResultRequest;
 import pl.tfhub.api.result.dto.request.UpdateResultRequest;
+import pl.tfhub.api.result.dto.response.AthleteResultHistoryResponse;
 import pl.tfhub.api.result.dto.response.CreateMultipleResultsResponse;
 import pl.tfhub.api.result.dto.response.ResultResponse;
 import pl.tfhub.api.result.entity.TestResult;
@@ -24,7 +25,9 @@ import pl.tfhub.api.result.exception.InactiveTestException;
 import pl.tfhub.api.result.exception.InvalidResultSearchException;
 import pl.tfhub.api.result.exception.MultipleResultsDuplicateAthleteException;
 import pl.tfhub.api.result.exception.ResultNotFoundException;
+import pl.tfhub.api.result.repository.AthleteProfileRepository;
 import pl.tfhub.api.result.repository.ResultRepository;
+import pl.tfhub.api.test.dto.response.TestResponse;
 import pl.tfhub.api.test.service.TestService;
 
 @Service
@@ -33,14 +36,40 @@ public class ResultService {
 	private final AthleteService athleteService;
 	private final TestService testService;
 	private final ResultRepository resultRepository;
+	private final AthleteProfileRepository athleteProfileRepository;
 
 	public ResultService(
 			AthleteService athleteService,
 			TestService testService,
-			ResultRepository resultRepository) {
+			ResultRepository resultRepository,
+			AthleteProfileRepository athleteProfileRepository) {
 		this.athleteService = athleteService;
 		this.testService = testService;
 		this.resultRepository = resultRepository;
+		this.athleteProfileRepository = athleteProfileRepository;
+	}
+
+	@Transactional(readOnly = true)
+	public List<TestResponse> getTestsWithResultsForAthlete(long athleteId) {
+		athleteService.getAthlete(athleteId);
+		return athleteProfileRepository.findTestsWithResultsForAthlete(athleteId);
+	}
+
+	@Transactional(readOnly = true)
+	public List<AthleteResultHistoryResponse> getAthleteResultHistory(
+			long athleteId,
+			List<Long> testIds,
+			LocalDate fromDate,
+			LocalDate toDate) {
+		if (fromDate != null && toDate != null && fromDate.isAfter(toDate)) {
+			throw new InvalidResultSearchException();
+		}
+		if (testIds != null && testIds.stream().anyMatch(testId -> testId == null || testId <= 0)) {
+			throw new InvalidResultSearchException();
+		}
+
+		athleteService.getAthlete(athleteId);
+		return athleteProfileRepository.findResultHistory(athleteId, testIds, fromDate, toDate);
 	}
 
 	@Transactional
