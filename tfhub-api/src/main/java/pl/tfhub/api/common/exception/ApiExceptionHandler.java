@@ -19,6 +19,8 @@ import pl.tfhub.api.result.exception.InvalidResultIdException;
 import pl.tfhub.api.result.exception.InvalidResultSearchException;
 import pl.tfhub.api.result.exception.MultipleResultsDuplicateAthleteException;
 import pl.tfhub.api.result.exception.ResultNotFoundException;
+import pl.tfhub.api.statistics.exception.InvalidStatisticsParameterException;
+import pl.tfhub.api.statistics.exception.StatisticsTestNotFoundException;
 import pl.tfhub.api.test.exception.InvalidTestIdException;
 import pl.tfhub.api.test.exception.TestAlreadyExistsException;
 import pl.tfhub.api.test.exception.TestHasResultsException;
@@ -141,6 +143,21 @@ public class ApiExceptionHandler {
 		ProblemDetail problem = ProblemDetail.forStatusAndDetail(
 				HttpStatus.BAD_REQUEST, "Athlete ID must be a positive integer");
 		problem.setTitle("Invalid athlete ID");
+		return problem;
+	}
+
+	@ExceptionHandler(InvalidStatisticsParameterException.class)
+	public ProblemDetail handleInvalidStatisticsParameter() {
+		ProblemDetail problem = ProblemDetail.forStatusAndDetail(
+				HttpStatus.BAD_REQUEST, "Statistics query parameters are invalid");
+		problem.setTitle("Invalid statistics parameter");
+		return problem;
+	}
+
+	@ExceptionHandler(StatisticsTestNotFoundException.class)
+	public ProblemDetail handleStatisticsTestNotFound(StatisticsTestNotFoundException exception) {
+		ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, exception.getMessage());
+		problem.setTitle("Test not found");
 		return problem;
 	}
 }

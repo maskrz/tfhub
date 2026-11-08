@@ -77,13 +77,23 @@ Business rules:
 - Adding multiple results should be handled as one operation: either all valid results are saved or none are saved.
 - Results can be edited and deleted.
 
+## 4. Statistics Module
+
+Provides read-only dashboard aggregates and club records.
+
+| ID | Use Case | Description | Status |
+|---|---|---|---|
+| BE-STAT-001 | Dashboard Statistics | Retrieve dashboard overview data and club records. | Implemented |
+
+Detailed specification:
+- [BE-STAT-001 Dashboard Statistics](UC-301-dashboard-stats.md)
+
 ---
 
 ## Future Modules
 
 The following functionality is intentionally outside the scope of the initial implementation:
 
-- Statistics and reports (personal bests, progress charts, rankings and comparisons).
 - Training sessions and attendance.
 - Groups and team management.
 - Competition management.
