@@ -5,6 +5,7 @@ import { App } from './app';
 import { routes } from './app.routes';
 import { AthletesApiService } from './features/athletes/athletes-api.service';
 import { ResultsApiService } from './features/results/results-api.service';
+import { StatisticsApiService } from './features/dashboard/statistics-api.service';
 import { TestsApiService } from './features/tests/tests-api.service';
 
 describe('App', () => {
@@ -25,6 +26,18 @@ describe('App', () => {
           provide: ResultsApiService,
           useValue: { getAll: () => of([]) },
         },
+        {
+          provide: StatisticsApiService,
+          useValue: {
+            getDashboardOverview: () => of({
+              activeAthleteCount: 0,
+              availableTests: [],
+              availableSeasons: [],
+              recentResults: [],
+            }),
+            getClubRecords: () => of({ testId: 1, season: null, FEMALE: [], MALE: [] }),
+          },
+        },
       ],
     })
       .compileComponents();
@@ -36,7 +49,7 @@ describe('App', () => {
     expect(app).toBeTruthy();
   });
 
-  it('renders the shared shell and Test Management view', async () => {
+  it('renders the shared shell and dashboard by default', async () => {
     const fixture = TestBed.createComponent(App);
     fixture.detectChanges();
     await TestBed.inject(Router).navigateByUrl('/');
@@ -45,7 +58,8 @@ describe('App', () => {
     const compiled = fixture.nativeElement as HTMLElement;
     expect(compiled.querySelector('app-header')).toBeTruthy();
     expect(compiled.querySelector('app-footer')).toBeTruthy();
-    expect(compiled.querySelector('h1')?.textContent).toContain('Testy');
+    expect(compiled.querySelector('h1')?.textContent).toContain('Panel główny');
+    expect(compiled.querySelector('nav a[routerlink="/dashboard"]')).toBeTruthy();
   });
 
   it('renders the Athletes view inside the shared shell', async () => {

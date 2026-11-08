@@ -6,11 +6,11 @@ import { RouterLink, RouterLinkActive } from '@angular/router';
   selector: 'app-header',
   template: `
     <header class="app-header">
-      <a class="brand" routerLink="/tests" aria-label="TFHUB — strona główna">
+      <a class="brand" routerLink="/dashboard" aria-label="TFHUB — strona główna">
         TFHUB<span>.</span>
       </a>
       <nav aria-label="Nawigacja główna">
-        <span class="planned-link" aria-disabled="true">Panel główny</span>
+        <a routerLink="/dashboard" routerLinkActive="active" ariaCurrentWhenActive="page">Panel główny</a>
         <a routerLink="/tests" routerLinkActive="active" ariaCurrentWhenActive="page">Testy</a>
         <a routerLink="/athletes" routerLinkActive="active" ariaCurrentWhenActive="page">Zawodnicy</a>
         <a routerLink="/results" routerLinkActive="active" ariaCurrentWhenActive="page">Wyniki</a>
@@ -50,7 +50,7 @@ import { RouterLink, RouterLinkActive } from '@angular/router';
       gap: clamp(.5rem, 2vw, 2rem);
       height: 5.6rem;
     }
-    nav a, .planned-link {
+    nav a {
       align-items: center;
       border-bottom: 4px solid transparent;
       color: #d3d8e0;
@@ -64,7 +64,6 @@ import { RouterLink, RouterLinkActive } from '@angular/router';
       border-bottom-color: #42c66f;
       color: #fff;
     }
-    .planned-link { color: #929ba9; }
     .account {
       align-items: center;
       background: #66707c;
@@ -86,7 +85,7 @@ import { RouterLink, RouterLinkActive } from '@angular/router';
     @media (max-width: 650px) {
       .app-header { flex-wrap: wrap; gap: .25rem 1rem; padding-block: .6rem 0; }
       nav { flex-basis: 100%; gap: .5rem; height: 3.25rem; justify-content: space-between; order: 1; }
-      nav a, .planned-link { font-size: .82rem; padding: 0 .15rem; }
+      nav a { font-size: .82rem; padding: 0 .15rem; }
       .account { margin-left: auto; }
     }
   `,

@@ -1,0 +1,202 @@
+<main class="dashboard">
+  <header class="page-heading">
+    <h1>Panel główny</h1>
+  </header>
+
+  <section class="quick-actions" aria-label="Szybkie akcje">
+    <button class="button button--primary" type="button" (click)="openResultForm()" [disabled]="lookupLoading()">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
+      <span>Dodaj wynik</span>
+    </button>
+    <button
+      class="button button--primary"
+      type="button"
+      (click)="openMultipleResultForm()"
+      [disabled]="lookupLoading()"
+    >
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h12M4 12h8M4 18h12M19 4v6M16 7h6" /></svg>
+      <span>Dodaj grupę wyników</span>
+    </button>
+    <button class="button button--primary" type="button" (click)="openAthleteForm()">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10" cy="8" r="3" /><path d="M4 20a6 6 0 0 1 12 0M19 8v6M16 11h6" /></svg>
+      <span>Dodaj zawodnika</span>
+    </button>
+  </section>
+
+  @if (lookupLoading()) {
+    <p class="inline-status" role="status">Pobieranie danych do formularza…</p>
+  }
+  @if (lookupError()) {
+    <div class="error-message" role="alert">{{ lookupError() }}</div>
+  }
+
+  <a class="athlete-summary" routerLink="/athletes" aria-label="Przejdź do listy zawodników">
+    <span>Aktywni zawodnicy</span>
+    @if (overview(); as data) {
+      <strong>{{ data.activeAthleteCount }}</strong>
+    } @else if (overviewLoading()) {
+      <strong class="loading-value" aria-label="Ładowanie">…</strong>
+    } @else {
+      <strong class="loading-value">—</strong>
+    }
+    <span class="summary-link">Zobacz zawodników →</span>
+  </a>
+
+  @if (overviewError()) {
+    <div class="error-message" role="alert">
+      <span>{{ overviewError() }}</span>
+      <button class="button button--secondary" type="button" (click)="retryOverview()">Spróbuj ponownie</button>
+    </div>
+  }
+
+  <section class="dashboard-section records-section" aria-labelledby="records-heading">
+    <div class="section-heading">
+      <div>
+        <h2 id="records-heading">Rekordy klubowe</h2>
+      </div>
+      @if (overview(); as data) {
+        @if (data.availableTests.length > 0) {
+          <div class="selectors">
+            <label class="filter-field">
+              <span>Test</span>
+              <select class="field-control select-with-arrow" [value]="selectedTestId()" (change)="onTestChange($event)">
+                @for (test of data.availableTests; track test.id) {
+                  <option [value]="test.id">{{ test.name }}</option>
+                }
+              </select>
+            </label>
+            <label class="filter-field">
+              <span>Sezon</span>
+              <select class="field-control select-with-arrow" [value]="selectedSeason()" (change)="onSeasonChange($event)">
+                <option value="">Wszystkie sezony</option>
+                @for (season of data.availableSeasons; track season) {
+                  <option [value]="season">{{ season }}</option>
+                }
+              </select>
+            </label>
+          </div>
+        }
+      }
+    </div>
+
+    @if (overviewLoading() && !overview()) {
+      <p class="empty-state" role="status">Ładowanie danych panelu…</p>
+    } @else if (overview(); as data) {
+      @if (data.availableTests.length === 0) {
+        <p class="empty-state">Brak testów z zarejestrowanymi wynikami.</p>
+      } @else if (recordsLoading()) {
+        <p class="empty-state" role="status">Ładowanie rekordów klubowych…</p>
+      } @else if (recordsError()) {
+        <div class="error-message" role="alert">
+          <span>{{ recordsError() }}</span>
+          <button class="button button--secondary" type="button" (click)="retryRecords()">Spróbuj ponownie</button>
+        </div>
+      } @else if (records(); as dataRecords) {
+        <div class="record-tables">
+          <article class="record-card">
+            <h3>Kobiety</h3>
+            <div class="table-scroll">
+              <table>
+                <thead>
+                  <tr><th scope="col">Miejsce</th><th scope="col">Zawodnik</th><th scope="col">Wynik</th><th scope="col">Data</th></tr>
+                </thead>
+                <tbody>
+                  @for (record of dataRecords.FEMALE; track record.athleteId) {
+                    <tr>
+                      <td>{{ record.place }}</td>
+                      <td>{{ record.athleteName }}</td>
+                      <td>{{ formatValue(record.value) }} {{ record.unit }}</td>
+                      <td>{{ formatDate(record.resultDate) }}</td>
+                    </tr>
+                  } @empty {
+                    <tr><td class="table-empty-cell" colspan="4">Brak rekordów dla wybranego testu i sezonu.</td></tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          </article>
+          <article class="record-card">
+            <h3>Mężczyźni</h3>
+            <div class="table-scroll">
+              <table>
+                <thead>
+                  <tr><th scope="col">Miejsce</th><th scope="col">Zawodnik</th><th scope="col">Wynik</th><th scope="col">Data</th></tr>
+                </thead>
+                <tbody>
+                  @for (record of dataRecords.MALE; track record.athleteId) {
+                    <tr>
+                      <td>{{ record.place }}</td>
+                      <td>{{ record.athleteName }}</td>
+                      <td>{{ formatValue(record.value) }} {{ record.unit }}</td>
+                      <td>{{ formatDate(record.resultDate) }}</td>
+                    </tr>
+                  } @empty {
+                    <tr><td class="table-empty-cell" colspan="4">Brak rekordów dla wybranego testu i sezonu.</td></tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          </article>
+        </div>
+      }
+    }
+  </section>
+
+  <section class="dashboard-section recent-section" aria-labelledby="recent-heading">
+    <div class="section-heading">
+      <div>
+        <h2 id="recent-heading">Ostatnie wyniki</h2>
+      </div>
+    </div>
+    @if (overview(); as data) {
+      @if (data.recentResults.length === 0) {
+        <p class="empty-state">Brak zapisanych wyników.</p>
+      } @else {
+        <div class="table-scroll">
+          <table>
+            <thead>
+              <tr><th scope="col">Data</th><th scope="col">Zawodnik</th><th scope="col">Test</th><th scope="col">Wynik</th></tr>
+            </thead>
+            <tbody>
+              @for (result of data.recentResults; track result.id) {
+                <tr>
+                  <td>{{ formatDate(result.resultDate) }}</td>
+                  <td>{{ result.athleteName }}</td>
+                  <td>{{ result.testName }}</td>
+                  <td>{{ formatValue(result.value) }} {{ result.unit }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
+    } @else if (overviewLoading()) {
+      <p class="empty-state" role="status">Ładowanie ostatnich wyników…</p>
+    }
+  </section>
+</main>
+
+@if (isAthleteFormOpen()) {
+  <app-athlete-form-modal
+    [mode]="'CREATE'"
+    (saved)="onAthleteCreated($event)"
+    (cancelled)="closeAthleteForm()"
+  />
+}
+@if (isResultFormOpen()) {
+  <app-result-form-modal
+    [mode]="'CREATE'"
+    [athletes]="athletes()"
+    [tests]="tests()"
+    (saved)="onResultCreated($event)"
+    (cancelled)="closeResultForm()"
+  />
+}
+@if (isMultipleResultFormOpen()) {
+  <app-multiple-results-form-modal
+    [athletes]="athletes()"
+    [tests]="tests()"
+    (saved)="onMultipleResultsCreated($event)"
+    (cancelled)="closeMultipleResultForm()"
+  />
+}

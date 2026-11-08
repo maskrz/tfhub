@@ -1,0 +1,280 @@
+:host {
+  display: block;
+}
+
+.dashboard {
+  display: grid;
+  gap: 1.4rem;
+  margin: 0 auto;
+  max-width: 76rem;
+  padding: 2rem clamp(1rem, 3vw, 2rem) 3rem;
+}
+
+.page-heading h1,
+.section-heading h2,
+.record-card h3 {
+  color: #172033;
+  margin: 0;
+}
+
+.page-heading h1 {
+  font-size: clamp(1.65rem, 3vw, 2rem);
+  letter-spacing: -.025em;
+}
+
+.page-heading p,
+.section-heading p {
+  color: #69758a;
+  margin: .35rem 0 0;
+}
+
+.quick-actions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: .75rem;
+}
+
+.quick-actions .button {
+  gap: .55rem;
+  min-height: 3.6rem;
+}
+
+.quick-actions svg {
+  fill: none;
+  height: 1.15rem;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
+  width: 1.15rem;
+}
+
+.athlete-summary {
+  align-items: center;
+  background: #fff;
+  border: 1px solid #e1e6ed;
+  border-radius: .85rem;
+  color: inherit;
+  display: flex;
+  gap: 1rem;
+  min-height: 5.2rem;
+  padding: 1rem 1.35rem;
+  text-decoration: none;
+  transition: border-color 140ms ease, box-shadow 140ms ease;
+}
+
+.athlete-summary:hover {
+  border-color: #9dc9aa;
+  box-shadow: 0 5px 16px rgb(23 32 51 / 7%);
+}
+
+.athlete-summary > span:first-child {
+  color: #4f5c72;
+  font-weight: 600;
+}
+
+.athlete-summary strong {
+  color: #16834e;
+  font-size: 1.8rem;
+  margin-left: auto;
+}
+
+.athlete-summary .loading-value {
+  color: #8993a3;
+}
+
+.summary-link {
+  color: #188c55;
+  font-size: .9rem;
+  font-weight: 600;
+}
+
+.dashboard-section {
+  background: #fff;
+  border: 1px solid #e1e6ed;
+  border-radius: .85rem;
+  min-width: 0;
+  padding: clamp(1rem, 2.5vw, 1.5rem);
+}
+
+.section-heading {
+  align-items: end;
+  display: flex;
+  gap: 1.5rem;
+  justify-content: space-between;
+  margin-bottom: 1.25rem;
+}
+
+.section-heading h2 {
+  font-size: 1.2rem;
+}
+
+.section-heading p {
+  font-size: .9rem;
+}
+
+.records-section .section-heading {
+  align-items: stretch;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.selectors {
+  display: flex;
+  gap: .8rem;
+  min-width: min(100%, 30rem);
+}
+
+.selectors .filter-field {
+  flex: 1;
+}
+
+.selectors .field-control {
+  height: 2.9rem;
+}
+
+.record-tables {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.record-card {
+  background: #fbfcfd;
+  border: 1px solid #e7ebf0;
+  border-radius: .7rem;
+  min-width: 0;
+  padding: 1rem;
+}
+
+.record-card h3 {
+  font-size: 1rem;
+  margin-bottom: .85rem;
+}
+
+.table-scroll {
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+table {
+  border-collapse: collapse;
+  font-size: .9rem;
+  text-align: left;
+  width: 100%;
+}
+
+th {
+  color: #68748a;
+  font-size: .78rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+th,
+td {
+  border-bottom: 1px solid #e8ecf1;
+  padding: .8rem .55rem;
+}
+
+tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+td {
+  color: #27344a;
+}
+
+.record-card table {
+  font-size: .82rem;
+}
+
+.record-card th,
+.record-card td {
+  padding: .65rem .35rem;
+}
+
+.empty-state,
+.table-empty,
+.inline-status {
+  color: #69758a;
+  margin: 0;
+  padding: 1.3rem .5rem;
+  text-align: center;
+}
+
+.table-empty-cell { color: #69758a; padding: 1.1rem .5rem; text-align: center; }
+
+.error-message {
+  align-items: center;
+  background: #fff5f4;
+  border: 1px solid #f0c9c5;
+  border-radius: .65rem;
+  color: #8d2923;
+  display: flex;
+  flex-wrap: wrap;
+  gap: .75rem;
+  justify-content: space-between;
+  padding: .85rem 1rem;
+}
+
+.inline-status {
+  padding: 0;
+  text-align: left;
+}
+
+@media (max-width: 760px) {
+  .dashboard {
+    gap: 1rem;
+    padding-top: 1.35rem;
+  }
+
+  .section-heading {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .selectors {
+    min-width: 0;
+  }
+
+  .record-tables {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 480px) {
+  .quick-actions {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .quick-actions .button {
+    width: 100%;
+  }
+
+  .athlete-summary {
+    flex-wrap: wrap;
+    gap: .45rem .8rem;
+  }
+
+  .athlete-summary strong {
+    margin-left: auto;
+  }
+
+  .summary-link {
+    flex-basis: 100%;
+  }
+
+  .selectors {
+    flex-direction: column;
+  }
+
+  table {
+    min-width: 32rem;
+  }
+
+  .record-card table {
+    min-width: 27rem;
+  }
+}
