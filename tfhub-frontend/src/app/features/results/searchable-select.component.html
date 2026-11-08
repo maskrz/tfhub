@@ -1,0 +1,44 @@
+<div class="searchable-select" (focusout)="onFocusOut($event)">
+  <input
+    [id]="inputId"
+    class="field-control select-with-arrow searchable-select__input"
+    type="text"
+    role="combobox"
+    aria-autocomplete="list"
+    aria-haspopup="listbox"
+    [attr.aria-label]="ariaLabel"
+    [attr.aria-invalid]="ariaInvalid"
+    [attr.aria-describedby]="describedBy || null"
+    [attr.aria-expanded]="isOpen()"
+    [attr.aria-controls]="inputId + '-options'"
+    [attr.aria-activedescendant]="activeIndex() >= 0 ? optionId(activeIndex()) : null"
+    [placeholder]="placeholder"
+    [value]="inputValue"
+    [disabled]="isDisabled()"
+    (focus)="onFocus($event)"
+    (input)="onInput($event)"
+    (keydown)="onKeydown($event)"
+  />
+
+  @if (isOpen()) {
+    <div class="searchable-select__options" [id]="inputId + '-options'" role="listbox" [attr.aria-label]="ariaLabel">
+      @for (option of filteredOptions; track option.value; let index = $index) {
+        <button
+          type="button"
+          class="searchable-select__option"
+          role="option"
+          [id]="optionId(index)"
+          [attr.data-value]="option.value"
+          [attr.aria-selected]="selectedValue() === option.value"
+          [class.active]="activeIndex() === index"
+          (pointerdown)="$event.preventDefault()"
+          (click)="selectOption(option)"
+        >
+          {{ option.label }}
+        </button>
+      } @empty {
+        <p class="searchable-select__empty" role="status">Brak pasujących pozycji.</p>
+      }
+    </div>
+  }
+</div>
