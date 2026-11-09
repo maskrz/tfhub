@@ -1,20 +1,4 @@
 <main class="profile-page">
-  <div class="page-heading">
-    <div>
-      <h1>Profil zawodnika</h1>
-      @if (athlete(); as currentAthlete) {
-        @if (canEdit()) {
-          <p class="breadcrumb"><a routerLink="/athletes">Zawodnicy</a> / {{ currentAthlete.firstName }} {{ currentAthlete.lastName }}</p>
-        }
-      }
-    </div>
-    @if (athlete(); as currentAthlete) {
-      @if (canEdit()) {
-      <button class="button button--secondary" type="button" (click)="openAthleteEdit()">Edytuj</button>
-      }
-    }
-  </div>
-
   @if (successMessage(); as message) {
     <p class="feedback success" role="status" aria-live="polite">{{ message }}</p>
   }
@@ -28,24 +12,26 @@
     </div>
   } @else if (athlete(); as currentAthlete) {
     <section class="profile-card athlete-card" aria-label="Dane zawodnika">
-      <div class="athlete-details">
-        <h2>{{ currentAthlete.firstName }} {{ currentAthlete.lastName }}</h2>
-        <p>Rocznik {{ currentAthlete.birthYear }} · {{ genderLabel(currentAthlete.gender) }}</p>
-        <span class="status-badge" [class.status-badge--inactive]="!currentAthlete.active">
-          {{ currentAthlete.active ? 'Aktywny' : 'Nieaktywny' }}
-        </span>
-      </div>
-      <div class="athlete-actions">
-        <span>Dane zawodnika</span>
+      <div class="athlete-header">
+        <div class="athlete-details">
+          <h2>{{ currentAthlete.firstName }} {{ currentAthlete.lastName }}</h2>
+          <p>Rocznik {{ currentAthlete.birthYear }} · {{ genderLabel(currentAthlete.gender) }}</p>
+          <span class="status-badge" [class.status-badge--inactive]="!currentAthlete.active">
+            {{ currentAthlete.active ? 'Aktywny' : 'Nieaktywny' }}
+          </span>
+        </div>
         @if (canEdit()) {
-        <button
-          class="button button--primary"
-          type="button"
-          [disabled]="!currentAthlete.active || lookupLoading()"
-          (click)="openAddResult()"
-        >
-          + Dodaj wynik
-        </button>
+          <div class="athlete-actions">
+            <button class="button button--secondary" type="button" (click)="openAthleteEdit()">Edytuj</button>
+            <button
+              class="button button--primary"
+              type="button"
+              [disabled]="!currentAthlete.active || lookupLoading()"
+              (click)="openAddResult()"
+            >
+              Dodaj wynik
+            </button>
+          </div>
         }
       </div>
       @if (lookupLoading()) {
@@ -56,10 +42,9 @@
       }
     </section>
 
-    <section class="profile-card history-card" aria-labelledby="history-heading">
+    <section class="history-filters" aria-labelledby="history-heading">
       <div class="section-title">
         <h2 id="history-heading">Historia wyników</h2>
-        <p>Wybierz testy i zakres dat, aby pobrać wyniki</p>
       </div>
 
       <div class="filters">
@@ -68,66 +53,89 @@
           @if (tests().length === 0) {
             <p class="no-tests">Ten zawodnik nie ma jeszcze wyników.</p>
           } @else {
+            <input
+              class="field-control test-search"
+              type="search"
+              aria-label="Szukaj testu po nazwie"
+              placeholder="Szukaj testu po nazwie"
+              [value]="testSearch()"
+              (input)="onTestSearch($event)"
+            />
             <div class="test-options" role="group" aria-label="Wybierz testy">
-              @for (test of tests(); track test.id) {
-                <label class="test-option">
-                  <input
-                    type="checkbox"
-                    [checked]="selectedTestIds().includes(test.id)"
-                    (change)="setTestSelected(test.id, $event)"
-                  />
-                  <span>{{ test.name }} ({{ test.unit }})</span>
-                  @if (!test.active) {
-                    <span class="inactive-label">nieaktywny</span>
-                  }
-                </label>
+              @for (group of visibleTestGroups(); track group.category) {
+                <div class="test-group" role="group" [attr.aria-label]="group.label">
+                  <h3 class="test-group__title">{{ group.label }}</h3>
+                  <div class="test-group__items">
+                    @for (test of group.tests; track test.id) {
+                      <label class="test-option">
+                        <input
+                          type="checkbox"
+                          [checked]="selectedTestIds().includes(test.id)"
+                          (change)="setTestSelected(test.id, $event)"
+                        />
+                        <span>{{ test.name }} ({{ test.unit }})</span>
+                        @if (!test.active) {
+                          <span class="inactive-label">nieaktywny</span>
+                        }
+                      </label>
+                    }
+                  </div>
+                </div>
+              } @empty {
+                <p class="no-tests" role="status">Brak testów pasujących do wyszukiwania.</p>
               }
             </div>
+            <button class="button button--secondary select-all-button" type="button" (click)="toggleAllTests()">
+              {{ allTestsSelected() ? 'Odznacz wszystkie' : 'Zaznacz wszystkie' }}
+            </button>
           }
         </fieldset>
 
-        <div class="date-range" role="group" aria-label="Zakres dat">
-          <label class="filter-field">
-            <span>Od</span>
-            <input class="field-control" type="date" [value]="fromDate()" (input)="onDateChange($event, 'from')" />
-          </label>
-          <label class="filter-field">
-            <span>Do</span>
-            <input class="field-control" type="date" [value]="toDate()" (input)="onDateChange($event, 'to')" />
-          </label>
+        <div class="date-actions">
+          <div class="date-range" role="group" aria-label="Zakres dat">
+            <label class="filter-field">
+              <span>Od</span>
+              <input class="field-control" type="date" [value]="fromDate()" (input)="onDateChange($event, 'from')" />
+            </label>
+            <label class="filter-field">
+              <span>Do</span>
+              <input class="field-control" type="date" [value]="toDate()" (input)="onDateChange($event, 'to')" />
+            </label>
+          </div>
+          <button
+            class="button button--primary load-button"
+            type="button"
+            [disabled]="historyLoading() || profileLoading() || tests().length === 0"
+            (click)="loadResults()"
+          >
+            {{ historyLoading() ? 'Pobieranie wyników…' : 'Pobierz wyniki' }}
+          </button>
         </div>
         @if (filterError(); as message) {
           <p class="feedback error filter-error" role="alert">{{ message }}</p>
         }
-        <button
-          class="button button--primary load-button"
-          type="button"
-          [disabled]="historyLoading() || profileLoading() || tests().length === 0"
-          (click)="loadResults()"
-        >
-          {{ historyLoading() ? 'Pobieranie wyników…' : '↓ Pobierz wyniki' }}
-        </button>
       </div>
+    </section>
 
-      <div class="section-divider"></div>
-      @if (historyError() && historyLoaded()) {
+    @if (!historyLoaded() && historyLoading()) {
+      <p class="feedback" role="status">Pobieranie historii wyników…</p>
+    } @else if (!historyLoaded() && historyError(); as message) {
+      <div class="feedback error" role="alert">
+        <p>{{ message }}</p>
+        <button class="button button--primary" type="button" (click)="retryHistory()">Spróbuj ponownie</button>
+      </div>
+    }
+
+    @if (historyLoaded()) {
+    <section class="profile-card history-card" aria-labelledby="matrix-heading">
+      @if (historyError()) {
         <p class="feedback error" role="alert">{{ historyError() }}</p>
       }
       <div class="section-title matrix-title">
-        <h3>Zestawienie wyników</h3>
-        <p>Najstarsze wyniki na górze</p>
+        <h2 id="matrix-heading">Zestawienie wyników</h2>
       </div>
 
-      @if (historyLoading() && !historyLoaded()) {
-        <p class="feedback" role="status">Pobieranie historii wyników…</p>
-      } @else if (historyError() && !historyLoaded()) {
-        <div class="feedback error" role="alert">
-          <p>{{ historyError() }}</p>
-          <button class="button button--primary" type="button" (click)="retryHistory()">Spróbuj ponownie</button>
-        </div>
-      } @else if (!historyLoaded()) {
-        <p class="matrix-prompt">Ustaw filtry i wybierz „Pobierz wyniki”.</p>
-      } @else if (history().length === 0) {
+      @if (history().length === 0) {
         <p class="feedback empty-state" role="status">Brak wyników dla wybranych filtrów.</p>
       } @else {
         <div class="matrix-scroll">
@@ -176,16 +184,12 @@
             </tbody>
           </table>
         </div>
-        @if (canEdit()) {
-          <p class="edit-hint">Kliknij wynik dwukrotnie na komputerze lub dotknij go na telefonie, aby edytować.</p>
-        }
       }
     </section>
 
     <section class="profile-card chart-card" aria-labelledby="chart-heading">
       <div class="section-title">
         <h2 id="chart-heading">Wykres postępów</h2>
-        <p>Wspólna oś czasu · niezależne skale dla każdej jednostki</p>
       </div>
 
       @if (chart(); as profileChart) {
@@ -273,12 +277,11 @@
             }
           </svg>
         </div>
-      } @else if (!historyLoaded()) {
-        <p class="chart-empty">Wczytaj wyniki, aby zobaczyć wykres postępów.</p>
       } @else {
         <p class="chart-empty">Brak wyników do przedstawienia na wykresie.</p>
       }
     </section>
+    }
   }
 </main>
 

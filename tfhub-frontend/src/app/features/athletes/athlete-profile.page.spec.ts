@@ -3,7 +3,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
 import { ActivatedRoute, provideRouter } from '@angular/router';
 import { convertToParamMap } from '@angular/router';
-import { Observable, of, throwError } from 'rxjs';
+import { Observable, Subject, of, throwError } from 'rxjs';
 import { signal } from '@angular/core';
 import { AthleteResponse } from './athlete.model';
 import { AthleteProfileResult } from './athlete-profile.model';
@@ -87,12 +87,50 @@ describe('AthleteProfilePage', () => {
     expect(fixture.nativeElement.textContent).toContain('Aktywny');
     expect(fixture.nativeElement.textContent).toContain('Rocznik 2010');
     expect(athletesApi.getResultHistory).not.toHaveBeenCalled();
+    expect(fixture.nativeElement.querySelector('.history-card')).toBeNull();
+    expect(fixture.nativeElement.querySelector('.chart-card')).toBeNull();
+  });
+
+  it('shows results and chart only after the first request succeeds', async () => {
+    const response = new Subject<AthleteProfileResult[]>();
+    await createPage(athlete, () => response);
+    (fixture.nativeElement.querySelector('.load-button') as HTMLButtonElement).click();
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('.history-card')).toBeNull();
+    expect(fixture.nativeElement.querySelector('.chart-card')).toBeNull();
+    expect(fixture.nativeElement.textContent).toContain('Pobieranie historii wyników');
+    response.next(results);
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('.history-card')).not.toBeNull();
+    expect(fixture.nativeElement.querySelector('.chart-card')).not.toBeNull();
+  });
+
+  it('shows empty states after a successful empty response', async () => {
+    await createPage(athlete, () => of([]));
+    (fixture.nativeElement.querySelector('.load-button') as HTMLButtonElement).click();
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('.history-card')?.textContent).toContain('Brak wyników dla wybranych filtrów.');
+    expect(fixture.nativeElement.querySelector('.chart-card')?.textContent).toContain('Brak wyników do przedstawienia na wykresie.');
+  });
+
+  it('shows the initial request error and allows retry without displaying the sections', async () => {
+    await createPage(athlete, () => throwError(() => new HttpErrorResponse({ status: 500 })));
+    (fixture.nativeElement.querySelector('.load-button') as HTMLButtonElement).click();
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('.history-card')).toBeNull();
+    expect(fixture.nativeElement.querySelector('.chart-card')).toBeNull();
+    expect(fixture.nativeElement.textContent).toContain('Nie udało się pobrać historii wyników.');
+    athletesApi.getResultHistory.mockReturnValueOnce(of(results));
+    (fixture.nativeElement.querySelector('.feedback.error .button') as HTMLButtonElement).click();
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('.history-card')).not.toBeNull();
+    expect(fixture.nativeElement.querySelector('.chart-card')).not.toBeNull();
   });
 
   it('loads and displays inactive athlete data without allowing result creation', async () => {
     await createPage(inactiveAthlete);
     expect(fixture.nativeElement.textContent).toContain('Nieaktywny');
-    expect((fixture.nativeElement.querySelector('.athlete-actions .button') as HTMLButtonElement).disabled).toBe(true);
+    expect((fixture.nativeElement.querySelector('.athlete-actions .button--primary') as HTMLButtonElement).disabled).toBe(true);
   });
 
   it('loads selected tests and date filters only after explicit request, retaining duplicate same-cell results', async () => {
@@ -126,8 +164,80 @@ describe('AthleteProfilePage', () => {
     expect(fixture.nativeElement.querySelectorAll('.matrix tbody tr .result-value')).toHaveLength(3);
   });
 
+  it('toggles all tests without loading results and preserves selection order when completing a partial selection', async () => {
+    await createPage();
+    const component = fixture.componentInstance;
+    const button = fixture.nativeElement.querySelector('.select-all-button') as HTMLButtonElement;
+    const checkboxes = fixture.nativeElement.querySelectorAll('.test-option input') as NodeListOf<HTMLInputElement>;
+
+    expect(button.previousElementSibling?.classList.contains('test-options')).toBe(true);
+    expect(button.textContent).toContain('Odznacz wszystkie');
+    button.click();
+    fixture.detectChanges();
+    expect(component.selectedTestIds()).toEqual([]);
+    expect([...checkboxes].every((checkbox) => !checkbox.checked)).toBe(true);
+    expect(button.textContent).toContain('Zaznacz wszystkie');
+
+    component.loadResults();
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).toContain('Wybierz co najmniej jeden test.');
+    button.click();
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).not.toContain('Wybierz co najmniej jeden test.');
+    checkboxes[0].checked = false;
+    checkboxes[0].dispatchEvent(new Event('change'));
+    fixture.detectChanges();
+    expect(button.textContent).toContain('Zaznacz wszystkie');
+    button.click();
+    fixture.detectChanges();
+    expect(component.selectedTestIds()).toEqual([5, 3]);
+    expect([...checkboxes].every((checkbox) => checkbox.checked)).toBe(true);
+    expect(button.textContent).toContain('Odznacz wszystkie');
+    expect(fixture.nativeElement.textContent).not.toContain('Wybierz co najmniej jeden test.');
+    expect(athletesApi.getResultHistory).not.toHaveBeenCalled();
+
+    (fixture.nativeElement.querySelector('.load-button') as HTMLButtonElement).click();
+    expect(athletesApi.getResultHistory).toHaveBeenCalledWith(8, { testIds: [5, 3] });
+  });
+
+  it('groups tests by category and filters them by name, limiting select-all to the visible tests', async () => {
+    await createPage();
+    const component = fixture.componentInstance;
+    const titles = () => [...fixture.nativeElement.querySelectorAll('.test-group__title')]
+      .map((title) => (title as HTMLElement).textContent?.trim());
+    expect(titles()).toEqual(['Czas', 'Dystans']);
+
+    const search = fixture.nativeElement.querySelector('.test-search') as HTMLInputElement;
+    search.value = 'skok';
+    search.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+    expect(titles()).toEqual(['Dystans']);
+
+    const button = fixture.nativeElement.querySelector('.select-all-button') as HTMLButtonElement;
+    button.click();
+    fixture.detectChanges();
+    expect(component.selectedTestIds()).toEqual([3]);
+
+    search.value = 'brak';
+    search.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).toContain('Brak testów pasujących do wyszukiwania.');
+  });
+
+  it('does not show the select-all action when there are no tests', async () => {
+    await createPage();
+    fixture.componentInstance.tests.set([]);
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('.select-all-button')).toBeNull();
+    expect(fixture.nativeElement.textContent).toContain('Ten zawodnik nie ma jeszcze wyników.');
+  });
+
   it('rejects a reversed date range without requesting results', async () => {
     await createPage();
+    const filters = fixture.nativeElement.querySelector('.history-filters') as HTMLElement;
+    const dateActions = filters.querySelector('.date-actions') as HTMLElement;
+    expect(dateActions.querySelector('.date-range')).not.toBeNull();
+    expect(dateActions.querySelector('.load-button')).not.toBeNull();
     const dates = fixture.nativeElement.querySelectorAll('input[type="date"]') as NodeListOf<HTMLInputElement>;
     dates[0].value = '2025-01-01';
     dates[0].dispatchEvent(new Event('input'));
@@ -136,6 +246,8 @@ describe('AthleteProfilePage', () => {
     (fixture.nativeElement.querySelector('.load-button') as HTMLButtonElement).click();
     fixture.detectChanges();
     expect(fixture.nativeElement.textContent).toContain('Data początkowa nie może być późniejsza');
+    expect(filters.querySelector('.filter-error')).not.toBeNull();
+    expect(dateActions.querySelector('.load-button')).not.toBeNull();
     expect(athletesApi.getResultHistory).not.toHaveBeenCalled();
   });
 

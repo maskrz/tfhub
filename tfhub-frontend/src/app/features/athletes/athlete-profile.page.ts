@@ -1,13 +1,13 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component, DestroyRef, OnInit, computed, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { ActivatedRoute, RouterLink } from '@angular/router';
+import { ActivatedRoute } from '@angular/router';
 import { EMPTY, catchError, finalize, forkJoin, take } from 'rxjs';
 import { AthleteFormModalComponent } from './athlete-form-modal.component';
 import { AthleteResponse, Gender } from './athlete.model';
 import { AthleteProfileResult, AthleteResultHistoryFilters } from './athlete-profile.model';
 import { AthletesApiService } from './athletes-api.service';
-import { TestResponse } from '../tests/test.model';
+import { TestCategory, TestResponse } from '../tests/test.model';
 import { TestsApiService } from '../tests/tests-api.service';
 import { ResultFormModalComponent } from '../results/result-form-modal.component';
 import { ResultResponse } from '../results/result.model';
@@ -71,7 +71,7 @@ interface ProfileChart {
 const chartColors = ['#2585d8', '#159c68', '#db8a2f', '#8558c7', '#d55252', '#259da5', '#b64f9a', '#777f31'];
 
 @Component({
-  imports: [RouterLink, AthleteFormModalComponent, ResultFormModalComponent],
+  imports: [AthleteFormModalComponent, ResultFormModalComponent],
   selector: 'app-athlete-profile-page',
   styleUrl: './athlete-profile.page.scss',
   templateUrl: './athlete-profile.page.html',
@@ -127,6 +127,25 @@ export class AthleteProfilePage implements OnInit {
       .map((id) => this.tests().find((test) => test.id === id))
       .filter((test): test is TestResponse => test !== undefined);
   });
+  readonly testSearch = signal('');
+  readonly visibleTestGroups = computed(() => {
+    const query = this.testSearch().trim().toLocaleLowerCase('pl');
+    const visible = this.tests().filter((test) => test.name.toLocaleLowerCase('pl').includes(query));
+    return (['TIME', 'DISTANCE', 'SPEED'] as const)
+      .map((category) => ({
+        category,
+        label: this.categoryLabel(category),
+        tests: visible
+          .filter((test) => test.category === category)
+          .sort((left, right) => left.name.localeCompare(right.name, 'pl')),
+      }))
+      .filter((group) => group.tests.length > 0);
+  });
+  readonly allTestsSelected = computed(() => {
+    const tests = this.visibleTestGroups().flatMap((group) => group.tests);
+    const selected = this.selectedTestIds();
+    return tests.length > 0 && tests.every((test) => selected.includes(test.id));
+  });
 
   private readonly route = inject(ActivatedRoute);
   readonly auth = inject(AuthService);
@@ -176,6 +195,33 @@ export class AthleteProfilePage implements OnInit {
         : ids.filter((id) => id !== testId),
     );
     this.filterError.set(null);
+  }
+
+  toggleAllTests(): void {
+    const visibleIds = this.visibleTestGroups().flatMap((group) => group.tests.map((test) => test.id));
+    if (this.allTestsSelected()) {
+      this.selectedTestIds.update((ids) => ids.filter((id) => !visibleIds.includes(id)));
+    } else {
+      const selected = this.selectedTestIds();
+      this.selectedTestIds.set([...selected, ...visibleIds.filter((id) => !selected.includes(id))]);
+    }
+    this.filterError.set(null);
+  }
+
+  onTestSearch(event: Event): void {
+    const input = event.target;
+    if (input instanceof HTMLInputElement) this.testSearch.set(input.value);
+  }
+
+  categoryLabel(category: TestCategory): string {
+    switch (category) {
+      case 'TIME':
+        return 'Czas';
+      case 'DISTANCE':
+        return 'Dystans';
+      case 'SPEED':
+        return 'Prędkość';
+    }
   }
 
   onDateChange(event: Event, bound: 'from' | 'to'): void {

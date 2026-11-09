@@ -86,13 +86,17 @@ describe('DashboardPage', () => {
     const fixture = TestBed.createComponent(DashboardPage);
     fixture.detectChanges();
 
-    const testSelect = fixture.nativeElement.querySelector('select') as HTMLSelectElement;
-    testSelect.value = '9';
-    testSelect.dispatchEvent(new Event('change'));
+    const testInput = fixture.nativeElement.querySelector('#dashboard-test') as HTMLInputElement;
+    testInput.value = 'skok';
+    testInput.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+    const options = fixture.nativeElement.querySelectorAll('app-searchable-select [role="option"]');
+    expect(options).toHaveLength(1);
+    (options[0] as HTMLButtonElement).click();
     fixture.detectChanges();
     expect(statistics.getClubRecords).toHaveBeenLastCalledWith(9, null, []);
 
-    const seasonSelect = fixture.nativeElement.querySelectorAll('select')[1] as HTMLSelectElement;
+    const seasonSelect = fixture.nativeElement.querySelector('select') as HTMLSelectElement;
     seasonSelect.value = '2024';
     seasonSelect.dispatchEvent(new Event('change'));
     fixture.detectChanges();
@@ -121,11 +125,13 @@ describe('DashboardPage', () => {
     const fixture = TestBed.createComponent(DashboardPage);
     fixture.detectChanges();
 
-    const testSelect = fixture.nativeElement.querySelector('select') as HTMLSelectElement;
-    testSelect.value = '9';
-    testSelect.dispatchEvent(new Event('change'));
-    latest.next(records(9));
-    first.next(records(8));
+    const testInput = fixture.nativeElement.querySelector('#dashboard-test') as HTMLInputElement;
+    testInput.value = 'skok';
+    testInput.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+    (fixture.nativeElement.querySelector('[role="option"][data-value="9"]') as HTMLButtonElement).click();
+        latest.next(records(9));
+        first.next(records(8));
     fixture.detectChanges();
 
     expect(fixture.componentInstance.records()?.testId).toBe(9);

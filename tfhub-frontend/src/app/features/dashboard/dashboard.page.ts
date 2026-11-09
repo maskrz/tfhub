@@ -1,5 +1,6 @@
 import { HttpErrorResponse } from '@angular/common/http';
-import { Component, DestroyRef, OnInit, inject, signal } from '@angular/core';
+import { Component, DestroyRef, OnInit, computed, inject, signal } from '@angular/core';
+import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { EMPTY, catchError, finalize, forkJoin, take } from 'rxjs';
@@ -9,6 +10,7 @@ import { AthletesApiService } from '../athletes/athletes-api.service';
 import { MultipleResultsFormModalComponent } from '../results/multiple-results-form-modal.component';
 import { CreateMultipleResultsResponse, ResultResponse } from '../results/result.model';
 import { ResultFormModalComponent } from '../results/result-form-modal.component';
+import { SearchableSelectComponent, SearchableSelectOption } from '../results/searchable-select.component';
 import { TestResponse } from '../tests/test.model';
 import { TestsApiService } from '../tests/tests-api.service';
 import { ClubRecords, DashboardOverview } from './statistics.model';
@@ -19,7 +21,9 @@ import { MultiSelectDropdownComponent } from '../../shared/multi-select-dropdown
 
 @Component({
   imports: [
+    FormsModule,
     RouterLink,
+    SearchableSelectComponent,
     AthleteFormModalComponent,
     ResultFormModalComponent,
     MultipleResultsFormModalComponent,
@@ -47,6 +51,9 @@ export class DashboardPage implements OnInit {
   readonly tests = signal<TestResponse[]>([]);
   readonly groups = signal<TrainingGroup[]>([]);
   readonly selectedGroupIds = signal<number[]>([]);
+  readonly testOptions = computed<SearchableSelectOption[]>(() =>
+    (this.overview()?.availableTests ?? []).map((test) => ({ value: String(test.id), label: test.name })),
+  );
 
   private readonly statisticsApi = inject(StatisticsApiService);
   private readonly athletesApi = inject(AthletesApiService);
@@ -113,10 +120,9 @@ export class DashboardPage implements OnInit {
       });
   }
 
-  onTestChange(event: Event): void {
-    const select = event.target;
-    if (select instanceof HTMLSelectElement && this.selectedTestId() !== select.value) {
-      this.selectedTestId.set(select.value);
+  onTestSelected(testId: string | null): void {
+    if (testId && this.selectedTestId() !== testId) {
+      this.selectedTestId.set(testId);
       this.loadRecords();
     }
   }

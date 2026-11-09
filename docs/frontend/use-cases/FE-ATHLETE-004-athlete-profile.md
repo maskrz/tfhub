@@ -67,6 +67,7 @@ Requirements:
 - Include tests with historical results even if they are inactive.
 - Do not show tests for which the athlete has no results.
 - Allow selecting multiple tests.
+- Provide an action to select all available tests or clear the selection.
 - Display test names and units.
 - Do not assume that only active tests are available.
 
@@ -81,6 +82,8 @@ Validate that the start date is not later than the end date.
 Results must not be fetched automatically whenever a filter changes.
 
 Fetch results only after the coach clicks **Wczytaj wyniki**.
+
+Show the results matrix and progress chart sections only after a successful results request, including an empty response.
 
 Send the selected test IDs and optional date range to the backend.
 

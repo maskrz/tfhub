@@ -73,14 +73,17 @@
       @if (overview(); as data) {
         @if (data.availableTests.length > 0) {
           <div class="selectors">
-            <label class="filter-field">
-              <span>Test</span>
-              <select class="field-control select-with-arrow" [value]="selectedTestId()" (change)="onTestChange($event)">
-                @for (test of data.availableTests; track test.id) {
-                  <option [value]="test.id">{{ test.name }}</option>
-                }
-              </select>
-            </label>
+            <div class="filter-field">
+              <label for="dashboard-test">Test</label>
+              <app-searchable-select
+                inputId="dashboard-test"
+                ariaLabel="Wybierz lub wyszukaj test"
+                placeholder="Wybierz lub wpisz nazwę testu"
+                [options]="testOptions()"
+                [ngModel]="selectedTestId()"
+                (ngModelChange)="onTestSelected($event)"
+              />
+            </div>
             <label class="filter-field">
               <span>Sezon</span>
               <select class="field-control select-with-arrow" [value]="selectedSeason()" (change)="onSeasonChange($event)">
