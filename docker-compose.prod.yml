@@ -1,0 +1,96 @@
+name: tfhub-prod
+
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${TFHUB_DB_NAME:?Set TFHUB_DB_NAME in .env.production}
+      POSTGRES_USER: ${TFHUB_DB_ADMIN_USER:?Set TFHUB_DB_ADMIN_USER in .env.production}
+      POSTGRES_PASSWORD: ${TFHUB_DB_ADMIN_PASSWORD:?Set TFHUB_DB_ADMIN_PASSWORD in .env.production}
+      TFHUB_DB_USER: ${TFHUB_DB_USER:?Set TFHUB_DB_USER in .env.production}
+      TFHUB_DB_PASSWORD: ${TFHUB_DB_PASSWORD:?Set TFHUB_DB_PASSWORD in .env.production}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./docker/postgres/init/01-create-app-user.sql:/docker-entrypoint-initdb.d/10-create-app-user.sql:ro
+    networks:
+      - database-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  api:
+    build:
+      context: ./tfhub-api
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_NAME: ${TFHUB_DB_NAME:?Set TFHUB_DB_NAME in .env.production}
+      DB_USER: ${TFHUB_DB_USER:?Set TFHUB_DB_USER in .env.production}
+      DB_PASSWORD: ${TFHUB_DB_PASSWORD:?Set TFHUB_DB_PASSWORD in .env.production}
+      SESSION_COOKIE_SECURE: "true"
+      JAVA_TOOL_OPTIONS: "-Xms128m -Xmx768m -XX:+UseSerialGC"
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - backend-network
+      - database-network
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/actuator/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 120s
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  web:
+    build:
+      context: ./tfhub-frontend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:${TFHUB_HTTP_PORT:-8081}:80"
+    networks:
+      - edge-network
+      - backend-network
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+networks:
+  edge-network:
+    driver: bridge
+  backend-network:
+    driver: bridge
+    internal: true
+  database-network:
+    driver: bridge
+    internal: true
+
+volumes:
+  postgres-data:
+    name: tfhub-prod-postgres-data

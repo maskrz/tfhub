@@ -75,7 +75,7 @@ POSTGRES_PASSWORD=your_password
 
 Do not commit `.env` or any other files containing secrets.
 
-The development Compose file publishes PostgreSQL on host port `5432` without restricting the host interface. This is not the production exposure model; restricting the development binding to `127.0.0.1:5432` is a separate configuration improvement.
+The development Compose file binds PostgreSQL to `127.0.0.1:5432` only. Raspberry Pi production deployment uses the separate `docker-compose.prod.yml` stack and does not publish PostgreSQL or the backend.
 
 ### 3. Start PostgreSQL
 
@@ -139,7 +139,7 @@ http://localhost:4200
 
 **Frontend:** Angular 22 project scaffold is present. The functional frontend areas are planned in the [frontend use-case catalog](docs/frontend/use-cases/README.md); the requirements and shared design direction are documented under `docs/frontend/`.
 
-**Security and production deployment:** Requirements and target architecture are documented, but authentication and the Raspberry Pi production deployment are not implemented yet.
+**Security and production deployment:** Session-based authentication and authorization are implemented. The Raspberry Pi Compose deployment and operating instructions are documented in [docs/deployment/architecture.md](docs/deployment/architecture.md); public tunnel access remains a future setup.
 
 Statistics, rankings, and charts remain future scope.
 

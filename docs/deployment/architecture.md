@@ -4,83 +4,75 @@
 
 This document describes the target deployment architecture for TFHub.
 
-The initial deployment target is a Raspberry Pi 5 (8 GB RAM) connected to the local network over Wi-Fi. TFHub will be accessible remotely through a Cloudflare Tunnel. The application will run as a Docker Compose stack.
+The initial deployment target is a Raspberry Pi 5 (8 GB RAM). TFHub runs as a Docker Compose stack and is initially reachable only from a browser on the Pi at `http://localhost:8081` (or the configured loopback port). Cloudflare Tunnel, public DNS, and external access are not configured by this deployment.
 
-This document defines the intended architecture and operational boundaries. It does not describe the step-by-step installation procedure or claim that the production deployment is already implemented.
+This document describes the implemented Compose architecture and the Raspberry Pi operating procedure. It does not claim that deployment has been tested on the target Pi.
 
 ## 2. Scope and principles
 
-The initial deployment must:
+The initial local deployment must:
 
 - run TFHub and its dependencies on the Raspberry Pi;
-- provide browser access from outside the local network without requiring a public IP address or router port forwarding;
+- provide local browser access without using a HomeCenter port;
 - keep PostgreSQL and the Spring Boot API inaccessible directly from the public internet;
-- use HTTPS for public browser access;
+- use HTTPS for browser access if public access is enabled later;
 - persist application data across container restarts and updates;
 - keep secrets out of source control;
-- support backups stored outside the Raspberry Pi;
-- avoid interfering with the existing Home Hub installation.
+- support database backups that can be copied outside the Raspberry Pi;
+- avoid interfering with the existing HomeCenter installation.
 
-Keep the deployment simple. Do not introduce Kubernetes, Redis, a separate database server, or additional infrastructure unless a concrete requirement justifies it.
+Keep the deployment simple. Do not introduce Kubernetes, Redis, a separate database server, a tunnel container, or additional infrastructure unless a concrete requirement justifies it.
 
 ## 3. High-level architecture
 
-The intended request path is:
+The current local request path is:
 
 ```text
-User's browser
+Pi-local browser
     |
-    | HTTPS
+    | HTTP on 127.0.0.1:8081 (configurable)
     v
-Cloudflare
+Nginx container (Angular static files)
     |
-    | Cloudflare Tunnel
+    | /api on backend-network
     v
-cloudflared container
-    | edge-network
+Spring Boot API
+    |
+    | database-network
     v
-Nginx container
-    | /                         | /api (backend-network)
-    v                           v
-Angular static files        Spring Boot API
-                                |
-                                | database-network
-                                v
-                           PostgreSQL
+PostgreSQL container
 ```
 
 Docker network membership limits which services can communicate:
 
 ```text
-edge-network:     cloudflared, web
+edge-network:     web (cloudflared may be added later)
 backend-network:  web, api
 database-network: api, db
 ```
 
-The only intended service paths are `cloudflared → web`, `web → api`, and `api → db`. Because `web` is not on `database-network`, `web → db` is not possible through Docker network membership. `cloudflared` is only on `edge-network`, so it cannot reach `api` or `db` through Docker network membership.
+The current service paths are `host loopback → web`, `web → api`, and `api → db`. Because `web` is not on `database-network`, it cannot reach PostgreSQL through Docker network membership. The backend and database networks are internal Docker networks. A future `cloudflared` service can be attached only to `edge-network`, where it can reach `web` but not `api` or `db`.
 
 Responsibilities:
 
-- **Cloudflare** provides the public hostname, DNS, and HTTPS at the edge.
-- **cloudflared** establishes an outbound tunnel from the Raspberry Pi to Cloudflare. No inbound router port forwarding is required.
+- **Cloudflare** and **cloudflared** are future optional ingress components; neither is configured now.
 - **Nginx** serves the built Angular application and reverse-proxies `/api` requests to the Spring Boot API. The browser uses a same-origin API, so CORS configuration should not be needed.
 - **Spring Boot** runs the backend and enforces application authentication and authorization rules. Cloudflare is not a replacement for application-level security.
 - **PostgreSQL** stores application data and is reachable only by the backend over a private Docker network.
 
-The browser-to-Cloudflare connection uses HTTPS. Traffic between containers may use HTTP inside the private Docker networks; TLS between containers is not required for the initial single-host deployment.
+Production session cookies remain `Secure` and use the `__Host-TFHUBSESSION` prefix. Public use therefore requires HTTPS at the future ingress; do not weaken the cookie settings for local HTTP.
 
 ## 4. Docker Compose services
 
-The production Compose stack is expected to contain these services:
+The production Compose stack contains these services:
 
 | Service | Responsibility | Network exposure |
 |---|---|---|
-| `cloudflared` | Maintains the Cloudflare Tunnel | Outbound connection to Cloudflare; no public inbound port |
-| `web` | Nginx serving Angular and proxying `/api` | Receives traffic from `cloudflared` |
+| `web` | Nginx serving Angular and proxying `/api` | Published on configurable host loopback port, default `127.0.0.1:8081` |
 | `api` | Spring Boot application | Receives API traffic from `web`; connects to `db` |
 | `db` | PostgreSQL database | Private access from `api` only |
 
-Service names are logical names and may be adjusted during implementation, provided the architecture remains the same.
+The production stack is `docker-compose.prod.yml`. `docker-compose.yml` remains the separate local-development PostgreSQL setup. The PostgreSQL image uses official `postgres:17-alpine`; its initial admin credentials are used only by the database container, while the API connects as the non-superuser `TFHUB_DB_USER`.
 
 ### 4.1 Network boundaries
 
@@ -88,17 +80,17 @@ Attach only the following services to each network:
 
 | Network | Members |
 |---|---|
-| `edge-network` | `cloudflared`, `web` |
+| `edge-network` | `web` (attach a future `cloudflared` service here) |
 | `backend-network` | `web`, `api` |
 | `database-network` | `api`, `db` |
 
-This network membership permits only `cloudflared → web`, `web → api`, and `api → db`. In particular, `web → db`, `cloudflared → api`, and `cloudflared → db` are not possible through Docker network membership. Do not attach a service to an additional network unless a concrete requirement justifies it.
+The current membership permits `web → api` and `api → db`; PostgreSQL and the backend publish no host ports. If a tunnel is added later, attach it only to `edge-network`. Do not attach a service to an additional network unless a concrete requirement justifies it.
 
-PostgreSQL and the Spring Boot API must not publish host ports in production. Only Nginx is reachable through the tunnel.
+Only Nginx publishes a port, bound to host loopback. `backend-network` and `database-network` are internal.
 
 ### 4.2 Persistent data
 
-PostgreSQL data must be stored in a named Docker volume so that container recreation or image updates do not remove the database.
+PostgreSQL data is stored in the named Docker volume `tfhub-prod-postgres-data`, mounted at `/var/lib/postgresql/data` in the database container.
 
 The database volume is persistent application data. Do not remove it as part of routine deployment or cleanup commands. In particular, `docker compose down -v` must not be used casually because it removes named volumes.
 
@@ -106,7 +98,7 @@ Application containers should be replaceable: rebuilding or recreating the `web`
 
 ## 5. Public access and Cloudflare Tunnel
 
-TFHub will be exposed through a Cloudflare Tunnel using a hostname configured in Cloudflare DNS.
+Cloudflare Tunnel is not configured in the initial deployment. For a future public deployment, TFHub may be exposed through a Cloudflare Tunnel using a hostname configured in Cloudflare DNS.
 
 Requirements:
 
@@ -142,7 +134,7 @@ This avoids the need for a separate public API hostname and ordinary cross-origi
 
 The Spring Boot service connects to PostgreSQL using the internal Compose service name and port, not `localhost`.
 
-Production configuration must be supplied separately from local development configuration.
+The production Compose file activates the `prod` Spring profile and supplies database connection values through environment variables. `application-prod.properties` uses the Compose hostname `db`, enables framework handling of the overwritten proxy headers, retains secure session cookies, and exposes only the existing Actuator health endpoint for internal container health checks. Nginx does not proxy Actuator paths, and neither API nor database has a published host port.
 
 Requirements:
 
@@ -168,11 +160,11 @@ At minimum, production secrets include:
 
 The account password is entered through the local initialization procedure and only its Argon2id hash is stored in PostgreSQL. Never put the plaintext account password in configuration or environment variables.
 
-For the initial deployment, secrets may be supplied through protected runtime files or environment configuration that is excluded from Git. Restrict access to these files to the operating-system account and administrators who need it.
+For production, copy `.env.example` to `.env.production`, set the `TFHUB_*` values, and restrict file access with `chmod 600`. The file is excluded by the root `.gitignore`. Keep the admin and application database passwords distinct; Compose passes only the application credentials to the API. The database init script runs only when the named volume is first created.
 
-The root `.env` file used for Compose must remain untracked. Commit an example file containing variable names and safe placeholder values, if useful, but never real credentials.
+Keep both the development `.env` and production `.env.production` untracked. `.env.example` contains placeholders for both sets of variables; never put real credentials in it.
 
-Changing a PostgreSQL environment variable after the database volume has already been initialized does not automatically change the password stored inside PostgreSQL. Password changes must be applied to the database itself using a controlled procedure.
+Changing PostgreSQL credentials in `.env.production` after the volume has been initialized does not change the existing database roles. Password changes must be applied to PostgreSQL itself using a controlled procedure.
 
 ## 9. Security boundaries
 
@@ -182,7 +174,7 @@ Key requirements:
 
 - all business API endpoints require authentication;
 - Spring Security uses server-side sessions; do not introduce JWT for this deployment;
-- only login and CSRF initialization endpoints are unauthenticated; do not expose Actuator or a health endpoint publicly;
+- only login and CSRF initialization endpoints are unauthenticated through the application proxy; Actuator health is available only on the unexposed backend container port for Docker health checking;
 - production session cookies use the agreed secure cookie settings;
 - CSRF protection remains enabled;
 - Nginx is the only internal service that forwards browser requests to the API;
@@ -192,7 +184,7 @@ Key requirements:
 - Actuator may be used only for local or internal checks, never routed through Nginx or Cloudflare;
 - secrets are provided at runtime and are not committed.
 
-The expected request/proxy chain is:
+The future public request/proxy chain is:
 
 ```text
 Browser -> Cloudflare -> cloudflared -> Nginx -> Spring Boot
@@ -204,7 +196,7 @@ The real client IP used for login rate limiting must be derived only from a corr
 
 PostgreSQL backups are required because the database volume alone does not protect against device failure, accidental deletion, or storage corruption.
 
-Initial backup policy:
+Backups are not automated by this Compose stack. The runbook below provides a manual PostgreSQL dump and restore procedure. For production operations:
 
 - create a database backup daily;
 - encrypt backup files before transferring or storing them outside the Raspberry Pi;
@@ -212,13 +204,13 @@ Initial backup policy:
 - perform a restore test quarterly;
 - keep backup credentials separate from the application database credentials.
 
-The backup destination and transfer mechanism can be selected during implementation. It must be independent of the Raspberry Pi so that a device failure does not destroy both the live database and its backups.
+Copy completed backups to storage independent of the Raspberry Pi so that a device failure does not destroy both the live database and its backups. Encryption and off-device retention are operational responsibilities, not configured by this repository.
 
 A backup is not considered verified until it has been successfully restored in a test environment.
 
 ## 11. Updates and operations
 
-The deployment should be manageable with a small number of documented Docker Compose commands.
+The production commands in the runbook consistently use `docker-compose.prod.yml` and `.env.production`.
 
 Operational requirements:
 
@@ -232,19 +224,20 @@ Operational requirements:
 
 Do not add a separate monitoring platform for the initial release. Use Docker health checks and local logs where appropriate. Revisit monitoring only if operational experience demonstrates a need.
 
-## 12. Home Hub coexistence
+## 12. HomeCenter coexistence
 
-The existing Home Hub installation must remain operational and must not be modified as part of the initial TFHub deployment.
+The existing HomeCenter installation must remain operational and must not be modified as part of the initial TFHub deployment.
 
 Deployment constraints:
 
-- TFHub must use its own Compose project and isolated container/service names.
-- TFHub must not replace, reconfigure, or stop Home Hub services.
-- Avoid host-port conflicts with services already used by Home Hub.
+- TFHub production uses its own Compose project (`tfhub-prod`), networks, and named volume.
+- TFHub must not replace, reconfigure, or stop HomeCenter services.
+- Avoid host-port conflicts with services already used by HomeCenter.
 - Use separate persistent volumes and application configuration.
-- Do not share databases or Docker networks between the two applications unless a future, explicit design decision requires it.
+- Do not share databases, Docker networks, or PostgreSQL data with HomeCenter.
+- Do not run the development Compose file on the Pi: its PostgreSQL port is for local development only.
 
-A single Cloudflare Tunnel may eventually route multiple hostnames to separate applications, but the initial TFHub deployment must not require changes to Home Hub. Any future consolidation of tunnel configuration must be planned and tested separately.
+A single Cloudflare Tunnel may eventually route multiple hostnames to separate applications, but the initial TFHub deployment must not require changes to HomeCenter. Any future consolidation of tunnel configuration must be planned and tested separately.
 
 ## 13. Environments
 
@@ -254,39 +247,122 @@ At minimum, distinguish:
 
 - Backend and frontend may run directly on the development computer.
 - PostgreSQL may run in Docker.
-- The current root development Compose file publishes port `5432` without restricting the host interface. This is development-only and is not the production network model; consider restricting it to `127.0.0.1:5432` as a separate configuration improvement.
+- The root development Compose file binds PostgreSQL to `127.0.0.1:5432`; do not use that development file for Raspberry Pi production.
 - Local configuration and credentials are separate from production.
 - Production-only cookie settings such as `Secure` must not prevent local HTTP development.
 
 ### Raspberry Pi production
 
-- Services run through Docker Compose.
-- Production secrets are provided at runtime.
-- The database uses persistent storage.
-- Public access is provided only through Cloudflare Tunnel and Nginx.
-- Production configuration must not depend on files or credentials from the developer's computer.
+- Services run through `docker-compose.prod.yml`.
+- Configure production values in the untracked `.env.production`.
+- The database uses `tfhub-prod-postgres-data`.
+- Nginx binds to `127.0.0.1:8081` by default; change `TFHUB_HTTP_PORT` to choose another host port.
+- No public tunnel or external access is configured.
 
-The exact build and deployment workflow can be documented once the first deployment is implemented.
+## 14. Raspberry Pi deployment and operations
 
-## 14. Implementation-time verification
+Run these commands from the repository root on the Raspberry Pi. The official PostgreSQL, Maven/Java, Node, and Nginx images support ARM64; building on the Pi selects its native architecture.
 
-The following items are intentionally left for implementation and deployment testing:
+### Prerequisites and initial configuration
+
+Check the target architecture, Docker Engine and Compose versions, and available disk space rather than assuming specific versions:
+
+```sh
+uname -m
+docker --version
+docker compose version
+df -h /
+```
+
+The expected architecture is `aarch64`. Clone or update the project source, then create the protected production environment file:
+
+```sh
+cp .env.example .env.production
+nano .env.production
+chmod 600 .env.production
+```
+
+Set `TFHUB_HTTP_PORT` (default `8081`), `TFHUB_DB_NAME`, `TFHUB_DB_ADMIN_USER`, `TFHUB_DB_ADMIN_PASSWORD`, `TFHUB_DB_USER`, and `TFHUB_DB_PASSWORD`. Generate two different random passwords with `openssl rand -hex 32`; put one in each password field and do not use the example placeholders. `TFHUB_DB_ADMIN_USER` is for PostgreSQL initialization/administration; the API uses only `TFHUB_DB_USER` and `TFHUB_DB_PASSWORD`.
+
+Validate the Compose configuration without printing resolved secrets, build, and start:
+
+```sh
+docker compose --env-file .env.production -f docker-compose.prod.yml config -q
+docker compose --env-file .env.production -f docker-compose.prod.yml build
+docker compose --env-file .env.production -f docker-compose.prod.yml up -d
+```
+
+Open `http://localhost:8081` in a browser on the Pi. The port is loopback-only, so other LAN devices cannot connect. Production session and CSRF cookies remain `Secure`; do not change those settings for local access. Future remote access requires HTTPS.
+
+### Health, logs, restart, and update
+
+```sh
+docker compose --env-file .env.production -f docker-compose.prod.yml ps
+docker compose --env-file .env.production -f docker-compose.prod.yml logs --tail=100 web api db
+docker compose --env-file .env.production -f docker-compose.prod.yml restart
+```
+
+The `db`, `api`, and `web` services have container health checks. To update the source, then rebuild and recreate services without removing persistent data:
+
+```sh
+git pull --ff-only
+docker compose --env-file .env.production -f docker-compose.prod.yml up -d --build
+```
+
+The named database volume survives this update. Do not use `docker compose down -v`, remove `tfhub-prod-postgres-data`, or run volume-pruning commands as routine maintenance. Docker-reported unsupported memory/swap limits are not configured; the API JVM is capped at 768 MiB and container logs rotate at 10 MiB × 3 files. Check actual disk and memory usage on the Pi.
+
+### Database backup and restore
+
+Create a custom-format dump, protect it, and copy it off the Pi:
+
+```sh
+umask 077
+backup="$HOME/tfhub-$(date +%F).dump"
+docker compose --env-file .env.production -f docker-compose.prod.yml exec -T db \
+  sh -c 'PGPASSWORD="$TFHUB_DB_PASSWORD" pg_dump --format=custom --no-owner --no-acl --username="$TFHUB_DB_USER" "$POSTGRES_DB"' \
+  > "$backup"
+chmod 600 "$backup"
+```
+
+**Destructive restore:** this replaces objects in the selected TFHUB database. Confirm the backup and target first, stop the API, restore the dump, and start the API only after a successful restore. It does not stop or alter HomeCenter.
+
+```sh
+set -e
+backup="$HOME/tfhub-YYYY-MM-DD.dump"
+docker compose --env-file .env.production -f docker-compose.prod.yml stop api
+docker compose --env-file .env.production -f docker-compose.prod.yml exec -T db \
+  sh -c 'PGPASSWORD="$TFHUB_DB_PASSWORD" pg_restore --exit-on-error --clean --if-exists --no-owner --no-acl --username="$TFHUB_DB_USER" --dbname="$POSTGRES_DB"' \
+  < "$backup"
+docker compose --env-file .env.production -f docker-compose.prod.yml start api
+```
+
+### Troubleshooting and future tunnel
+
+- If `web` cannot bind its port, set another free loopback port in `TFHUB_HTTP_PORT` and recreate the `web` service.
+- If `api` is unhealthy, inspect `logs api db`; verify the application credentials and that the database volume was initialized successfully.
+- If PostgreSQL credentials were changed after initialization, update the role in the database as well; editing `.env.production` alone does not rotate it.
+- Check free space with `df -h /` and Docker usage with `docker system df`. The SD card is the only database storage in this setup; copy backups off-device.
+- The Compose project does not configure Cloudflare Tunnel. In a future controlled change, attach `cloudflared` only to `edge-network` and route it to `web:80`; do not publish the backend or database. Review Nginx's trusted forwarded-header values for the actual tunnel path before enabling remote access.
+
+## 15. Deployment verification boundaries
+
+The following items require deployment testing on the target Pi and have not been verified from this development machine:
 
 - Verify that the selected Raspberry Pi OS, Docker Engine, and Docker Compose versions support the required images and architecture.
 - Verify that all selected container images support the Raspberry Pi's CPU architecture.
 - Verify that the production Compose stack starts correctly after a host reboot.
-- Verify that Nginx routing, Angular client-side routes, and `/api` proxying work through the tunnel.
+- Verify that Nginx routing, Angular client-side routes, and `/api` proxying work locally.
 - Verify that the Docker network memberships allow only the intended service paths and that PostgreSQL and the API have no published host ports.
-- Verify that Cloudflare Tunnel reconnects after a temporary internet interruption.
+- Configure and verify Cloudflare Tunnel separately before any remote access.
 - Verify the trusted proxy/header configuration and real client IP handling for login rate limiting.
 - Verify that production secrets are not present in the repository, image layers, or logs.
 - Verify that PostgreSQL data survives container recreation and that backups can be restored.
-- Verify that TFHub does not conflict with or interrupt Home Hub.
+- Verify that TFHub does not conflict with or interrupt HomeCenter.
 - Verify that the Raspberry Pi's Wi-Fi connection and upload bandwidth are sufficient for normal use.
 
 These are verification tasks, not unresolved architectural choices.
 
-## 15. Out of scope
+## 16. Out of scope
 
 The initial deployment does not include:
 
@@ -297,6 +373,6 @@ The initial deployment does not include:
 - a separate public API hostname;
 - multi-node or high-availability deployment;
 - a dedicated monitoring platform;
-- changes to the existing Home Hub architecture.
+- changes to the existing HomeCenter architecture.
 
 These may be reconsidered only when a concrete requirement arises.
