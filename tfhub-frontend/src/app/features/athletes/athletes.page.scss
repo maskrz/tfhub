@@ -153,6 +153,9 @@ td { font-size: 1.05rem; }
 tbody tr:last-child td { border-bottom: 0; }
 tbody tr.inactive-row { background: #fff0f0; }
 td strong { display: block; font-size: 1.08rem; font-weight: 650; }
+.athlete-profile-link { color: inherit; text-decoration: none; }
+.athlete-profile-link:hover { color: #16834e; text-decoration: underline; }
+.athlete-profile-link:focus-visible { border-radius: .2rem; outline: 3px solid var(--button-focus); outline-offset: 2px; }
 .edit-button { min-width: 6rem; }
 .action-cell {
   align-items: center;

@@ -1,5 +1,6 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { provideRouter } from '@angular/router';
 import { Observable, Subject, of, throwError } from 'rxjs';
 import { AthleteResponse } from '../athletes/athlete.model';
 import { AthletesApiService } from '../athletes/athletes-api.service';
@@ -62,6 +63,7 @@ describe('ResultsPage', () => {
     await TestBed.configureTestingModule({
       imports: [ResultsPage],
       providers: [
+        provideRouter([]),
         { provide: ResultsApiService, useValue: resultsApi },
         { provide: AthletesApiService, useValue: athletesApi },
         { provide: TestsApiService, useValue: testsApi },
@@ -300,6 +302,7 @@ describe('ResultsPage', () => {
     await TestBed.configureTestingModule({
       imports: [ResultsPage],
       providers: [
+        provideRouter([]),
         { provide: ResultsApiService, useValue: resultsApi },
         { provide: AthletesApiService, useValue: athletesApi },
         { provide: TestsApiService, useValue: testsApi },

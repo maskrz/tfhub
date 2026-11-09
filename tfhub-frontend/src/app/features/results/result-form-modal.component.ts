@@ -15,6 +15,7 @@ export class ResultFormModalComponent implements AfterViewInit {
   @Input({ required: true }) athletes: AthleteResponse[] = [];
   @Input({ required: true }) tests: TestResponse[] = [];
   @Input() result: ResultResponse | null = null;
+  @Input() initialAthleteId: number | null = null;
   @Output() saved = new EventEmitter<ResultResponse>();
   @Output() cancelled = new EventEmitter<void>();
   @ViewChild('dialog') private dialog!: ElementRef<HTMLDialogElement>;

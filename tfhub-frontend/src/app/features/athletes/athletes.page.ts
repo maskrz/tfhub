@@ -2,12 +2,13 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { Component, DestroyRef, OnInit, computed, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { EMPTY, catchError, finalize } from 'rxjs';
+import { RouterLink } from '@angular/router';
 import { AthleteFormMode, AthleteResponse, Gender } from './athlete.model';
 import { AthletesApiService } from './athletes-api.service';
 import { AthleteFormModalComponent } from './athlete-form-modal.component';
 
 @Component({
-  imports: [AthleteFormModalComponent],
+  imports: [AthleteFormModalComponent, RouterLink],
   selector: 'app-athletes-page',
   styleUrl: './athletes.page.scss',
   templateUrl: './athletes.page.html',

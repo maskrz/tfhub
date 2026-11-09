@@ -1,0 +1,288 @@
+<main class="profile-page">
+  <div class="page-heading">
+    <div>
+      <h1>Profil zawodnika</h1>
+      @if (athlete(); as currentAthlete) {
+        <p class="breadcrumb"><a routerLink="/athletes">Zawodnicy</a> / {{ currentAthlete.firstName }} {{ currentAthlete.lastName }}</p>
+      }
+    </div>
+    @if (athlete(); as currentAthlete) {
+      <button class="button button--secondary" type="button" (click)="openAthleteEdit()">Edytuj</button>
+    }
+  </div>
+
+  @if (successMessage(); as message) {
+    <p class="feedback success" role="status" aria-live="polite">{{ message }}</p>
+  }
+
+  @if (profileLoading()) {
+    <p class="feedback" role="status">Ładowanie profilu zawodnika…</p>
+  } @else if (profileError(); as message) {
+    <div class="feedback error" role="alert">
+      <p>{{ message }}</p>
+      <button class="button button--primary" type="button" (click)="retryProfile()">Spróbuj ponownie</button>
+    </div>
+  } @else if (athlete(); as currentAthlete) {
+    <section class="profile-card athlete-card" aria-label="Dane zawodnika">
+      <div class="athlete-details">
+        <h2>{{ currentAthlete.firstName }} {{ currentAthlete.lastName }}</h2>
+        <p>Rocznik {{ currentAthlete.birthYear }} · {{ genderLabel(currentAthlete.gender) }}</p>
+        <span class="status-badge" [class.status-badge--inactive]="!currentAthlete.active">
+          {{ currentAthlete.active ? 'Aktywny' : 'Nieaktywny' }}
+        </span>
+      </div>
+      <div class="athlete-actions">
+        <span>Dane zawodnika</span>
+        <button
+          class="button button--primary"
+          type="button"
+          [disabled]="!currentAthlete.active || lookupLoading()"
+          (click)="openAddResult()"
+        >
+          + Dodaj wynik
+        </button>
+      </div>
+      @if (lookupLoading()) {
+        <p class="inline-status" role="status">Przygotowywanie formularza…</p>
+      }
+      @if (lookupError(); as message) {
+        <p class="feedback error compact-feedback" role="alert">{{ message }}</p>
+      }
+    </section>
+
+    <section class="profile-card history-card" aria-labelledby="history-heading">
+      <div class="section-title">
+        <h2 id="history-heading">Historia wyników</h2>
+        <p>Wybierz testy i zakres dat, aby pobrać wyniki</p>
+      </div>
+
+      <div class="filters">
+        <fieldset class="test-picker">
+          <legend>Testy</legend>
+          @if (tests().length === 0) {
+            <p class="no-tests">Ten zawodnik nie ma jeszcze wyników.</p>
+          } @else {
+            <div class="test-options" role="group" aria-label="Wybierz testy">
+              @for (test of tests(); track test.id) {
+                <label class="test-option">
+                  <input
+                    type="checkbox"
+                    [checked]="selectedTestIds().includes(test.id)"
+                    (change)="setTestSelected(test.id, $event)"
+                  />
+                  <span>{{ test.name }} ({{ test.unit }})</span>
+                  @if (!test.active) {
+                    <span class="inactive-label">nieaktywny</span>
+                  }
+                </label>
+              }
+            </div>
+          }
+        </fieldset>
+
+        <div class="date-range" role="group" aria-label="Zakres dat">
+          <label class="filter-field">
+            <span>Od</span>
+            <input class="field-control" type="date" [value]="fromDate()" (input)="onDateChange($event, 'from')" />
+          </label>
+          <label class="filter-field">
+            <span>Do</span>
+            <input class="field-control" type="date" [value]="toDate()" (input)="onDateChange($event, 'to')" />
+          </label>
+        </div>
+        @if (filterError(); as message) {
+          <p class="feedback error filter-error" role="alert">{{ message }}</p>
+        }
+        <button
+          class="button button--primary load-button"
+          type="button"
+          [disabled]="historyLoading() || profileLoading() || tests().length === 0"
+          (click)="loadResults()"
+        >
+          {{ historyLoading() ? 'Pobieranie wyników…' : '↓ Pobierz wyniki' }}
+        </button>
+      </div>
+
+      <div class="section-divider"></div>
+      @if (historyError() && historyLoaded()) {
+        <p class="feedback error" role="alert">{{ historyError() }}</p>
+      }
+      <div class="section-title matrix-title">
+        <h3>Zestawienie wyników</h3>
+        <p>Najstarsze wyniki na górze</p>
+      </div>
+
+      @if (historyLoading() && !historyLoaded()) {
+        <p class="feedback" role="status">Pobieranie historii wyników…</p>
+      } @else if (historyError() && !historyLoaded()) {
+        <div class="feedback error" role="alert">
+          <p>{{ historyError() }}</p>
+          <button class="button button--primary" type="button" (click)="retryHistory()">Spróbuj ponownie</button>
+        </div>
+      } @else if (!historyLoaded()) {
+        <p class="matrix-prompt">Ustaw filtry i wybierz „Pobierz wyniki”.</p>
+      } @else if (history().length === 0) {
+        <p class="feedback empty-state" role="status">Brak wyników dla wybranych filtrów.</p>
+      } @else {
+        <div class="matrix-scroll">
+          <table class="matrix">
+            <thead>
+              <tr>
+                <th scope="col">Data</th>
+                @for (test of selectedTests(); track test.id) {
+                  <th scope="col">{{ test.name }} ({{ test.unit }})</th>
+                }
+              </tr>
+            </thead>
+            <tbody>
+              @for (row of matrixRows(); track row.date) {
+                <tr>
+                  <th scope="row">{{ formatDate(row.date) }}</th>
+                  @for (test of selectedTests(); track test.id) {
+                    <td>
+                      @for (cell of row.cells.get(test.id) ?? []; track cell.result.id) {
+                        <button
+                          class="result-value"
+                          type="button"
+                          [attr.aria-label]="'Edytuj wynik ' + formatValue(cell.result.value) + ' ' + cell.result.testUnit + ', ' + formatDate(cell.result.resultDate) + ', ' + typeLabel(cell.result.type)"
+                          [title]="typeLabel(cell.result.type) + ' · dwuklik, aby edytować'"
+                          (click)="onResultClick($event, cell.result)"
+                          (dblclick)="openResultEdit(cell.result)"
+                          (pointerup)="onResultPointerUp($event, cell.result)"
+                        >
+                          <span>{{ formatValue(cell.result.value) }}</span>
+                          <span class="result-type">{{ typeLabel(cell.result.type) }}</span>
+                        </button>
+                      } @empty {
+                        <span class="no-result" aria-label="Brak wyniku">—</span>
+                      }
+                    </td>
+                  }
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+        <p class="edit-hint">Kliknij wynik dwukrotnie na komputerze lub dotknij go na telefonie, aby edytować.</p>
+      }
+    </section>
+
+    <section class="profile-card chart-card" aria-labelledby="chart-heading">
+      <div class="section-title">
+        <h2 id="chart-heading">Wykres postępów</h2>
+        <p>Wspólna oś czasu · niezależne skale dla każdej jednostki</p>
+      </div>
+
+      @if (chart(); as profileChart) {
+        <div class="chart-toolbar">
+          <div class="chart-legend" aria-label="Serie wykresu">
+            @for (series of profileChart.series; track series.testId) {
+              <button
+                type="button"
+                class="legend-item"
+                [class.legend-item--selected]="selectedSeriesIds().includes(series.testId)"
+                [attr.aria-pressed]="selectedSeriesIds().includes(series.testId)"
+                (click)="toggleSeries(series.testId)"
+              >
+                <span class="legend-dot" [style.background-color]="series.color"></span>
+                {{ series.name }}
+              </button>
+            }
+          </div>
+          <div class="scale-actions">
+            @if (selectedSeriesIds().length > 0) {
+              <button type="button" class="button button--secondary" (click)="separateSelectedScales()">Oddziel skalę</button>
+              <button type="button" class="button button--secondary" (click)="mergeSelectedScales()">Połącz z pozostałymi</button>
+            }
+          </div>
+        </div>
+
+        <div class="chart-scroll">
+          <svg
+            class="progress-chart"
+            viewBox="0 0 980 410"
+            role="img"
+            aria-label="Wykres wyników zawodnika w czasie"
+            preserveAspectRatio="xMinYMin meet"
+          >
+            @for (y of profileChart.gridLines; track y) {
+              <line
+                [attr.x1]="profileChart.plotLeft"
+                [attr.x2]="profileChart.plotRight"
+                [attr.y1]="y"
+                [attr.y2]="y"
+                class="grid-line"
+              />
+            }
+            @for (scale of profileChart.scales; track scale.key) {
+              <line
+                [attr.x1]="scale.axisX"
+                [attr.x2]="scale.axisX"
+                [attr.y1]="profileChart.plotTop"
+                [attr.y2]="profileChart.plotBottom"
+                class="axis-line"
+              />
+              <text class="axis-unit" [attr.x]="scale.axisX" y="23">{{ scale.unit }}</text>
+              @for (tick of scale.ticks; track tick.y) {
+                <text class="axis-label" [attr.x]="scale.axisX - 9" [attr.y]="tick.y + 4">
+                  {{ formatValue(tick.value) }}
+                </text>
+              }
+            }
+            <line
+              [attr.x1]="profileChart.plotLeft"
+              [attr.x2]="profileChart.plotRight"
+              [attr.y1]="profileChart.plotBottom"
+              [attr.y2]="profileChart.plotBottom"
+              class="axis-line"
+            />
+            @for (tick of profileChart.dates; track tick.label + tick.x) {
+              <text class="date-label" [attr.x]="tick.x" [attr.y]="profileChart.plotBottom + 23">{{ tick.label }}</text>
+            }
+            @for (series of profileChart.series; track series.testId) {
+              @if (series.path) {
+                <path [attr.d]="series.path" class="series-line" [attr.stroke]="series.color" />
+              }
+              @for (point of series.points; track point.id) {
+                <circle
+                  [attr.cx]="point.x"
+                  [attr.cy]="point.y"
+                  r="5"
+                  [attr.fill]="point.type === 'TRAINING' ? series.color : '#fff'"
+                  [attr.stroke]="series.color"
+                  stroke-width="2.5"
+                >
+                  <title>{{ series.name }} · {{ formatDate(point.date) }} · {{ formatValue(point.value) }} · {{ typeLabel(point.type) }}</title>
+                </circle>
+              }
+            }
+          </svg>
+        </div>
+      } @else if (!historyLoaded()) {
+        <p class="chart-empty">Wczytaj wyniki, aby zobaczyć wykres postępów.</p>
+      } @else {
+        <p class="chart-empty">Brak wyników do przedstawienia na wykresie.</p>
+      }
+    </section>
+  }
+</main>
+
+@if (isAthleteFormOpen() && athlete(); as currentAthlete) {
+  <app-athlete-form-modal
+    [mode]="'EDIT'"
+    [athlete]="currentAthlete"
+    (saved)="onAthleteSaved($event)"
+    (cancelled)="closeAthleteForm()"
+  />
+}
+@if (isResultFormOpen()) {
+  <app-result-form-modal
+    [mode]="selectedResult() ? 'EDIT' : 'CREATE'"
+    [athletes]="athleteOptions()"
+    [tests]="testOptions()"
+    [result]="selectedResult()"
+    [initialAthleteId]="selectedResult() ? null : athleteId"
+    (saved)="onResultSaved($event)"
+    (cancelled)="closeResultForm()"
+  />
+}

@@ -185,6 +185,10 @@ td {
   color: #27344a;
 }
 
+.athlete-profile-link { color: inherit; text-decoration: none; }
+.athlete-profile-link:hover { color: #16834e; text-decoration: underline; }
+.athlete-profile-link:focus-visible { border-radius: .2rem; outline: 3px solid var(--button-focus); outline-offset: 2px; }
+
 .record-card table {
   font-size: .82rem;
 }

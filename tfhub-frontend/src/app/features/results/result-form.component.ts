@@ -51,6 +51,7 @@ export class ResultFormComponent implements OnInit {
   @Input({ required: true }) athletes: AthleteResponse[] = [];
   @Input({ required: true }) tests: TestResponse[] = [];
   @Input() result: ResultResponse | null = null;
+  @Input() initialAthleteId: number | null = null;
   @Output() saved = new EventEmitter<ResultResponse>();
   @Output() savingChange = new EventEmitter<boolean>();
 
@@ -88,6 +89,8 @@ export class ResultFormComponent implements OnInit {
         type: this.result.type,
       });
       this.selectedTestId.set(String(this.result.testId));
+    } else if (this.mode === 'CREATE' && this.initialAthleteId !== null) {
+      this.form.controls.athleteId.setValue(String(this.initialAthleteId));
     }
   }
 

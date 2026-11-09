@@ -146,7 +146,9 @@
           @for (athlete of visibleAthletes(); track athlete.id) {
             <tr [class.inactive-row]="!athlete.active">
               <td data-label="Zawodnik">
-                <strong>{{ athlete.firstName }} {{ athlete.lastName }}</strong>
+                <a class="athlete-profile-link" [routerLink]="['/athletes', athlete.id]">
+                  <strong>{{ athlete.firstName }} {{ athlete.lastName }}</strong>
+                </a>
               </td>
               <td data-label="Rok urodzenia">{{ athlete.birthYear }}</td>
               <td data-label="Płeć">{{ genderLabel(athlete.gender) }}</td>

@@ -80,4 +80,48 @@ describe('AthletesApiService', () => {
     expect(request.request.body).toEqual(body);
     request.flush({ ...athlete, ...body });
   });
+
+  it('retrieves an athlete by ID and returns the DTO contract', () => {
+    service.getById(8).subscribe((actual) => expect(actual).toEqual(athlete));
+    const request = httpTesting.expectOne('/api/athletes/8');
+    expect(request.request.method).toBe('GET');
+    request.flush(athlete);
+  });
+
+  it('retrieves tests with results for the athlete', () => {
+    service.getTestsWithResults(8).subscribe((actual) => expect(actual).toEqual([
+      { id: 3, name: 'Bieg 100 m', unit: 's', category: 'TIME', higherIsBetter: false, active: false },
+    ]));
+    const request = httpTesting.expectOne('/api/athletes/8/tests');
+    expect(request.request.method).toBe('GET');
+    request.flush([{ id: 3, name: 'Bieg 100 m', unit: 's', category: 'TIME', higherIsBetter: false, active: false }]);
+  });
+
+  it('requests athlete results with repeated test IDs and optional date bounds', () => {
+    service.getResultHistory(8, {
+      testIds: [3, 5],
+      fromDate: '2024-01-01',
+      toDate: '2024-12-31',
+    }).subscribe((actual) => expect(actual).toEqual([
+      { id: 10, testId: 3, testName: 'Bieg 100 m', testUnit: 's', resultDate: '2024-05-01', value: 12.1, type: 'TRAINING' },
+    ]));
+
+    const request = httpTesting.expectOne((req) => req.url === '/api/athletes/8/results');
+    expect(request.request.method).toBe('GET');
+    expect(request.request.params.getAll('testIds')).toEqual(['3', '5']);
+    expect(request.request.params.get('fromDate')).toBe('2024-01-01');
+    expect(request.request.params.get('toDate')).toBe('2024-12-31');
+    request.flush([
+      { id: 10, testId: 3, testName: 'Bieg 100 m', testUnit: 's', resultDate: '2024-05-01', value: 12.1, type: 'TRAINING' },
+    ]);
+  });
+
+  it('omits empty date bounds from athlete result history requests', () => {
+    service.getResultHistory(8, { testIds: [3], fromDate: '', toDate: '' }).subscribe();
+    const request = httpTesting.expectOne((req) => req.url === '/api/athletes/8/results');
+    expect(request.request.params.getAll('testIds')).toEqual(['3']);
+    expect(request.request.params.has('fromDate')).toBe(false);
+    expect(request.request.params.has('toDate')).toBe(false);
+    request.flush([]);
+  });
 });

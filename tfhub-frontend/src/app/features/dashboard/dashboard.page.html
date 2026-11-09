@@ -104,7 +104,7 @@
                   @for (record of dataRecords.FEMALE; track record.athleteId) {
                     <tr>
                       <td>{{ record.place }}</td>
-                      <td>{{ record.athleteName }}</td>
+                      <td><a class="athlete-profile-link" [routerLink]="['/athletes', record.athleteId]">{{ record.athleteName }}</a></td>
                       <td>{{ formatValue(record.value) }} {{ record.unit }}</td>
                       <td>{{ formatDate(record.resultDate) }}</td>
                     </tr>
@@ -126,7 +126,7 @@
                   @for (record of dataRecords.MALE; track record.athleteId) {
                     <tr>
                       <td>{{ record.place }}</td>
-                      <td>{{ record.athleteName }}</td>
+                      <td><a class="athlete-profile-link" [routerLink]="['/athletes', record.athleteId]">{{ record.athleteName }}</a></td>
                       <td>{{ formatValue(record.value) }} {{ record.unit }}</td>
                       <td>{{ formatDate(record.resultDate) }}</td>
                     </tr>
@@ -161,7 +161,7 @@
               @for (result of data.recentResults; track result.id) {
                 <tr>
                   <td>{{ formatDate(result.resultDate) }}</td>
-                  <td>{{ result.athleteName }}</td>
+                  <td><a class="athlete-profile-link" [routerLink]="['/athletes', result.athleteId]">{{ result.athleteName }}</a></td>
                   <td>{{ result.testName }}</td>
                   <td>{{ formatValue(result.value) }} {{ result.unit }}</td>
                 </tr>

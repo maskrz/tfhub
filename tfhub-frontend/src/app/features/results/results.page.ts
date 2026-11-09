@@ -1,5 +1,6 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component, DestroyRef, OnInit, computed, inject, signal } from '@angular/core';
+import { RouterLink } from '@angular/router';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { EMPTY, catchError, finalize, forkJoin } from 'rxjs';
 import { AthleteResponse } from '../athletes/athlete.model';
@@ -13,7 +14,7 @@ import { MultipleResultsFormModalComponent } from './multiple-results-form-modal
 import { DeleteResultConfirmationComponent } from './delete-result-confirmation.component';
 
 @Component({
-  imports: [ResultFormModalComponent, MultipleResultsFormModalComponent, DeleteResultConfirmationComponent],
+  imports: [RouterLink, ResultFormModalComponent, MultipleResultsFormModalComponent, DeleteResultConfirmationComponent],
   selector: 'app-results-page',
   styleUrl: './results.page.scss',
   templateUrl: './results.page.html',

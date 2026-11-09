@@ -1,5 +1,6 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { provideRouter } from '@angular/router';
 import { Observable, Subject, of, throwError } from 'rxjs';
 import { AthleteResponse, CreateAthleteRequest, UpdateAthleteRequest } from './athlete.model';
 import { AthletesApiService } from './athletes-api.service';
@@ -64,7 +65,7 @@ describe('AthletesPage', () => {
     };
     await TestBed.configureTestingModule({
       imports: [AthletesPage],
-      providers: [{ provide: AthletesApiService, useValue: api }],
+      providers: [provideRouter([]), { provide: AthletesApiService, useValue: api }],
     }).compileComponents();
     fixture = TestBed.createComponent(AthletesPage);
     fixture.detectChanges();
