@@ -4,8 +4,8 @@ import { Component } from '@angular/core';
   selector: 'app-footer',
   template: `
     <footer>
-      <p><strong>TFHUB.</strong> Zarządzanie testami sportowymi</p>
-      <span>v0.0.0</span>
+      <p><strong>TFHUB.</strong></p>
+      <span>v0.1.0</span>
     </footer>
   `,
   styles: `
