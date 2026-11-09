@@ -1,5 +1,6 @@
 package pl.tfhub.api.statistics.controller;
 
+import java.util.List;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -19,14 +20,16 @@ public class StatisticsController {
 	}
 
 	@GetMapping("/dashboard")
-	public DashboardOverviewResponse getDashboardOverview() {
-		return statisticsService.getDashboardOverview();
+	public DashboardOverviewResponse getDashboardOverview(
+			@RequestParam(required = false) List<Long> groupIds) {
+		return statisticsService.getDashboardOverview(groupIds);
 	}
 
 	@GetMapping("/records")
 	public ClubRecordsResponse getClubRecords(
 			@RequestParam(required = false) String testId,
-			@RequestParam(required = false) String season) {
-		return statisticsService.getClubRecords(testId, season);
+			@RequestParam(required = false) String season,
+			@RequestParam(required = false) List<Long> groupIds) {
+		return statisticsService.getClubRecords(testId, season, groupIds);
 	}
 }

@@ -4,6 +4,7 @@ import jakarta.validation.Valid;
 import java.net.URI;
 import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
+import java.util.ArrayList;
 import java.util.List;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -46,13 +47,15 @@ public class ResultController {
 			@RequestParam(required = false) String testId,
 			@RequestParam(required = false) String fromDate,
 			@RequestParam(required = false) String toDate,
-			@RequestParam(required = false) String type) {
+			@RequestParam(required = false) String type,
+			@RequestParam(required = false) List<String> groupIds) {
 		return resultService.searchResults(
 				parseId(athleteId),
 				parseId(testId),
 				parseDate(fromDate),
 				parseDate(toDate),
-				parseType(type));
+				parseType(type),
+				parseIds(groupIds));
 	}
 
 	@PostMapping
@@ -93,6 +96,17 @@ public class ResultController {
 			throw new InvalidResultSearchException();
 		}
 		throw new InvalidResultSearchException();
+	}
+
+	private List<Long> parseIds(List<String> values) {
+		if (values == null) {
+			return null;
+		}
+		List<Long> ids = new ArrayList<>();
+		for (String value : values) {
+			ids.add(parseId(value));
+		}
+		return ids;
 	}
 
 	private LocalDate parseDate(String value) {

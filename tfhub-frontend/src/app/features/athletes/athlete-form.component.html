@@ -70,4 +70,31 @@
       <span class="field-error" id="athlete-gender-error">{{ message }}</span>
     }
   </div>
+  @if (mode === 'CREATE') {
+    <div class="field">
+      <label for="athlete-training-group">
+        Grupa treningowa
+        @if (auth.currentUser()?.role === 'COACH') { <span aria-hidden="true">*</span> }
+      </label>
+      <select
+        id="athlete-training-group"
+        class="field-control select-with-arrow"
+        formControlName="trainingGroupId"
+        [attr.aria-invalid]="fieldError('trainingGroupId') ? 'true' : null"
+        aria-describedby="athlete-training-group-error"
+      >
+        @if (auth.currentUser()?.role !== 'COACH') {
+          <option [ngValue]="null">Bez przypisanej grupy</option>
+        } @else {
+          <option [ngValue]="null" disabled>Wybierz grupę</option>
+        }
+        @for (group of groups(); track group.id) {
+          <option [ngValue]="group.id">{{ group.name }}</option>
+        }
+      </select>
+      @if (fieldError('trainingGroupId'); as message) {
+        <span class="field-error" id="athlete-training-group-error">{{ message }}</span>
+      }
+    </div>
+  }
 </form>

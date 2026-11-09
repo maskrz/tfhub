@@ -37,7 +37,7 @@ public class StatisticsRepository {
 				JOIN tests t ON t.id = r.test_id
 				WHERE r.test_id = :testId
 				  AND a.gender = :gender
-				%s
+				%s%s
 			),
 			best_results AS (
 				SELECT *
@@ -72,22 +72,37 @@ public class StatisticsRepository {
 	}
 
 	public long countActiveAthletes() {
-		return jdbcClient.sql("SELECT COUNT(*) FROM athletes WHERE active = TRUE")
-				.query(Long.class)
-				.single();
+		return countActiveAthletes(null);
+	}
+
+	public long countActiveAthletes(List<Long> groupIds) {
+		String groupFilter = groupIds == null ? "" : " AND a.training_group_id IN (:groupIds)";
+		JdbcClient.StatementSpec statement = jdbcClient.sql(
+				"SELECT COUNT(*) FROM athletes a WHERE a.active = TRUE" + groupFilter);
+		statement = withGroups(statement, groupIds);
+		return statement.query(Long.class).single();
 	}
 
 	public List<AvailableTestResponse> findAvailableTests() {
-		return jdbcClient.sql("""
+		return findAvailableTests(null);
+	}
+
+	public List<AvailableTestResponse> findAvailableTests(List<Long> groupIds) {
+		String groupFilter = groupIds == null ? "" : " AND a.training_group_id IN (:groupIds)";
+		JdbcClient.StatementSpec statement = jdbcClient.sql("""
 						SELECT id, name, category, unit, active
 						FROM (
 							SELECT DISTINCT t.id, t.name, t.category, t.unit, t.active
 							FROM tests t
 							JOIN test_results r ON r.test_id = t.id
+							JOIN athletes a ON a.id = r.athlete_id
+							WHERE TRUE
+							%s
 						) available_tests
 						ORDER BY LOWER(name), name, id
-						""")
-				.query((resultSet, rowNumber) -> new AvailableTestResponse(
+						""".formatted(groupFilter));
+		statement = withGroups(statement, groupIds);
+		return statement.query((resultSet, rowNumber) -> new AvailableTestResponse(
 						resultSet.getLong("id"),
 						resultSet.getString("name"),
 						TestCategory.valueOf(resultSet.getString("category")),
@@ -97,17 +112,29 @@ public class StatisticsRepository {
 	}
 
 	public List<Integer> findAvailableSeasons() {
-		return jdbcClient.sql("""
+		return findAvailableSeasons(null);
+	}
+
+	public List<Integer> findAvailableSeasons(List<Long> groupIds) {
+		String groupFilter = groupIds == null ? "" : " AND a.training_group_id IN (:groupIds)";
+		JdbcClient.StatementSpec statement = jdbcClient.sql("""
 						SELECT DISTINCT EXTRACT(YEAR FROM result_date)::INTEGER AS season
-						FROM test_results
+						FROM test_results r
+						JOIN athletes a ON a.id = r.athlete_id
+						WHERE TRUE
+						%s
 						ORDER BY season DESC
-						""")
-				.query(Integer.class)
-				.list();
+						""".formatted(groupFilter));
+		statement = withGroups(statement, groupIds);
+		return statement.query(Integer.class).list();
 	}
 
 	public List<RecentResultResponse> findRecentResults() {
-		return jdbcClient.sql("""
+		return findRecentResults(null);
+	}
+
+	public List<RecentResultResponse> findRecentResults(List<Long> groupIds) {
+		JdbcClient.StatementSpec statement = jdbcClient.sql("""
 						SELECT
 							r.id,
 							r.result_date,
@@ -121,10 +148,12 @@ public class StatisticsRepository {
 						FROM test_results r
 						JOIN athletes a ON a.id = r.athlete_id
 						JOIN tests t ON t.id = r.test_id
+						%s
 						ORDER BY r.result_date DESC, r.id DESC
 						LIMIT 10
-						""")
-				.query((resultSet, rowNumber) -> new RecentResultResponse(
+						""".formatted(groupIds == null ? "" : "WHERE a.training_group_id IN (:groupIds)"));
+		statement = withGroups(statement, groupIds);
+		return statement.query((resultSet, rowNumber) -> new RecentResultResponse(
 						resultSet.getLong("id"),
 						resultSet.getObject("result_date", LocalDate.class),
 						resultSet.getLong("athlete_id"),
@@ -145,13 +174,23 @@ public class StatisticsRepository {
 	}
 
 	public List<ClubRecordRow> findClubRecords(long testId, Integer season, Gender gender) {
+		return findClubRecords(testId, season, gender, null);
+	}
+
+	public List<ClubRecordRow> findClubRecords(
+			long testId,
+			Integer season,
+			Gender gender,
+			List<Long> groupIds) {
 		String seasonFilter = season == null ? "" : "AND EXTRACT(YEAR FROM r.result_date)::INTEGER = :season";
-		JdbcClient.StatementSpec statement = jdbcClient.sql(CLUB_RECORDS_SQL.formatted(seasonFilter))
+		String groupFilter = groupIds == null ? "" : "AND a.training_group_id IN (:groupIds)";
+		JdbcClient.StatementSpec statement = jdbcClient.sql(CLUB_RECORDS_SQL.formatted(seasonFilter, groupFilter))
 				.param("testId", testId)
 				.param("gender", gender.name());
 		if (season != null) {
 			statement = statement.param("season", season);
 		}
+		statement = withGroups(statement, groupIds);
 
 		return statement.query((resultSet, rowNumber) -> new ClubRecordRow(
 				resultSet.getInt("place"),
@@ -161,5 +200,9 @@ public class StatisticsRepository {
 				resultSet.getString("unit"),
 				resultSet.getObject("result_date", LocalDate.class)))
 				.list();
+	}
+
+	private JdbcClient.StatementSpec withGroups(JdbcClient.StatementSpec statement, List<Long> groupIds) {
+		return groupIds == null ? statement : statement.param("groupIds", groupIds);
 	}
 }

@@ -2,9 +2,12 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { Observable, Subject, of, throwError } from 'rxjs';
+import { signal } from '@angular/core';
 import { AthleteResponse, CreateAthleteRequest, UpdateAthleteRequest } from './athlete.model';
 import { AthletesApiService } from './athletes-api.service';
 import { AthletesPage } from './athletes.page';
+import { TrainingGroupsApiService } from '../training-groups/training-groups-api.service';
+import { AuthService } from '../../core/auth/auth.service';
 
 const activeAthlete: AthleteResponse = {
   id: 1,
@@ -13,6 +16,7 @@ const activeAthlete: AthleteResponse = {
   birthYear: 2010,
   gender: 'MALE',
   active: true,
+  trainingGroupId: 1,
 };
 
 const inactiveAthlete: AthleteResponse = {
@@ -22,6 +26,7 @@ const inactiveAthlete: AthleteResponse = {
   birthYear: 2011,
   gender: 'FEMALE',
   active: false,
+  trainingGroupId: 2,
 };
 
 const createdAthlete: AthleteResponse = {
@@ -65,7 +70,17 @@ describe('AthletesPage', () => {
     };
     await TestBed.configureTestingModule({
       imports: [AthletesPage],
-      providers: [provideRouter([]), { provide: AthletesApiService, useValue: api }],
+      providers: [
+        provideRouter([]),
+        { provide: AthletesApiService, useValue: api },
+        { provide: TrainingGroupsApiService, useValue: { getAccessible: () => of([]) } },
+        {
+          provide: AuthService,
+          useValue: {
+            currentUser: signal({ authenticated: true, userId: 1, username: 'admin', role: 'ADMIN', athleteId: null }),
+          },
+        },
+      ],
     }).compileComponents();
     fixture = TestBed.createComponent(AthletesPage);
     fixture.detectChanges();
@@ -155,6 +170,34 @@ describe('AthletesPage', () => {
     expect(fixture.nativeElement.textContent).toContain('Jan Kowalski');
     expect(fixture.nativeElement.textContent).not.toContain('Anna Nowak');
     expect(fixture.nativeElement.querySelectorAll('tbody tr')).toHaveLength(1);
+  });
+
+  it('displays group names and filters athletes by one or more groups locally', async () => {
+    await createPage();
+    fixture.componentInstance.groups.set([
+      { id: 1, name: 'Grupa 1' },
+      { id: 2, name: 'Grupa 2' },
+    ]);
+    fixture.componentInstance.allAthletes.set([
+      activeAthlete,
+      inactiveAthlete,
+      { ...createdAthlete, trainingGroupId: null },
+    ]);
+    showInactive();
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.textContent).toContain('Grupa 1');
+    expect(fixture.nativeElement.textContent).toContain('Grupa 2');
+    expect(fixture.nativeElement.textContent).toContain('Bez grupy');
+
+    fixture.componentInstance.onGroupIdsChange([2, 0]);
+    fixture.detectChanges();
+    expect(rowNames()).toEqual(['Anna Nowak', 'Ala Zielińska']);
+
+    fixture.componentInstance.onGroupIdsChange([]);
+    fixture.detectChanges();
+    expect(rowNames()).toHaveLength(3);
+    expect(api.getAll).toHaveBeenCalledTimes(1);
   });
 
   it('includes inactive athletes when the toggle is enabled without another request', async () => {
@@ -366,17 +409,20 @@ describe('AthletesPage', () => {
     expect(fixture.nativeElement.textContent).toContain('Jan Kowalski');
   });
 
-  it('renders the four required columns and keeps the status switch beside the edit action', async () => {
+  it('renders the athlete group and keeps the status switch beside the edit action', async () => {
     await createPage();
 
     const headings = Array.from(
       fixture.nativeElement.querySelectorAll('thead th'),
-    ).map((heading) =>
-      (heading as HTMLTableCellElement).querySelector('.sort-button')?.childNodes[0]?.textContent?.trim()
-      ?? '',
-    );
-    expect(headings).toEqual(['Zawodnik', 'Rok urodzenia', 'Płeć', '']);
-    expect(fixture.nativeElement.querySelectorAll('tbody tr:first-child td')).toHaveLength(4);
+    ).map((heading) => {
+      const cell = heading as HTMLTableCellElement;
+      const sortButton = cell.querySelector('.sort-button');
+      return sortButton
+        ? sortButton.childNodes[0]?.textContent?.trim() ?? ''
+        : cell.textContent?.trim() ?? '';
+    });
+    expect(headings).toEqual(['Zawodnik', 'Rok urodzenia', 'Płeć', 'Grupa treningowa', '']);
+    expect(fixture.nativeElement.querySelectorAll('tbody tr:first-child td')).toHaveLength(5);
     expect(fixture.nativeElement.querySelector('tbody tr:first-child td:last-child .status-toggle')).toBeTruthy();
     expect(fixture.nativeElement.querySelector('tbody tr:first-child td:last-child .edit-button')).toBeTruthy();
     expect(fixture.nativeElement.querySelector('.button--primary')?.textContent).toContain(
@@ -393,7 +439,7 @@ describe('AthletesPage', () => {
 
     expect(fixture.nativeElement.querySelector('app-athlete-form-modal')).toBeTruthy();
     expect(fixture.nativeElement.querySelector('#modal-title')?.textContent).toContain('Dodaj zawodnika');
-    expect(fixture.nativeElement.querySelectorAll('#athlete-form .field-control')).toHaveLength(4);
+    expect(fixture.nativeElement.querySelectorAll('#athlete-form .field-control')).toHaveLength(5);
     expect(fixture.nativeElement.querySelector('#athlete-gender')).toBeTruthy();
     expect(fixture.nativeElement.querySelector('[formControlName="active"]')).toBeNull();
     expect(api.getAll).toHaveBeenCalledTimes(1);

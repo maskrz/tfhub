@@ -8,6 +8,8 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.containers.PostgreSQLContainer;
@@ -17,6 +19,8 @@ import pl.tfhub.api.athlete.exception.AthleteNotFoundException;
 import pl.tfhub.api.result.dto.response.AthleteResultHistoryResponse;
 import pl.tfhub.api.result.service.ResultService;
 import pl.tfhub.api.test.dto.response.TestResponse;
+import pl.tfhub.api.user.enums.UserRole;
+import pl.tfhub.api.user.service.AuthenticatedUser;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -45,6 +49,9 @@ class AthleteProfileRepositoryIntegrationTests {
 
 	@BeforeEach
 	void resetDatabase() {
+		SecurityContextHolder.getContext().setAuthentication(
+				UsernamePasswordAuthenticationToken.authenticated(
+						new AuthenticatedUser(1, "test-admin", "", UserRole.ADMIN, true), null, List.of()));
 		jdbcTemplate.execute("TRUNCATE TABLE test_results, athletes, tests RESTART IDENTITY CASCADE");
 		insertAthlete(1, "Alice", "Able");
 		insertAthlete(2, "Beth", "Baker");
@@ -57,6 +64,11 @@ class AthleteProfileRepositoryIntegrationTests {
 		insertResult(103, 1, 11, "2025-03-02", "6.100", "TRAINING");
 		insertResult(104, 1, 11, "2025-04-15", "6.250", "COMPETITION");
 		insertResult(105, 2, 12, "2025-03-01", "8.500", "TRAINING");
+	}
+
+	@org.junit.jupiter.api.AfterEach
+	void clearSecurityContext() {
+		SecurityContextHolder.clearContext();
 	}
 
 	@Test

@@ -30,7 +30,7 @@ class StatisticsControllerTests {
 
 	@Test
 	void returnsDashboardOverviewDto() throws Exception {
-		when(statisticsService.getDashboardOverview())
+		when(statisticsService.getDashboardOverview(null))
 				.thenReturn(new DashboardOverviewResponse(2, List.of(), List.of(2026), List.of()));
 
 		mockMvc.perform(get("/api/statistics/dashboard"))
@@ -40,12 +40,12 @@ class StatisticsControllerTests {
 						""", true))
 				.andExpect(jsonPath("$.class").doesNotExist());
 
-		verify(statisticsService).getDashboardOverview();
+		verify(statisticsService).getDashboardOverview(null);
 	}
 
 	@Test
 	void delegatesClubRecordParametersAndReturnsResponseDto() throws Exception {
-		when(statisticsService.getClubRecords("10", "2026"))
+		when(statisticsService.getClubRecords("10", "2026", null))
 				.thenReturn(new ClubRecordsResponse(10L, 2026, List.of(), List.of()));
 
 		mockMvc.perform(get("/api/statistics/records")
@@ -57,16 +57,16 @@ class StatisticsControllerTests {
 						""", true))
 				.andExpect(jsonPath("$.class").doesNotExist());
 
-		verify(statisticsService).getClubRecords("10", "2026");
+		verify(statisticsService).getClubRecords("10", "2026", null);
 	}
 
 	@Test
 	void mapsUnknownTestAndInvalidParametersToStandardProblemResponses() throws Exception {
-		when(statisticsService.getClubRecords("404", null))
+		when(statisticsService.getClubRecords("404", null, null))
 				.thenThrow(new StatisticsTestNotFoundException(404));
-		when(statisticsService.getClubRecords("0", null))
+		when(statisticsService.getClubRecords("0", null, null))
 				.thenThrow(new InvalidStatisticsParameterException());
-		when(statisticsService.getClubRecords(null, null))
+		when(statisticsService.getClubRecords(null, null, null))
 				.thenThrow(new InvalidStatisticsParameterException());
 
 		mockMvc.perform(get("/api/statistics/records").param("testId", "404"))

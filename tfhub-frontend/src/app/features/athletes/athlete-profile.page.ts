@@ -11,6 +11,7 @@ import { TestResponse } from '../tests/test.model';
 import { TestsApiService } from '../tests/tests-api.service';
 import { ResultFormModalComponent } from '../results/result-form-modal.component';
 import { ResultResponse } from '../results/result.model';
+import { AuthService } from '../../core/auth/auth.service';
 
 interface MatrixCell {
   result: AthleteProfileResult;
@@ -100,6 +101,10 @@ export class AthleteProfilePage implements OnInit {
   readonly selectedSeriesIds = signal<number[]>([]);
   readonly scaleGroupByTestId = signal<Map<number, number>>(new Map());
   readonly chart = computed(() => this.buildChart());
+  readonly canEdit = computed(() => {
+    const role = this.auth.currentUser()?.role;
+    return role === 'ADMIN' || role === 'COACH';
+  });
   readonly matrixRows = computed(() => {
     const rows = new Map<string, Map<number, MatrixCell[]>>();
     for (const result of this.history()) {
@@ -124,6 +129,7 @@ export class AthleteProfilePage implements OnInit {
   });
 
   private readonly route = inject(ActivatedRoute);
+  readonly auth = inject(AuthService);
   private readonly athletesApi = inject(AthletesApiService);
   private readonly testsApi = inject(TestsApiService);
   private readonly destroyRef = inject(DestroyRef);
@@ -196,7 +202,7 @@ export class AthleteProfilePage implements OnInit {
   }
 
   openAthleteEdit(): void {
-    if (this.athlete()) this.isAthleteFormOpen.set(true);
+    if (this.canEdit() && this.athlete()) this.isAthleteFormOpen.set(true);
   }
 
   closeAthleteForm(): void {
@@ -210,6 +216,7 @@ export class AthleteProfilePage implements OnInit {
   }
 
   openAddResult(): void {
+    if (!this.canEdit()) return;
     if (!this.athlete()?.active) {
       this.lookupError.set('Nie można dodać wyniku zawodnikowi nieaktywnemu.');
       return;
@@ -249,6 +256,7 @@ export class AthleteProfilePage implements OnInit {
   }
 
   openResultEdit(result: AthleteProfileResult): void {
+    if (!this.canEdit()) return;
     this.selectedResult.set({
       id: result.id,
       athleteId: this.athleteId,
@@ -261,11 +269,11 @@ export class AthleteProfilePage implements OnInit {
   }
 
   onResultClick(event: MouseEvent, result: AthleteProfileResult): void {
-    if (event.detail === 0) this.openResultEdit(result);
+    if (this.canEdit() && event.detail === 0) this.openResultEdit(result);
   }
 
   onResultPointerUp(event: PointerEvent, result: AthleteProfileResult): void {
-    if (event.pointerType === 'touch') this.openResultEdit(result);
+    if (this.canEdit() && event.pointerType === 'touch') this.openResultEdit(result);
   }
 
   onResultSaved(_result: ResultResponse): void {

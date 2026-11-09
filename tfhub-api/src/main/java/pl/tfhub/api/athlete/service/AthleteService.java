@@ -5,6 +5,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import org.hibernate.exception.ConstraintViolationException;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
@@ -18,6 +19,10 @@ import pl.tfhub.api.athlete.entity.Athlete;
 import pl.tfhub.api.athlete.exception.AthleteAlreadyExistsException;
 import pl.tfhub.api.athlete.exception.AthleteNotFoundException;
 import pl.tfhub.api.athlete.repository.AthleteRepository;
+import pl.tfhub.api.common.authorization.AccessScopeService;
+import pl.tfhub.api.traininggroup.entity.TrainingGroup;
+import pl.tfhub.api.traininggroup.exception.TrainingGroupNotFoundException;
+import pl.tfhub.api.traininggroup.repository.TrainingGroupRepository;
 
 @Service
 public class AthleteService {
@@ -25,13 +30,29 @@ public class AthleteService {
 	private static final String UNIQUE_CONSTRAINT = "uq_athletes_name_birth_year";
 
 	private final AthleteRepository athleteRepository;
+	private final TrainingGroupRepository trainingGroupRepository;
+	private final AccessScopeService accessScopeService;
 
-	public AthleteService(AthleteRepository athleteRepository) {
+	@Autowired
+	public AthleteService(
+			AthleteRepository athleteRepository,
+			TrainingGroupRepository trainingGroupRepository,
+			AccessScopeService accessScopeService) {
 		this.athleteRepository = athleteRepository;
+		this.trainingGroupRepository = trainingGroupRepository;
+		this.accessScopeService = accessScopeService;
 	}
 
 	@Transactional
 	public AthleteResponse createAthlete(CreateAthleteRequest request) {
+		accessScopeService.requireCoachOrAdmin();
+		accessScopeService.requireGroupWhenMissing(request.trainingGroupId() != null);
+		TrainingGroup trainingGroup = null;
+		if (request.trainingGroupId() != null) {
+			accessScopeService.requireGroupAssignment(request.trainingGroupId());
+			trainingGroup = trainingGroupRepository.findById(request.trainingGroupId())
+					.orElseThrow(() -> new TrainingGroupNotFoundException(request.trainingGroupId()));
+		}
 		if (athleteRepository.existsByFirstNameAndLastNameAndBirthYear(
 				request.firstName(), request.lastName(), request.birthYear())) {
 			throw new AthleteAlreadyExistsException();
@@ -41,7 +62,8 @@ public class AthleteService {
 				request.firstName(),
 				request.lastName(),
 				request.birthYear(),
-				request.gender());
+				request.gender(),
+				trainingGroup);
 
 		try {
 			return AthleteResponse.from(athleteRepository.saveAndFlush(athlete));
@@ -55,6 +77,7 @@ public class AthleteService {
 
 	@Transactional(readOnly = true)
 	public AthleteResponse getAthlete(long id) {
+		accessScopeService.requireAthleteAccess(id);
 		Athlete athlete = athleteRepository.findById(id)
 				.orElseThrow(() -> new AthleteNotFoundException(id));
 		return AthleteResponse.from(athlete);
@@ -62,6 +85,8 @@ public class AthleteService {
 
 	@Transactional
 	public AthleteResponse updateAthlete(long id, UpdateAthleteRequest request) {
+		accessScopeService.requireCoachOrAdmin();
+		accessScopeService.requireAthleteWriteAccess(id);
 		Athlete athlete = athleteRepository.findById(id)
 				.orElseThrow(() -> new AthleteNotFoundException(id));
 
@@ -88,6 +113,8 @@ public class AthleteService {
 
 	@Transactional
 	public AthleteResponse changeAthleteStatus(long id, ChangeAthleteStatusRequest request) {
+		accessScopeService.requireCoachOrAdmin();
+		accessScopeService.requireAthleteWriteAccess(id);
 		Athlete athlete = athleteRepository.findById(id)
 				.orElseThrow(() -> new AthleteNotFoundException(id));
 		athlete.changeStatus(request.active());
@@ -96,6 +123,7 @@ public class AthleteService {
 
 	@Transactional(readOnly = true)
 	public List<AthleteResponse> searchAthletes(SearchAthletesRequest request) {
+		accessScopeService.requireCoachOrAdmin();
 		Specification<Athlete> specification = (root, query, criteriaBuilder) -> {
 			List<Predicate> predicates = new ArrayList<>();
 			if (request.firstName() != null) {
@@ -116,6 +144,10 @@ public class AthleteService {
 			}
 			if (request.birthYear() != null) {
 				predicates.add(criteriaBuilder.equal(root.get("birthYear"), request.birthYear()));
+			}
+			if (!accessScopeService.isAdmin()) {
+				List<Long> groupIds = accessScopeService.querySafeIds(accessScopeService.assignedGroupIds());
+				predicates.add(root.get("trainingGroup").get("id").in(groupIds));
 			}
 			return criteriaBuilder.and(predicates.toArray(Predicate[]::new));
 		};

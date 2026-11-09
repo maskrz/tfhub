@@ -2,7 +2,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { Component, DestroyRef, OnInit, computed, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { EMPTY, catchError, finalize, forkJoin } from 'rxjs';
+import { EMPTY, catchError, finalize, forkJoin, of } from 'rxjs';
 import { AthleteResponse } from '../athletes/athlete.model';
 import { AthletesApiService } from '../athletes/athletes-api.service';
 import { TestResponse } from '../tests/test.model';
@@ -12,9 +12,18 @@ import { ResultsApiService } from './results-api.service';
 import { ResultFormModalComponent } from './result-form-modal.component';
 import { MultipleResultsFormModalComponent } from './multiple-results-form-modal.component';
 import { DeleteResultConfirmationComponent } from './delete-result-confirmation.component';
+import { TrainingGroup, TrainingGroupsApiService } from '../training-groups/training-groups-api.service';
+import { AuthService } from '../../core/auth/auth.service';
+import { MultiSelectDropdownComponent } from '../../shared/multi-select-dropdown.component';
 
 @Component({
-  imports: [RouterLink, ResultFormModalComponent, MultipleResultsFormModalComponent, DeleteResultConfirmationComponent],
+  imports: [
+    RouterLink,
+    ResultFormModalComponent,
+    MultipleResultsFormModalComponent,
+    DeleteResultConfirmationComponent,
+    MultiSelectDropdownComponent,
+  ],
   selector: 'app-results-page',
   styleUrl: './results.page.scss',
   templateUrl: './results.page.html',
@@ -37,6 +46,9 @@ export class ResultsPage implements OnInit {
   readonly resultPendingDelete = signal<ResultRow | null>(null);
   readonly isMultipleCreateFormOpen = signal(false);
   readonly successMessage = signal<string | null>(null);
+  readonly groups = signal<TrainingGroup[]>([]);
+  readonly selectedGroupIds = signal<number[]>([]);
+  readonly auth = inject(AuthService);
   readonly visibleResults = computed(() => {
     const terms = this.query().trim().toLocaleLowerCase('pl-PL').split(/\s+/).filter(Boolean);
     const athleteId = this.selectedAthleteId();
@@ -67,6 +79,7 @@ export class ResultsPage implements OnInit {
   private readonly api = inject(ResultsApiService);
   private readonly athletesApi = inject(AthletesApiService);
   private readonly testsApi = inject(TestsApiService);
+  private readonly groupsApi = inject(TrainingGroupsApiService);
   private readonly destroyRef = inject(DestroyRef);
 
   ngOnInit(): void {
@@ -115,6 +128,11 @@ export class ResultsPage implements OnInit {
     }
   }
 
+  onGroupIdsChange(groupIds: number[]): void {
+    this.selectedGroupIds.set(groupIds);
+    this.loadResults();
+  }
+
   toggleDateSort(): void {
     this.sortDirection.update((direction) => direction === 'asc' ? 'desc' : 'asc');
   }
@@ -148,7 +166,8 @@ export class ResultsPage implements OnInit {
       this.selectedTestId() ||
       this.fromDate() ||
       this.toDate() ||
-      this.selectedType(),
+      this.selectedType() ||
+      this.selectedGroupIds().length > 0,
     );
   }
 
@@ -227,10 +246,12 @@ export class ResultsPage implements OnInit {
   private loadResults(): void {
     this.loading.set(true);
     this.errorMessage.set(null);
+    const coach = this.auth.currentUser()?.role === 'COACH';
     forkJoin({
-      results: this.api.getAll(),
+      results: this.api.getAll(this.selectedGroupIds()),
       athletes: this.athletesApi.getAll(),
       tests: this.testsApi.getAll(),
+      groups: coach ? this.groupsApi.getAccessible() : of([] as TrainingGroup[]),
     })
       .pipe(
         catchError((error: unknown) => {
@@ -243,7 +264,8 @@ export class ResultsPage implements OnInit {
         finalize(() => this.loading.set(false)),
         takeUntilDestroyed(this.destroyRef),
       )
-      .subscribe(({ results, athletes, tests }) => {
+      .subscribe(({ results, athletes, tests, groups }) => {
+        this.groups.set(groups);
         this.athletes.set(athletes);
         this.tests.set(tests);
         this.allResults.set(this.joinResults(results, athletes, tests));

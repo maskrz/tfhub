@@ -75,7 +75,7 @@ describe('DashboardPage', () => {
     fixture.detectChanges();
 
     expect(statistics.getDashboardOverview).toHaveBeenCalledTimes(1);
-    expect(statistics.getClubRecords).toHaveBeenCalledWith(8, null);
+    expect(statistics.getClubRecords).toHaveBeenCalledWith(8, null, []);
     expect(fixture.nativeElement.textContent).toContain('Aktywni zawodnicy');
     expect(fixture.nativeElement.textContent).toContain('Anna Kowalska');
     expect(fixture.nativeElement.querySelectorAll('.record-card table thead th').length).toBe(8);
@@ -90,13 +90,13 @@ describe('DashboardPage', () => {
     testSelect.value = '9';
     testSelect.dispatchEvent(new Event('change'));
     fixture.detectChanges();
-    expect(statistics.getClubRecords).toHaveBeenLastCalledWith(9, null);
+    expect(statistics.getClubRecords).toHaveBeenLastCalledWith(9, null, []);
 
     const seasonSelect = fixture.nativeElement.querySelectorAll('select')[1] as HTMLSelectElement;
     seasonSelect.value = '2024';
     seasonSelect.dispatchEvent(new Event('change'));
     fixture.detectChanges();
-    expect(statistics.getClubRecords).toHaveBeenLastCalledWith(9, 2024);
+    expect(statistics.getClubRecords).toHaveBeenLastCalledWith(9, 2024, []);
   });
 
   it('preserves valid test and season selections when refreshing the overview', () => {
@@ -109,7 +109,7 @@ describe('DashboardPage', () => {
 
     expect(fixture.componentInstance.selectedTestId()).toBe('9');
     expect(fixture.componentInstance.selectedSeason()).toBe('2024');
-    expect(statistics.getClubRecords).toHaveBeenLastCalledWith(9, 2024);
+    expect(statistics.getClubRecords).toHaveBeenLastCalledWith(9, 2024, []);
   });
 
   it('ignores stale record responses after the selection changes', () => {

@@ -3,6 +3,22 @@
     <h1>Panel główny</h1>
   </header>
 
+  @if (auth.currentUser()?.role === 'COACH' && groups().length > 0) {
+    <div class="selectors dashboard-group-filter">
+      <div class="filter-field">
+        <span>Grupy treningowe</span>
+        <app-multi-select-dropdown
+          [options]="groups()"
+          [selectedIds]="selectedGroupIds()"
+          [label]="'Filtruj panel według grup treningowych'"
+          [controlId]="'dashboard-group-options'"
+          (selectedIdsChange)="onGroupIdsChange($event)"
+        />
+        <small>Brak zaznaczonych grup oznacza wszystkie przypisane grupy.</small>
+      </div>
+    </div>
+  }
+
   <section class="quick-actions" aria-label="Szybkie akcje">
     <button class="button button--primary" type="button" (click)="openResultForm()" [disabled]="lookupLoading()">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>

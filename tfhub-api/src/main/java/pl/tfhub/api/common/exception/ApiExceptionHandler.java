@@ -13,6 +13,7 @@ import pl.tfhub.api.athlete.entity.Athlete;
 import pl.tfhub.api.athlete.exception.AthleteAlreadyExistsException;
 import pl.tfhub.api.athlete.exception.AthleteNotFoundException;
 import pl.tfhub.api.athlete.exception.InvalidAthleteIdException;
+import pl.tfhub.api.athlete.exception.InvalidAthleteGroupException;
 import pl.tfhub.api.result.exception.InactiveAthleteException;
 import pl.tfhub.api.result.exception.InactiveTestException;
 import pl.tfhub.api.result.exception.InvalidResultIdException;
@@ -25,6 +26,7 @@ import pl.tfhub.api.test.exception.InvalidTestIdException;
 import pl.tfhub.api.test.exception.TestAlreadyExistsException;
 import pl.tfhub.api.test.exception.TestHasResultsException;
 import pl.tfhub.api.test.exception.TestNotFoundException;
+import pl.tfhub.api.traininggroup.exception.TrainingGroupNotFoundException;
 
 @RestControllerAdvice
 public class ApiExceptionHandler {
@@ -135,6 +137,20 @@ public class ApiExceptionHandler {
 	public ProblemDetail handleAthleteNotFound(AthleteNotFoundException exception) {
 		ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, exception.getMessage());
 		problem.setTitle("Athlete not found");
+		return problem;
+	}
+
+	@ExceptionHandler(InvalidAthleteGroupException.class)
+	public ProblemDetail handleInvalidAthleteGroup(InvalidAthleteGroupException exception) {
+		ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, exception.getMessage());
+		problem.setTitle("Training group is required");
+		return problem;
+	}
+
+	@ExceptionHandler(TrainingGroupNotFoundException.class)
+	public ProblemDetail handleTrainingGroupNotFound(TrainingGroupNotFoundException exception) {
+		ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, exception.getMessage());
+		problem.setTitle("Training group not found");
 		return problem;
 	}
 

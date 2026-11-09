@@ -10,6 +10,7 @@ import java.sql.SQLException;
 import java.util.List;
 import org.hibernate.exception.ConstraintViolationException;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
@@ -28,6 +29,9 @@ import pl.tfhub.api.test.exception.TestAlreadyExistsException;
 import pl.tfhub.api.test.exception.TestHasResultsException;
 import pl.tfhub.api.test.exception.TestNotFoundException;
 import pl.tfhub.api.test.repository.TestRepository;
+import pl.tfhub.api.common.authorization.AccessScopeService;
+import pl.tfhub.api.user.enums.UserRole;
+import pl.tfhub.api.user.service.AuthenticatedUser;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -43,8 +47,17 @@ class TestServiceTests {
 	@Mock
 	private TestRepository testRepository;
 
+	@Mock
+	private AccessScopeService accessScopeService;
+
 	@InjectMocks
 	private TestService testService;
+
+	@BeforeEach
+	void provideAdminIdentity() {
+		org.mockito.Mockito.lenient().when(accessScopeService.currentUser())
+				.thenReturn(new AuthenticatedUser(1, "admin", "", UserRole.ADMIN, true));
+	}
 
 	@Test
 	void createsEachCategoryWithCorrectUnitDirectionAndActiveStatus() {

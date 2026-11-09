@@ -8,6 +8,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import pl.tfhub.api.statistics.exception.InvalidStatisticsParameterException;
 import pl.tfhub.api.statistics.exception.StatisticsTestNotFoundException;
 import pl.tfhub.api.statistics.repository.StatisticsRepository;
+import pl.tfhub.api.common.authorization.AccessScopeService;
 
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.never;
@@ -19,6 +20,9 @@ class StatisticsServiceTests {
 
 	@Mock
 	private StatisticsRepository statisticsRepository;
+
+	@Mock
+	private AccessScopeService accessScopeService;
 
 	@InjectMocks
 	private StatisticsService statisticsService;

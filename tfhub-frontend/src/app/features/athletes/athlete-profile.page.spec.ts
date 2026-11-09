@@ -4,12 +4,14 @@ import { By } from '@angular/platform-browser';
 import { ActivatedRoute, provideRouter } from '@angular/router';
 import { convertToParamMap } from '@angular/router';
 import { Observable, of, throwError } from 'rxjs';
+import { signal } from '@angular/core';
 import { AthleteResponse } from './athlete.model';
 import { AthleteProfileResult } from './athlete-profile.model';
 import { AthletesApiService } from './athletes-api.service';
 import { AthleteProfilePage } from './athlete-profile.page';
 import { ResultFormModalComponent } from '../results/result-form-modal.component';
 import { TestsApiService } from '../tests/tests-api.service';
+import { AuthService } from '../../core/auth/auth.service';
 
 const athlete: AthleteResponse = {
   id: 8,
@@ -63,6 +65,12 @@ describe('AthleteProfilePage', () => {
         { provide: ActivatedRoute, useValue: { paramMap: of(convertToParamMap({ id: '8' })) } },
         { provide: AthletesApiService, useValue: athletesApi },
         { provide: TestsApiService, useValue: testsApi },
+        {
+          provide: AuthService,
+          useValue: {
+            currentUser: signal({ authenticated: true, userId: 1, username: 'admin', role: 'ADMIN', athleteId: null }),
+          },
+        },
       ],
     }).compileComponents();
     fixture = TestBed.createComponent(AthleteProfilePage);

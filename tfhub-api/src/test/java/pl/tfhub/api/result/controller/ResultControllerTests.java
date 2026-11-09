@@ -233,13 +233,13 @@ class ResultControllerTests {
 
 	@Test
 	void listsResultsWithoutFiltersAndReturnsAnEmptyJsonArrayWhenNoneMatch() throws Exception {
-		when(resultService.searchResults(null, null, null, null, null)).thenReturn(List.of());
+		when(resultService.searchResults(null, null, null, null, null, null)).thenReturn(List.of());
 
 		mockMvc.perform(get("/api/results"))
 				.andExpect(status().isOk())
 				.andExpect(content().json("[]", true));
 
-		verify(resultService).searchResults(null, null, null, null, null);
+		verify(resultService).searchResults(null, null, null, null, null, null);
 	}
 
 	@Test
@@ -247,7 +247,7 @@ class ResultControllerTests {
 		ResultResponse result = new ResultResponse(
 				32L, 7L, 2L, LocalDate.parse("2026-11-05"), new BigDecimal("5.420"), ResultType.TRAINING);
 		when(resultService.searchResults(
-				7L, 2L, LocalDate.parse("2026-11-01"), LocalDate.parse("2026-11-30"), ResultType.TRAINING))
+				7L, 2L, LocalDate.parse("2026-11-01"), LocalDate.parse("2026-11-30"), ResultType.TRAINING, null))
 				.thenReturn(List.of(result));
 
 		mockMvc.perform(get("/api/results")
@@ -264,18 +264,18 @@ class ResultControllerTests {
 				.andExpect(jsonPath("$[0].class").doesNotExist());
 
 		verify(resultService).searchResults(
-				7L, 2L, LocalDate.parse("2026-11-01"), LocalDate.parse("2026-11-30"), ResultType.TRAINING);
+				7L, 2L, LocalDate.parse("2026-11-01"), LocalDate.parse("2026-11-30"), ResultType.TRAINING, null);
 	}
 
 	@Test
 	void acceptsEachResultSearchFilterIndividually() throws Exception {
-		when(resultService.searchResults(7L, null, null, null, null)).thenReturn(List.of());
-		when(resultService.searchResults(null, 2L, null, null, null)).thenReturn(List.of());
-		when(resultService.searchResults(null, null, LocalDate.parse("2026-11-01"), null, null))
+		when(resultService.searchResults(7L, null, null, null, null, null)).thenReturn(List.of());
+		when(resultService.searchResults(null, 2L, null, null, null, null)).thenReturn(List.of());
+		when(resultService.searchResults(null, null, LocalDate.parse("2026-11-01"), null, null, null))
 				.thenReturn(List.of());
-		when(resultService.searchResults(null, null, null, LocalDate.parse("2026-11-30"), null))
+		when(resultService.searchResults(null, null, null, LocalDate.parse("2026-11-30"), null, null))
 				.thenReturn(List.of());
-		when(resultService.searchResults(null, null, null, null, ResultType.COMPETITION)).thenReturn(List.of());
+		when(resultService.searchResults(null, null, null, null, ResultType.COMPETITION, null)).thenReturn(List.of());
 
 		mockMvc.perform(get("/api/results").param("athleteId", "7")).andExpect(status().isOk());
 		mockMvc.perform(get("/api/results").param("testId", "2")).andExpect(status().isOk());
@@ -283,17 +283,17 @@ class ResultControllerTests {
 		mockMvc.perform(get("/api/results").param("toDate", "2026-11-30")).andExpect(status().isOk());
 		mockMvc.perform(get("/api/results").param("type", "COMPETITION")).andExpect(status().isOk());
 
-		verify(resultService).searchResults(7L, null, null, null, null);
-		verify(resultService).searchResults(null, 2L, null, null, null);
-		verify(resultService).searchResults(null, null, LocalDate.parse("2026-11-01"), null, null);
-		verify(resultService).searchResults(null, null, null, LocalDate.parse("2026-11-30"), null);
-		verify(resultService).searchResults(null, null, null, null, ResultType.COMPETITION);
+		verify(resultService).searchResults(7L, null, null, null, null, null);
+		verify(resultService).searchResults(null, 2L, null, null, null, null);
+		verify(resultService).searchResults(null, null, LocalDate.parse("2026-11-01"), null, null, null);
+		verify(resultService).searchResults(null, null, null, LocalDate.parse("2026-11-30"), null, null);
+		verify(resultService).searchResults(null, null, null, null, ResultType.COMPETITION, null);
 	}
 
 	@Test
 	void listsResultsForAnUnknownButValidAthleteOrTestAsAnEmptyArray() throws Exception {
-		when(resultService.searchResults(999L, null, null, null, null)).thenReturn(List.of());
-		when(resultService.searchResults(null, 998L, null, null, null)).thenReturn(List.of());
+		when(resultService.searchResults(999L, null, null, null, null, null)).thenReturn(List.of());
+		when(resultService.searchResults(null, 998L, null, null, null, null)).thenReturn(List.of());
 
 		mockMvc.perform(get("/api/results").param("athleteId", "999"))
 				.andExpect(status().isOk())

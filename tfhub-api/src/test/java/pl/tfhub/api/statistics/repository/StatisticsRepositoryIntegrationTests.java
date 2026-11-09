@@ -14,6 +14,10 @@ import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import pl.tfhub.api.result.enums.ResultType;
+import pl.tfhub.api.user.enums.UserRole;
+import pl.tfhub.api.user.service.AuthenticatedUser;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
 import pl.tfhub.api.statistics.dto.response.DashboardOverviewResponse;
 import pl.tfhub.api.statistics.service.StatisticsService;
 
@@ -45,6 +49,9 @@ class StatisticsRepositoryIntegrationTests {
 
 	@BeforeEach
 	void resetDatabase() {
+		SecurityContextHolder.getContext().setAuthentication(
+				UsernamePasswordAuthenticationToken.authenticated(
+						new AuthenticatedUser(1, "test-admin", "", UserRole.ADMIN, true), null, List.of()));
 		jdbcTemplate.execute("TRUNCATE TABLE test_results, athletes, tests RESTART IDENTITY CASCADE");
 		insertAthlete(1, "Alice", "Able", "FEMALE", true);
 		insertAthlete(2, "Beth", "Baker", "FEMALE", false);
@@ -54,6 +61,11 @@ class StatisticsRepositoryIntegrationTests {
 		insertTest(10, "40 m sprint", "s", "TIME", false, true);
 		insertTest(11, "Long jump", "m", "DISTANCE", true, false);
 		insertTest(12, "Running speed", "m/s", "SPEED", true, true);
+	}
+
+	@org.junit.jupiter.api.AfterEach
+	void clearSecurityContext() {
+		SecurityContextHolder.clearContext();
 	}
 
 	@Test

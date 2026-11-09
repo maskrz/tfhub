@@ -7,13 +7,16 @@ import { ClubRecords, DashboardOverview } from './statistics.model';
 export class StatisticsApiService {
   private readonly http = inject(HttpClient);
 
-  getDashboardOverview(): Observable<DashboardOverview> {
-    return this.http.get<DashboardOverview>('/api/statistics/dashboard');
+  getDashboardOverview(groupIds: number[] = []): Observable<DashboardOverview> {
+    let params = new HttpParams();
+    for (const groupId of groupIds) params = params.append('groupIds', groupId);
+    return this.http.get<DashboardOverview>('/api/statistics/dashboard', { params });
   }
 
-  getClubRecords(testId: number, season: number | null): Observable<ClubRecords> {
+  getClubRecords(testId: number, season: number | null, groupIds: number[] = []): Observable<ClubRecords> {
     let params = new HttpParams().set('testId', testId);
     if (season !== null) params = params.set('season', season);
+    for (const groupId of groupIds) params = params.append('groupIds', groupId);
     return this.http.get<ClubRecords>('/api/statistics/records', { params });
   }
 }

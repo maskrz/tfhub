@@ -5,6 +5,7 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -16,6 +17,7 @@ import pl.tfhub.api.athlete.dto.response.AthleteResponse;
 import pl.tfhub.api.athlete.enums.Gender;
 import pl.tfhub.api.athlete.exception.AthleteNotFoundException;
 import pl.tfhub.api.athlete.service.AthleteService;
+import pl.tfhub.api.common.authorization.AccessScopeService;
 import pl.tfhub.api.result.dto.request.CreateMultipleResultsRequest;
 import pl.tfhub.api.result.dto.request.CreateResultEntryRequest;
 import pl.tfhub.api.result.dto.request.CreateResultRequest;
@@ -30,10 +32,13 @@ import pl.tfhub.api.result.exception.InvalidResultSearchException;
 import pl.tfhub.api.result.exception.MultipleResultsDuplicateAthleteException;
 import pl.tfhub.api.result.exception.ResultNotFoundException;
 import pl.tfhub.api.result.repository.ResultRepository;
+import pl.tfhub.api.result.repository.AthleteProfileRepository;
 import pl.tfhub.api.test.dto.response.TestResponse;
 import pl.tfhub.api.test.enums.TestCategory;
 import pl.tfhub.api.test.exception.TestNotFoundException;
 import pl.tfhub.api.test.service.TestService;
+import pl.tfhub.api.user.enums.UserRole;
+import pl.tfhub.api.user.service.AuthenticatedUser;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -57,8 +62,20 @@ class ResultServiceTests {
 	@Mock
 	private ResultRepository resultRepository;
 
+	@Mock
+	private AthleteProfileRepository athleteProfileRepository;
+
+	@Mock
+	private AccessScopeService accessScopeService;
+
 	@InjectMocks
 	private ResultService resultService;
+
+	@BeforeEach
+	void provideAdminIdentity() {
+		org.mockito.Mockito.lenient().when(accessScopeService.currentUser())
+				.thenReturn(new AuthenticatedUser(1, "admin", "", UserRole.ADMIN, true));
+	}
 
 	@Test
 	void retrievesResultAndReturnsOnlyResultFieldsRegardlessOfRelatedStatus() {
@@ -151,7 +168,7 @@ class ResultServiceTests {
 		when(resultRepository.findById(32L)).thenReturn(java.util.Optional.of(result));
 		when(athleteService.getAthlete(7L))
 				.thenReturn(new AthleteResponse(7L, "A", "B", 2000, Gender.MALE, true));
-		when(testService.getTest(2L))
+		when(testService.getTestForResultUpdate(2L))
 				.thenReturn(new TestResponse(2L, "Sprint", "s", TestCategory.TIME, false, true));
 		when(resultRepository.saveAndFlush(result)).thenReturn(result);
 

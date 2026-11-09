@@ -21,18 +21,22 @@ The user selects "Zawodnicy" from the main application navigation.
     - "Dodaj zawodnika" primary action
     - Search input
     - Gender filter
+    - Training-group multi-select filter
     - Birth-year range filters
     - "Pokaż nieaktywnych" toggle
     - Athletes table
-4. By default, only active athletes are displayed.
-5. The user can search by first name, last name, or Polish gender label.
-6. Gender can also be selected from a dedicated filter.
-7. The user can filter using an inclusive birth-year range with optional lower and upper bounds.
-8. The user can enable "Pokaż nieaktywnych" to include inactive athletes.
-9. Search, gender, birth-year range, and active-status filtering work together.
-10. The user can sort by athlete name, birth year, or gender using the table headers.
-11. The "Dodaj zawodnika" action opens FE-ATHLETE-002.
-12. Each row provides a status toggle and an "Edytuj" action that opens FE-ATHLETE-003.
+5. The table displays each athlete's current training group, or "Bez grupy" for an unassigned athlete.
+6. By default, only active athletes are displayed.
+7. The user can search by first name, last name, or Polish gender label.
+8. Gender can also be selected from a dedicated filter.
+9. The user can filter by one or more accessible training groups; an empty selection means all accessible groups.
+10. Administrators can additionally filter for athletes without an assigned group.
+11. The user can filter using an inclusive birth-year range with optional lower and upper bounds.
+12. The user can enable "Pokaż nieaktywnych" to include inactive athletes.
+13. Search, gender, group, birth-year range, and active-status filtering work together.
+14. The user can sort by athlete name, birth year, or gender using the table headers.
+15. The "Dodaj zawodnika" action opens FE-ATHLETE-002.
+16. Each row provides a status toggle and an "Edytuj" action that opens FE-ATHLETE-003.
 
 ## Table Columns
 
@@ -41,6 +45,7 @@ The user selects "Zawodnicy" from the main application navigation.
 | Zawodnik | First name and last name |
 | Rok urodzenia | Athlete's birth year |
 | Płeć | Athlete's gender |
+| Grupa treningowa | Current group name, or "Bez grupy" |
 | Akcje | Active/inactive status toggle and "Edytuj" action |
 
 The name, birth-year, and gender headers are sortable. The initial order is athlete surname ascending, then first name ascending; selecting the active header reverses the order. Name and gender use Polish locale-aware comparison.
@@ -52,9 +57,11 @@ The name, birth-year, and gender headers are sortable. The initial order is athl
 - The gender dropdown supports all athletes, men, or women.
 - Birth year can be constrained by optional "Od" and "Do" inclusive bounds.
 - Search, gender, birth-year range, and inactive filtering are combined.
+- Group filtering supports multiple groups and is combined with all other filters. Administrators can include unassigned athletes; coaches only see groups assigned to them.
 - Sorting is local and can be used with every filter. Name sorting compares surname first and first name as a tie-breaker.
 - Default view displays active athletes only.
-- Search, gender, birth-year range, status filtering, and sorting are performed locally; changing them does not send additional requests.
+- Search, gender, group, birth-year range, status filtering, and sorting are performed locally; changing them does not send additional requests.
+- The page loads the accessible training groups once to display names and populate the group filter.
 - Search terms are trimmed, case-insensitive, and can match first and last name in any order.
 
 Prefer local filtering after the initial API request if the existing API supports retrieving all athletes, including inactive ones.
@@ -83,7 +90,7 @@ If the API cannot provide all required data in a single initial request, report 
 
 - `POST /api/athletes/search` with `{}` returns `AthleteResponse[]`, including active and inactive athletes when no criteria are specified.
 - `PATCH /api/athletes/{id}/status` accepts `ChangeAthleteStatusRequest` (`{ "active": boolean }`) and returns the updated `AthleteResponse`.
-- The existing request/response fields are used without backend changes.
+- `AthleteResponse` includes nullable `trainingGroupId`; the page uses the authenticated user's accessible groups to display group names.
 
 ## UI States
 Support:
@@ -123,6 +130,8 @@ The table structure should remain compatible with a future athlete profile entry
 - The list is loaded once per view initialization and contains inactive athletes.
 - Search works by first name, last name, and gender label.
 - Gender and birth-year filters work together with search and status filtering.
+- The current group is shown for each athlete.
+- Multiple group filters work together with the existing local filters. Administrators can select "Bez grupy"; coaches only receive their assigned group options.
 - Sorting by surname then first name, birth year, and gender works locally and together with filters.
 - Each athlete has an Edit action.
 - Each athlete has an activation/deactivation toggle.

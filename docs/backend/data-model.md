@@ -8,14 +8,15 @@
 
 This document describes the data model used by TFHub.
 
-The application data model consists of three business entities and a small authentication account table:
+The application data model consists of athlete, test, result, user, and training-group entities:
 
 - `Athlete` – an athlete managed by the coach.
 - `Test` – a definition of an athletic performance test.
 - `TestResult` – a recorded result of an athlete performing a test.
-- `users` – credentials for the single authorized application account.
+- `User` – login account, role, and active status.
+- `TrainingGroup` – current athlete group and coach access scope.
 
-The initial release has exactly one authorized user account. The `users` table supports authentication only; it does not imply a user-management module or user CRUD API. Multi-user support and per-user ownership are outside the current scope.
+There is no registration or user/group-management API or UI in this release. Initial accounts and memberships are provisioned locally or directly in PostgreSQL.
 
 ## 2. Entity Relationship Diagram
 
@@ -25,10 +26,31 @@ erDiagram
         bigint id PK
         varchar username UK
         varchar password_hash
+        varchar role
+        boolean active
         timestamptz created_at
         timestamptz password_changed_at
     }
 
+    TRAINING_GROUPS {
+        bigint id PK
+        varchar name
+        varchar coach_name
+    }
+
+    USER_TRAINING_GROUP {
+        bigint user_id FK
+        bigint training_group_id FK
+    }
+
+    USER_ATHLETE_ACCESS {
+        bigint user_id FK
+        bigint athlete_id FK
+    }
+
+    TRAINING_GROUPS ||--o{ ATHLETES : contains
+    USERS }o--o{ TRAINING_GROUPS : coaches
+    USERS }o--o{ ATHLETES : athlete_access
     ATHLETES ||--o{ TEST_RESULTS : has
     TESTS ||--o{ TEST_RESULTS : measures
 
@@ -39,6 +61,7 @@ erDiagram
         integer birth_year
         varchar gender
         boolean active
+        bigint training_group_id FK "nullable"
     }
 
     TESTS {
@@ -62,19 +85,25 @@ erDiagram
 
 ## 3. Authentication Account
 
-The `users` table stores the single account used to authenticate to TFHub. It has no relationship to athletes, tests, or results.
+The `users` table stores application login accounts. `User` is distinct from `Athlete`; role belongs to the account.
 
 | Field | Database type | Required | Description |
 |---|---|---|---|
 | id | BIGINT | Yes | Primary key, generated automatically |
 | username | VARCHAR | Yes | Unique login name |
 | password_hash | VARCHAR | Yes | Argon2id password hash; never a plaintext password |
+| role | VARCHAR | Yes | `ADMIN`, `COACH`, or `ATHLETE` |
+| active | BOOLEAN | Yes | Inactive accounts cannot authenticate or continue using an existing session |
 | created_at | TIMESTAMP WITH TIME ZONE | Yes | Account creation time |
 | password_changed_at | TIMESTAMP WITH TIME ZONE | Yes | Time the password was last changed |
 
-The unique constraint on `username` prevents duplicate accounts. The initial account is created through a controlled local initialization procedure. Password changes and resets use local administrative procedures. No registration, user CRUD endpoints, roles, permissions, or account-management UI are part of the initial release.
+The username must be unique after the chosen normalization (recommended: case-insensitive trimmed uniqueness). The initial administrator is provisioned locally without a committed/default password. Password changes and resets use local administrative procedures. Registration, user CRUD endpoints, and account-management UI are excluded.
 
-The username's maximum length and case-normalization rules must be defined when the schema migration is prepared. The plaintext password must not be stored in PostgreSQL, configuration, environment variables, or logs.
+The username's maximum length and case-normalization rules must be enforced consistently in the application and schema. The plaintext password must not be stored in PostgreSQL, configuration, environment variables, or logs.
+
+## 3.1 TrainingGroup and memberships
+
+`training_groups` contains an identity, required name, and optional descriptive `coach_name`. The descriptive field does not confer access. `user_training_group` is a many-to-many join for coaches and groups; each pair is unique. `user_athlete_access` is a many-to-many association between accounts and athletes, also with unique pairs. An ATHLETE account must have exactly one linked athlete in this release; retain the many-to-many schema for future flexibility. Enforce role/membership compatibility and the first-release cardinality during provisioning and service validation.
 
 ## 4. Athlete
 
@@ -90,6 +119,7 @@ Represents an athlete whose performance is tracked by the application.
 | birth_year | INTEGER | Yes | Year of birth |
 | gender | VARCHAR(20) | Yes | Athlete's gender |
 | active | BOOLEAN | Yes | Indicates whether the athlete is active |
+| training_group_id | BIGINT | No | Current group; null means unassigned |
 
 ### 4.2 Gender
 
@@ -105,6 +135,7 @@ Allowed Java enum values:
 - Primary key: `id`.
 - Unique constraint: `(first_name, last_name, birth_year)`.
 - `active` defaults to `true`.
+- `training_group_id` references `training_groups.id` with restrictive deletion. A coach-created athlete must have a group chosen from the authenticated coach's assigned groups; administrators may leave the group null or assign any existing group.
 
 ### 4.4 Business rules
 
@@ -239,7 +270,7 @@ No separate Competition entity is required initially.
 - Results must use the canonical unit of the selected test.
 - Results must be positive numbers.
 - New results can be recorded only for active athletes. Existing historical results for deactivated athletes remain accessible.
-- New results should normally be recorded only for active tests.
+- New results can be recorded only for active tests. An existing result may retain its current inactive test during editing, but it cannot be changed to a different inactive test.
 - Multiple results for the same athlete, test and date are technically allowed.
 - The application does not enforce uniqueness of `(athlete_id, test_id, result_date)`.
 
@@ -266,6 +297,8 @@ Deleting a test with existing results must be prevented.
 Foreign key constraints are enforced by PostgreSQL.
 
 The database uses `ON DELETE RESTRICT` for both relationships.
+
+An athlete has zero or one current training group. A coach may belong to multiple groups and a group may have multiple coaches. Reassignment changes current coach access only; it does not update, delete, or re-parent historical results.
 
 ## 8. Data Types and Precision
 
@@ -312,7 +345,7 @@ The migration creates:
 - `tests`
 - `test_results`
 
-The authentication `users` table is planned and must be introduced through a new Flyway migration; do not alter an already-applied migration. All future database modifications must be introduced through new Flyway migrations.
+The authentication and training-group tables were introduced through `V3__add_users_and_training_groups.sql`; the migration adds a nullable athlete group reference and preserves existing athlete and result rows. Do not alter an already-applied migration. All future database modifications must be introduced through new Flyway migrations.
 
 Existing applied migrations must not be modified.
 
@@ -322,8 +355,8 @@ Hibernate uses schema validation and must not modify the schema automatically.
 
 The following entities and capabilities are not part of the initial model:
 
-- A full user-management domain module or user CRUD API (the authentication-only `users` table is defined above)
-- TrainingGroup
+- User-management UI or public user CRUD API
+- Training-group management UI and athlete group-reassignment UI
 - TrainingSession
 - Competition
 - TrainingPlan
@@ -334,8 +367,8 @@ They may be introduced later when supported by actual application requirements.
 
 Potential future improvements include:
 
-- Athlete groups.
-- Multiple coaches and user ownership.
+- Administrative user/group management screens.
+- Parent accounts and multiple athlete profiles per account.
 - Detailed competition metadata.
 - Import of external competition results.
 - Training sessions.

@@ -1,14 +1,17 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component, DestroyRef, OnInit, computed, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { EMPTY, catchError, finalize } from 'rxjs';
+import { EMPTY, catchError, finalize, take } from 'rxjs';
 import { RouterLink } from '@angular/router';
 import { AthleteFormMode, AthleteResponse, Gender } from './athlete.model';
 import { AthletesApiService } from './athletes-api.service';
 import { AthleteFormModalComponent } from './athlete-form-modal.component';
+import { AuthService } from '../../core/auth/auth.service';
+import { MultiSelectDropdownComponent, MultiSelectOption } from '../../shared/multi-select-dropdown.component';
+import { TrainingGroup, TrainingGroupsApiService } from '../training-groups/training-groups-api.service';
 
 @Component({
-  imports: [AthleteFormModalComponent, RouterLink],
+  imports: [AthleteFormModalComponent, MultiSelectDropdownComponent, RouterLink],
   selector: 'app-athletes-page',
   styleUrl: './athletes.page.scss',
   templateUrl: './athletes.page.html',
@@ -20,6 +23,10 @@ export class AthletesPage implements OnInit {
   readonly query = signal('');
   readonly showInactive = signal(false);
   readonly selectedGender = signal<Gender | ''>('');
+  readonly selectedGroupIds = signal<number[]>([]);
+  readonly groups = signal<TrainingGroup[]>([]);
+  readonly groupsLoading = signal(false);
+  readonly groupsError = signal<string | null>(null);
   readonly birthYearFrom = signal('');
   readonly birthYearTo = signal('');
   readonly sortColumn = signal<'name' | 'birthYear' | 'gender'>('name');
@@ -33,6 +40,7 @@ export class AthletesPage implements OnInit {
   readonly visibleAthletes = computed(() => {
     const terms = this.query().trim().toLowerCase().split(/\s+/).filter(Boolean);
     const gender = this.selectedGender();
+    const selectedGroupIds = this.selectedGroupIds();
     const yearFrom = this.parseYear(this.birthYearFrom());
     const yearTo = this.parseYear(this.birthYearTo());
     const direction = this.sortDirection() === 'asc' ? 1 : -1;
@@ -40,6 +48,12 @@ export class AthletesPage implements OnInit {
     return this.allAthletes().filter((athlete) => {
       if (!this.showInactive() && !athlete.active) return false;
       if (gender && athlete.gender !== gender) return false;
+      if (selectedGroupIds.length > 0) {
+        const groupMatches = athlete.trainingGroupId === null || athlete.trainingGroupId === undefined
+          ? selectedGroupIds.includes(0)
+          : selectedGroupIds.includes(athlete.trainingGroupId);
+        if (!groupMatches) return false;
+      }
       if (yearFrom !== null && athlete.birthYear < yearFrom) return false;
       if (yearTo !== null && athlete.birthYear > yearTo) return false;
       const firstName = athlete.firstName.toLowerCase();
@@ -71,10 +85,19 @@ export class AthletesPage implements OnInit {
   });
 
   private readonly api = inject(AthletesApiService);
+  private readonly groupsApi = inject(TrainingGroupsApiService);
+  readonly auth = inject(AuthService);
   private readonly destroyRef = inject(DestroyRef);
+  readonly groupOptions = computed<MultiSelectOption[]>(() => [
+    ...this.groups().map((group) => ({ id: group.id, name: group.name })),
+    ...(this.auth.currentUser()?.role === 'ADMIN' ? [{ id: 0, name: 'Bez grupy' }] : []),
+  ]);
 
   ngOnInit(): void {
     this.loadAthletes();
+    if (this.auth.currentUser()?.role === 'ADMIN' || this.auth.currentUser()?.role === 'COACH') {
+      this.loadGroups();
+    }
   }
 
   onSearchInput(event: Event): void {
@@ -99,6 +122,16 @@ export class AthletesPage implements OnInit {
         this.selectedGender.set(value);
       }
     }
+  }
+
+  onGroupIdsChange(groupIds: number[]): void {
+    this.selectedGroupIds.set(groupIds);
+  }
+
+  groupName(athlete: AthleteResponse): string {
+    if (athlete.trainingGroupId === null || athlete.trainingGroupId === undefined) return 'Bez grupy';
+    return this.groups().find((group) => group.id === athlete.trainingGroupId)?.name
+      ?? `Grupa #${athlete.trainingGroupId}`;
   }
 
   onBirthYearChange(event: Event, bound: 'from' | 'to'): void {
@@ -197,6 +230,7 @@ export class AthletesPage implements OnInit {
     return (
       this.query().trim().length > 0 ||
       this.selectedGender() !== '' ||
+      this.selectedGroupIds().length > 0 ||
       this.birthYearFrom().trim().length > 0 ||
       this.birthYearTo().trim().length > 0
     );
@@ -223,6 +257,23 @@ export class AthletesPage implements OnInit {
         takeUntilDestroyed(this.destroyRef),
       )
       .subscribe((athletes) => this.allAthletes.set(athletes));
+  }
+
+  private loadGroups(): void {
+    this.groupsLoading.set(true);
+    this.groupsError.set(null);
+    this.groupsApi
+      .getAccessible()
+      .pipe(
+        take(1),
+        catchError(() => {
+          this.groupsError.set('Nie udało się pobrać grup treningowych.');
+          return EMPTY;
+        }),
+        finalize(() => this.groupsLoading.set(false)),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe((groups) => this.groups.set(groups));
   }
 
   private getErrorMessage(error: unknown): string {

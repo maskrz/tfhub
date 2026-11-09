@@ -28,7 +28,11 @@ import pl.tfhub.api.athlete.enums.Gender;
 import pl.tfhub.api.athlete.exception.AthleteAlreadyExistsException;
 import pl.tfhub.api.athlete.exception.AthleteNotFoundException;
 import pl.tfhub.api.athlete.repository.AthleteRepository;
+import pl.tfhub.api.common.authorization.AccessScopeService;
+import pl.tfhub.api.traininggroup.entity.TrainingGroup;
+import pl.tfhub.api.traininggroup.repository.TrainingGroupRepository;
 
+import static org.mockito.Mockito.lenient;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -44,8 +48,19 @@ class AthleteServiceTests {
 	@Mock
 	private AthleteRepository athleteRepository;
 
+	@Mock
+	private TrainingGroupRepository trainingGroupRepository;
+
+	@Mock
+	private AccessScopeService accessScopeService;
+
 	@InjectMocks
 	private AthleteService athleteService;
+
+	@org.junit.jupiter.api.BeforeEach
+	void allowAdminScopeInUnitTests() {
+		lenient().when(accessScopeService.isAdmin()).thenReturn(true);
+	}
 
 	@Test
 	void searchesWithAllCriteriaAndMapsEntitiesToResponseDtos() {
@@ -58,6 +73,20 @@ class AthleteServiceTests {
 
 		assertEquals(List.of(new AthleteResponse(1L, "Jan", "Kowalski", 2010, Gender.MALE, true)), responses);
 		verify(athleteRepository).findAll(any(Specification.class));
+	}
+
+	@Test
+	void includesCurrentTrainingGroupIdInTheAthleteResponse() {
+		TrainingGroup group = mock(TrainingGroup.class);
+		when(group.getId()).thenReturn(7L);
+		Athlete athlete = new Athlete("Jan", "Kowalski", 2010, Gender.MALE, group);
+		ReflectionTestUtils.setField(athlete, "id", 1L);
+		when(athleteRepository.findAll(any(Specification.class))).thenReturn(List.of(athlete));
+
+		List<AthleteResponse> responses = athleteService.searchAthletes(
+				new SearchAthletesRequest(null, null, null, null, null));
+
+		assertEquals(7L, responses.getFirst().trainingGroupId());
 	}
 
 	@Test

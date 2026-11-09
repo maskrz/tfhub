@@ -5,6 +5,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import org.hibernate.exception.ConstraintViolationException;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
@@ -19,6 +20,8 @@ import pl.tfhub.api.test.exception.TestAlreadyExistsException;
 import pl.tfhub.api.test.exception.TestHasResultsException;
 import pl.tfhub.api.test.exception.TestNotFoundException;
 import pl.tfhub.api.test.repository.TestRepository;
+import pl.tfhub.api.common.authorization.AccessScopeService;
+import pl.tfhub.api.user.enums.UserRole;
 
 @Service
 public class TestService {
@@ -26,13 +29,17 @@ public class TestService {
 	private static final String UNIQUE_CONSTRAINT = "uq_tests_normalized_name";
 
 	private final TestRepository testRepository;
+	private final AccessScopeService accessScopeService;
 
-	public TestService(TestRepository testRepository) {
+	@Autowired
+	public TestService(TestRepository testRepository, AccessScopeService accessScopeService) {
 		this.testRepository = testRepository;
+		this.accessScopeService = accessScopeService;
 	}
 
 	@Transactional
 	public TestResponse createTest(CreateTestRequest request) {
+		accessScopeService.requireAdmin();
 		if (testRepository.existsByNormalizedName(request.name())) {
 			throw new TestAlreadyExistsException();
 		}
@@ -54,6 +61,21 @@ public class TestService {
 
 	@Transactional(readOnly = true)
 	public TestResponse getTest(long id) {
+		UserRole role = accessScopeService.currentUser().role();
+		if (role == UserRole.ATHLETE) {
+			throw new org.springframework.security.access.AccessDeniedException("Athlete accounts cannot browse tests");
+		}
+		AthleticTest test = testRepository.findById(id)
+				.orElseThrow(() -> new TestNotFoundException(id));
+		if (role == UserRole.COACH && !test.isActive()) {
+			throw new TestNotFoundException(id);
+		}
+		return TestResponse.from(test);
+	}
+
+	@Transactional(readOnly = true)
+	public TestResponse getTestForResultUpdate(long id) {
+		accessScopeService.requireCoachOrAdmin();
 		AthleticTest test = testRepository.findById(id)
 				.orElseThrow(() -> new TestNotFoundException(id));
 		return TestResponse.from(test);
@@ -61,6 +83,7 @@ public class TestService {
 
 	@Transactional
 	public TestResponse updateTest(long id, UpdateTestRequest request) {
+		accessScopeService.requireAdmin();
 		AthleticTest test = testRepository.findById(id)
 				.orElseThrow(() -> new TestNotFoundException(id));
 
@@ -87,6 +110,7 @@ public class TestService {
 
 	@Transactional
 	public TestResponse changeTestStatus(long id, ChangeTestStatusRequest request) {
+		accessScopeService.requireAdmin();
 		AthleticTest test = testRepository.findById(id)
 				.orElseThrow(() -> new TestNotFoundException(id));
 		test.changeStatus(request.active());
@@ -95,6 +119,10 @@ public class TestService {
 
 	@Transactional(readOnly = true)
 	public List<TestResponse> searchTests(TestSearchRequest request) {
+		UserRole role = accessScopeService.currentUser().role();
+		if (role == UserRole.ATHLETE) {
+			throw new org.springframework.security.access.AccessDeniedException("Athlete accounts cannot browse tests");
+		}
 		Specification<AthleticTest> specification = (root, query, criteriaBuilder) -> {
 			List<Predicate> predicates = new ArrayList<>();
 			if (request.name() != null) {
@@ -111,7 +139,9 @@ public class TestService {
 			if (request.higherIsBetter() != null) {
 				predicates.add(criteriaBuilder.equal(root.get("higherIsBetter"), request.higherIsBetter()));
 			}
-			if (request.active() != null) {
+			if (role == UserRole.COACH) {
+				predicates.add(criteriaBuilder.isTrue(root.get("active")));
+			} else if (request.active() != null) {
 				predicates.add(criteriaBuilder.equal(root.get("active"), request.active()));
 			}
 			return criteriaBuilder.and(predicates.toArray(Predicate[]::new));

@@ -10,6 +10,8 @@ import {
   UpdateAthleteRequest,
 } from './athlete.model';
 import { AthletesApiService } from './athletes-api.service';
+import { AuthService } from '../../core/auth/auth.service';
+import { TrainingGroup, TrainingGroupsApiService } from '../training-groups/training-groups-api.service';
 
 const genders: Gender[] = ['MALE', 'FEMALE'];
 const trimmedRequired: ValidatorFn = (control) =>
@@ -40,6 +42,8 @@ export class AthleteFormComponent {
   readonly serverFieldErrors = signal<Record<string, string>>({});
   readonly genders = genders;
   readonly currentYear = new Date().getFullYear();
+  readonly groups = signal<TrainingGroup[]>([]);
+  readonly groupsLoading = signal(false);
   readonly form = new FormGroup({
     firstName: new FormControl('', {
       nonNullable: true,
@@ -61,22 +65,47 @@ export class AthleteFormComponent {
       nonNullable: true,
       validators: [Validators.required],
     }),
+    trainingGroupId: new FormControl<number | null>(null),
   });
 
   private readonly api = inject(AthletesApiService);
+  private readonly groupsApi = inject(TrainingGroupsApiService);
+  readonly auth = inject(AuthService);
 
   ngOnInit(): void {
+    if (this.mode === 'CREATE') {
+      if (this.auth.currentUser()?.role === 'COACH') {
+        this.form.controls.trainingGroupId.addValidators(Validators.required);
+      }
+      this.groupsLoading.set(true);
+      this.groupsApi.getAccessible().pipe(
+        take(1),
+        catchError((error: unknown) => {
+          this.errorMessage.set(error instanceof HttpErrorResponse && error.status === 403
+            ? 'Brak dostępu do przypisania grupy zawodnikowi.'
+            : 'Nie udało się pobrać dostępnych grup treningowych.');
+          return EMPTY;
+        }),
+        finalize(() => this.groupsLoading.set(false)),
+      ).subscribe((groups) => {
+        this.groups.set(groups);
+        if (this.auth.currentUser()?.role === 'COACH' && groups.length === 0) {
+          this.errorMessage.set('Nie masz przypisanej grupy. Skontaktuj się z administratorem.');
+        }
+      });
+    }
     if (this.mode === 'EDIT' && this.athlete) {
       this.form.setValue({
         firstName: this.athlete.firstName,
         lastName: this.athlete.lastName,
         birthYear: this.athlete.birthYear,
         gender: this.athlete.gender,
+        trainingGroupId: null,
       });
     }
   }
 
-  fieldError(field: 'firstName' | 'lastName' | 'birthYear' | 'gender'): string | null {
+  fieldError(field: 'firstName' | 'lastName' | 'birthYear' | 'gender' | 'trainingGroupId'): string | null {
     const control = this.form.controls[field];
     if (control.invalid && (control.touched || control.dirty)) {
       if (control.hasError('required')) {
@@ -97,6 +126,9 @@ export class AthleteFormComponent {
       }
       if (control.hasError('integer')) {
         return 'Rok urodzenia musi być liczbą całkowitą.';
+      }
+      if (field === 'trainingGroupId' && control.hasError('required')) {
+        return 'Wybierz grupę treningową.';
       }
     }
     return this.serverFieldErrors()[field] ?? null;
@@ -127,6 +159,9 @@ export class AthleteFormComponent {
       lastName: this.form.controls.lastName.value.trim(),
       birthYear,
       gender,
+      ...(this.form.controls.trainingGroupId.value !== null
+        ? { trainingGroupId: this.form.controls.trainingGroupId.value }
+        : {}),
     };
 
     this.setSaving(true);

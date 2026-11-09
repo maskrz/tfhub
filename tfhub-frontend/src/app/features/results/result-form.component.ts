@@ -104,12 +104,19 @@ export class ResultFormComponent implements OnInit {
   }
 
   get testOptions(): SearchableSelectOption[] {
-    return this.tests
+    const options = this.tests
       .filter((test) => this.isActiveTest(test))
       .map((test) => ({
         value: String(test.id),
         label: `${test.name}${test.active ? '' : ' (nieaktywny)'}`,
       }));
+    if (this.mode === 'EDIT' && this.result && !this.tests.some((test) => test.id === this.result?.testId)) {
+      options.push({
+        value: String(this.result.testId),
+        label: `Test #${this.result.testId} (nieaktywny — bieżący)`,
+      });
+    }
+    return options;
   }
 
   onTestSelected(testId: string): void {
@@ -166,7 +173,7 @@ export class ResultFormComponent implements OnInit {
       ) ||
       !this.tests.some((test) =>
         test.id === Number(testId) && (test.active || (this.mode === 'EDIT' && test.id === this.result?.testId)),
-      )
+      ) && !(this.mode === 'EDIT' && Number(testId) === this.result?.testId)
     ) {
       return;
     }

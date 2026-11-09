@@ -3,11 +3,15 @@
     <div>
       <h1>Profil zawodnika</h1>
       @if (athlete(); as currentAthlete) {
-        <p class="breadcrumb"><a routerLink="/athletes">Zawodnicy</a> / {{ currentAthlete.firstName }} {{ currentAthlete.lastName }}</p>
+        @if (canEdit()) {
+          <p class="breadcrumb"><a routerLink="/athletes">Zawodnicy</a> / {{ currentAthlete.firstName }} {{ currentAthlete.lastName }}</p>
+        }
       }
     </div>
     @if (athlete(); as currentAthlete) {
+      @if (canEdit()) {
       <button class="button button--secondary" type="button" (click)="openAthleteEdit()">Edytuj</button>
+      }
     }
   </div>
 
@@ -33,6 +37,7 @@
       </div>
       <div class="athlete-actions">
         <span>Dane zawodnika</span>
+        @if (canEdit()) {
         <button
           class="button button--primary"
           type="button"
@@ -41,6 +46,7 @@
         >
           + Dodaj wynik
         </button>
+        }
       </div>
       @if (lookupLoading()) {
         <p class="inline-status" role="status">Przygotowywanie formularza…</p>
@@ -141,18 +147,25 @@
                   @for (test of selectedTests(); track test.id) {
                     <td>
                       @for (cell of row.cells.get(test.id) ?? []; track cell.result.id) {
-                        <button
-                          class="result-value"
-                          type="button"
-                          [attr.aria-label]="'Edytuj wynik ' + formatValue(cell.result.value) + ' ' + cell.result.testUnit + ', ' + formatDate(cell.result.resultDate) + ', ' + typeLabel(cell.result.type)"
-                          [title]="typeLabel(cell.result.type) + ' · dwuklik, aby edytować'"
-                          (click)="onResultClick($event, cell.result)"
-                          (dblclick)="openResultEdit(cell.result)"
-                          (pointerup)="onResultPointerUp($event, cell.result)"
-                        >
-                          <span>{{ formatValue(cell.result.value) }}</span>
-                          <span class="result-type">{{ typeLabel(cell.result.type) }}</span>
-                        </button>
+                        @if (canEdit()) {
+                          <button
+                            class="result-value"
+                            type="button"
+                            [attr.aria-label]="'Edytuj wynik ' + formatValue(cell.result.value) + ' ' + cell.result.testUnit + ', ' + formatDate(cell.result.resultDate) + ', ' + typeLabel(cell.result.type)"
+                            [title]="typeLabel(cell.result.type) + ' · dwuklik, aby edytować'"
+                            (click)="onResultClick($event, cell.result)"
+                            (dblclick)="openResultEdit(cell.result)"
+                            (pointerup)="onResultPointerUp($event, cell.result)"
+                          >
+                            <span>{{ formatValue(cell.result.value) }}</span>
+                            <span class="result-type">{{ typeLabel(cell.result.type) }}</span>
+                          </button>
+                        } @else {
+                          <span class="result-value">
+                            <span>{{ formatValue(cell.result.value) }}</span>
+                            <span class="result-type">{{ typeLabel(cell.result.type) }}</span>
+                          </span>
+                        }
                       } @empty {
                         <span class="no-result" aria-label="Brak wyniku">—</span>
                       }
@@ -163,7 +176,9 @@
             </tbody>
           </table>
         </div>
-        <p class="edit-hint">Kliknij wynik dwukrotnie na komputerze lub dotknij go na telefonie, aby edytować.</p>
+        @if (canEdit()) {
+          <p class="edit-hint">Kliknij wynik dwukrotnie na komputerze lub dotknij go na telefonie, aby edytować.</p>
+        }
       }
     </section>
 
@@ -267,7 +282,7 @@
   }
 </main>
 
-@if (isAthleteFormOpen() && athlete(); as currentAthlete) {
+@if (canEdit() && isAthleteFormOpen() && athlete(); as currentAthlete) {
   <app-athlete-form-modal
     [mode]="'EDIT'"
     [athlete]="currentAthlete"
@@ -275,7 +290,7 @@
     (cancelled)="closeAthleteForm()"
   />
 }
-@if (isResultFormOpen()) {
+@if (canEdit() && isResultFormOpen()) {
   <app-result-form-modal
     [mode]="selectedResult() ? 'EDIT' : 'CREATE'"
     [athletes]="athleteOptions()"

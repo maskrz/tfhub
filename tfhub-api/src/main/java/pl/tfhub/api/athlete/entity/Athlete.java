@@ -7,8 +7,12 @@ import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import pl.tfhub.api.athlete.enums.Gender;
+import pl.tfhub.api.traininggroup.entity.TrainingGroup;
 
 @Entity
 @Table(name = "athletes")
@@ -34,6 +38,10 @@ public class Athlete {
 	@Column(nullable = false)
 	private boolean active = true;
 
+	@ManyToOne(fetch = FetchType.LAZY)
+	@JoinColumn(name = "training_group_id")
+	private TrainingGroup trainingGroup;
+
 	protected Athlete() {
 	}
 
@@ -42,6 +50,16 @@ public class Athlete {
 		this.lastName = lastName;
 		this.birthYear = birthYear;
 		this.gender = gender;
+	}
+
+	public Athlete(
+			String firstName,
+			String lastName,
+			Integer birthYear,
+			Gender gender,
+			TrainingGroup trainingGroup) {
+		this(firstName, lastName, birthYear, gender);
+		this.trainingGroup = trainingGroup;
 	}
 
 	public Long getId() {
@@ -66,6 +84,10 @@ public class Athlete {
 
 	public boolean isActive() {
 		return active;
+	}
+
+	public TrainingGroup getTrainingGroup() {
+		return trainingGroup;
 	}
 
 	public void updatePersonalInformation(String firstName, String lastName, Integer birthYear, Gender gender) {

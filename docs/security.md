@@ -1,7 +1,7 @@
 # TFHub Security Architecture
 
-**Status:** Target architecture; security mechanisms are not yet implemented
-**Scope:** Initial single-account browser application
+**Status:** Implementation in progress; this document defines the agreed security contract
+**Scope:** Browser application with administrator, coach, and athlete accounts
 
 ## 1. Purpose
 
@@ -20,13 +20,15 @@ The requirements below are architectural direction, not a statement that the mec
 
 ## 3. Authentication and Account Scope
 
-Use Spring Security for backend-enforced authentication. TFHub has exactly one authorized account, created through a controlled local initialization process and persisted in the PostgreSQL `users` table. The table stores a unique username, an Argon2id password hash, account creation time, and password-change time. The password hash is never a plaintext password and must not be stored in configuration or environment variables.
+Use Spring Security for backend-enforced authentication. Accounts are persisted in the PostgreSQL `users` table with a unique username, Argon2id password hash, role (`ADMIN`, `COACH`, or `ATHLETE`), active status, account creation time, and password-change time. Password hashes are never plaintext and must not be stored in configuration or environment variables.
 
-There is no registration, user CRUD API, account-management UI, multi-user or role management, or email-based password recovery. Password changes and resets are performed through local administrative procedures.
+The application has no public registration, user CRUD API, account-management UI, or email-based password recovery. Initial accounts and user/group/athlete associations are provisioned locally or directly in PostgreSQL. `PasswordHashGenerator` provides an interactive local password-hash utility; only its Argon2id output is inserted into PostgreSQL. Password changes and resets are performed through local administrative procedures. Never commit production credentials or seed a default password.
+
+`User` is an application login account, not an `Athlete`. An athlete account is linked through `user_athlete_access`; exactly one athlete must be linked to an `ATHLETE` account for this release. The relationship remains many-to-many for future flexibility. Coaches are linked to multiple training groups through `user_training_group`; a coach's group membership, not descriptive `coach_name`, grants access. Athletes optionally belong to one current training group; group reassignment changes current access but does not alter historical results.
 
 ## 4. Session Management
 
-Use Spring Security server-side sessions rather than JWT. For this single-user, same-origin browser application, a browser-managed session cookie and backend session state are sufficient; logout can invalidate the session without adding token storage or lifecycle complexity.
+Use Spring Security server-side sessions rather than JWT. A browser-managed session cookie and backend session state are sufficient; logout invalidates the session without client-side token storage.
 
 The session lifecycle must:
 
@@ -36,6 +38,7 @@ The session lifecycle must:
 - Enforce an absolute maximum lifetime of 24 hours, after which the user must authenticate again. If the framework's idle timeout does not provide this limit, enforce it separately.
 - Invalidate the server-side session on logout and expire or clear the corresponding browser cookie.
 - Reject requests using missing, invalid, expired, or logged-out sessions.
+- Reject and invalidate sessions for inactive users. Check current account activity on authenticated requests so direct database deactivation takes effect on the next request.
 
 Use in-memory sessions for the initial single-instance deployment. A backend restart may invalidate active sessions.
 
@@ -54,7 +57,7 @@ Never store session identifiers or credentials in browser `localStorage` or `ses
 
 Keep Spring Security CSRF protection enabled for browser-authenticated requests and protect all state-changing requests.
 
-Use Angular HttpClient's built-in XSRF support with an `XSRF-TOKEN` cookie and `X-XSRF-TOKEN` request header. The CSRF cookie must be readable by Angular; it is not the HttpOnly session cookie or an authentication credential.
+Use Angular HttpClient's built-in XSRF support with an `XSRF-TOKEN` cookie and `X-XSRF-TOKEN` request header. The CSRF cookie must be readable by Angular; it is not the HttpOnly session cookie or an authentication credential. Both the CSRF cookie and session cookie use `SameSite=Lax`; set `SESSION_COOKIE_SECURE=true` in production and set `SESSION_COOKIE_NAME=__Host-TFHUBSESSION` to use the production host-prefixed cookie. The host prefix requires HTTPS, `Path=/`, and no `Domain` attribute.
 
 The authentication API contract is:
 
@@ -62,7 +65,7 @@ The authentication API contract is:
 |---|---|---|---|
 | `GET` | `/api/csrf` | Public | Initialize or refresh the CSRF token; return `200 OK` and set the `XSRF-TOKEN` cookie. |
 | `POST` | `/api/auth/login` | Public, CSRF required | Accept `username` and `password`; establish a session on success. |
-| `GET` | `/api/auth/session` | Authentication required | Return the authenticated session state, or `401 Unauthorized`. |
+| `GET` | `/api/auth/session` | Authentication required | Return authenticated user identity and role, or `401 Unauthorized`; never return password data. |
 | `POST` | `/api/auth/logout` | Authentication required, CSRF required | Invalidate the current session; return `204 No Content`. |
 
 Login request body:
@@ -74,7 +77,7 @@ Login request body:
 }
 ```
 
-Successful login returns `200 OK` with `{"authenticated": true}`. Invalid credentials return `401 Unauthorized` using a generic standard API error response. The session check returns `200 OK` with `{"authenticated": true}` when authenticated, and `401 Unauthorized` otherwise. Logout returns no response body. After successful login and logout, the frontend calls `GET /api/csrf` to refresh the CSRF token. Never expose password hashes or other credential data through the API.
+Successful login returns `200 OK` with authenticated state and the safe user identity/role. Invalid credentials return `401 Unauthorized` using a generic standard API error response. The session check returns the same safe identity/role shape or `401 Unauthorized`. Logout returns no response body. After successful login and logout, the frontend calls `GET /api/csrf` to refresh the CSRF token. Never expose password hashes or other credential data through the API.
 
 Verify token initialization, refresh, and state-changing request validation with a simple end-to-end test.
 
@@ -84,6 +87,12 @@ Verify token initialization, refresh, and state-changing request validation with
 - Return HTTP `401 Unauthorized` for unauthenticated API requests; do not redirect API clients to an HTML login page.
 - Return HTTP `403 Forbidden` when an authenticated request is not permitted, including when CSRF validation fails.
 - Allow only `POST /api/auth/login` and `GET /api/csrf` without authentication. `GET /api/auth/session` returns `401 Unauthorized` when no authenticated session exists.
+- Require `ADMIN` to manage tests. Coaches may read active tests needed to enter results; they cannot create, update, activate, deactivate, or delete tests. Athlete accounts cannot manage or browse tests as a global resource.
+- Administrators have unrestricted business-data access. Coaches can access only athletes currently assigned to their groups and results belonging to those athletes; unassigned athletes are not coach-accessible. Athlete accounts can read only their linked athlete profile, history, and statistics and cannot mutate athletes or results.
+- Scope must be enforced in service and data-access paths for lists, direct IDs, updates, deletes, profile history, batches, records, and dashboard aggregation. Route guards and filters in Angular are UX only.
+- An athlete created by a coach must be assigned to one of that coach's groups in the create request. The server validates current membership. An administrator may create an unassigned athlete or choose any group. No group-management or separate reassignment UI is included; existing assignments may initially be managed in PostgreSQL.
+- New results require active tests. An existing result may be edited with its current inactive test retained; it cannot be changed to another inactive test.
+- Return `404` for inaccessible scoped resources where revealing their existence would leak data. Use `403` for authenticated users denied an operation independent of hidden-resource existence.
 - Do not expose Actuator or a health endpoint publicly. Reconsider a minimal health endpoint only if a concrete deployment requirement appears.
 
 The backend must enforce these rules regardless of Angular route or component visibility.
@@ -112,6 +121,7 @@ Use generic login error messages and do not rely on Angular controls or client-s
 - Handle `401` responses by presenting the unauthenticated state and directing the user to the login flow as appropriate.
 - Handle `403` responses as access or request-forbidden errors; do not treat them as proof that the user is unauthenticated.
 - Route guards may improve navigation and user experience, but they are not access control. The backend must protect every business endpoint.
+- Display role-appropriate navigation and actions. Coaches select from their assigned groups for the dashboard; no selection means all their groups. Athletes use an own-profile/statistics view and do not have the global Results view.
 - Never include secrets in frontend source, build-time public configuration, or production bundles.
 
 ## 11. Same-Origin Deployment and CORS
@@ -168,7 +178,12 @@ Keep the proxy configuration simple and verify it during deployment.
 - [ ] Production session cookies are `HttpOnly`, `Secure`, and use the approved `SameSite` policy.
 - [ ] No credential or session identifier is stored in browser web storage.
 - [ ] CSRF protection remains enabled and state-changing browser requests are validated.
-- [ ] The single account is provisioned locally; only its adaptive password hash is stored in PostgreSQL, and credentials are never exposed through the API.
+- [ ] Users are provisioned locally; only Argon2id password hashes are stored in PostgreSQL, and credentials are never exposed through the API.
+- [ ] ADMIN, COACH, and ATHLETE permissions are enforced server-side for every business endpoint.
+- [ ] Coach data access is restricted to current group membership, including direct IDs, result writes/deletes, batches, profile history, dashboard counts, recent results, and records.
+- [ ] ATHLETE accounts can read only their associated athlete and cannot mutate athlete or result data.
+- [ ] Coaches must select one of their assigned groups when creating an athlete; administrators may create an unassigned athlete.
+- [ ] New results require active tests; edits may retain the existing inactive test but cannot switch to another inactive test.
 - [ ] Login attempt throttling is enforced server-side.
 - [ ] Angular route guards are not relied upon to secure API data or operations.
 - [ ] PostgreSQL and internal application services are not publicly reachable.
@@ -182,20 +197,21 @@ Keep the proxy configuration simple and verify it during deployment.
 The initial security scope does not include:
 
 - Public registration or self-service account creation.
-- Multiple user accounts, user administration, roles, or permissions management.
+- User-management UI or public user CRUD endpoints.
+- Training-group management UI or separate athlete group-reassignment UI.
 - JWT-based authentication.
 - MFA.
 - Public business functionality.
 - Introducing Redis or other infrastructure without a demonstrated need.
 
-These are not implied future requirements; any scope expansion requires an explicit decision.
+Initial users, groups, and relationships are provisioned manually. The schema and service boundaries must support future management screens without redesign. Athlete parent accounts and multiple athlete profiles per athlete account are not implemented now.
 
 ## 18. Open Decisions
 
 The architecture is agreed. Verify these implementation details before production:
 
-1. Confirm the selected Spring Security implementation supports Argon2id; benchmark the OWASP minimum parameters on the Raspberry Pi. Add BouncyCastle only if required.
-2. Verify framework support for the production `__Host-` session cookie.
-3. Implement and end-to-end test the documented login/session/logout contract and CSRF token initialization at `GET /api/csrf`, refresh after login/logout, and Angular HttpClient request validation.
-4. Verify the 24-hour absolute session lifetime is enforced independently of the 2-hour idle timeout.
-5. Define username maximum length and case-normalization in the migration, then test login rate limiting, trusted proxy/header handling, local account initialization/reset, and backup/restore procedures in the deployment environment.
+1. Benchmark the configured Argon2id parameters (19 MiB, 2 iterations, parallelism 1) on the Raspberry Pi before production.
+2. Verify login/session/logout, CSRF initialization and refresh, inactive-account invalidation, and the 24-hour absolute session lifetime with end-to-end tests.
+3. Configure and verify the production `SESSION_COOKIE_NAME` and `SESSION_COOKIE_SECURE` settings behind the trusted Nginx proxy.
+4. Verify login rate limiting and real client-IP handling through the configured trusted proxy chain.
+5. Provision the initial administrator and coach/group/athlete relationships using the local administrative procedure; verify that each ATHLETE account has exactly one athlete association.

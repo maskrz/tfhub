@@ -4,13 +4,16 @@ import { AthleteProfilePage } from './features/athletes/athlete-profile.page';
 import { DashboardPage } from './features/dashboard/dashboard.page';
 import { ResultsPage } from './features/results/results.page';
 import { TestManagementPage } from './features/tests/test-management.page';
+import { adminGuard, authenticatedGuard, homeGuard, staffGuard } from './core/auth/auth.guards';
+import { LoginPage } from './core/auth/login.page';
 
 export const routes: Routes = [
-  { path: '', pathMatch: 'full', redirectTo: 'dashboard' },
-  { path: 'dashboard', component: DashboardPage, title: 'Panel główny' },
-  { path: 'tests', component: TestManagementPage, title: 'Testy' },
-  { path: 'athletes/:id', component: AthleteProfilePage, title: 'Profil zawodnika' },
-  { path: 'athletes', component: AthletesPage, title: 'Zawodnicy' },
-  { path: 'results', component: ResultsPage, title: 'Wyniki' },
-  { path: '**', redirectTo: 'tests' },
+  { path: '', pathMatch: 'full', canActivate: [homeGuard], component: DashboardPage },
+  { path: 'login', component: LoginPage, title: 'Logowanie' },
+  { path: 'dashboard', component: DashboardPage, canActivate: [staffGuard], title: 'Panel główny' },
+  { path: 'tests', component: TestManagementPage, canActivate: [adminGuard], title: 'Testy' },
+  { path: 'athletes/:id', component: AthleteProfilePage, canActivate: [authenticatedGuard], title: 'Profil zawodnika' },
+  { path: 'athletes', component: AthletesPage, canActivate: [staffGuard], title: 'Zawodnicy' },
+  { path: 'results', component: ResultsPage, canActivate: [staffGuard], title: 'Wyniki' },
+  { path: '**', redirectTo: 'dashboard' },
 ];

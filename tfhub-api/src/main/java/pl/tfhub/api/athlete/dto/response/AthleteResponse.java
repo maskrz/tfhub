@@ -9,7 +9,18 @@ public record AthleteResponse(
 		String lastName,
 		Integer birthYear,
 		Gender gender,
-		boolean active) {
+		boolean active,
+		Long trainingGroupId) {
+
+	public AthleteResponse(
+			Long id,
+			String firstName,
+			String lastName,
+			Integer birthYear,
+			Gender gender,
+			boolean active) {
+		this(id, firstName, lastName, birthYear, gender, active, null);
+	}
 
 	public static AthleteResponse from(Athlete athlete) {
 		return new AthleteResponse(
@@ -18,6 +29,7 @@ public record AthleteResponse(
 				athlete.getLastName(),
 				athlete.getBirthYear(),
 				athlete.getGender(),
-				athlete.isActive());
+				athlete.isActive(),
+				athlete.getTrainingGroup() == null ? null : athlete.getTrainingGroup().getId());
 	}
 }

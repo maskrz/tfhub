@@ -1,4 +1,4 @@
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import {
@@ -13,8 +13,10 @@ import {
 export class ResultsApiService {
   private readonly http = inject(HttpClient);
 
-  getAll(): Observable<ResultResponse[]> {
-    return this.http.get<ResultResponse[]>('/api/results');
+  getAll(groupIds: number[] = []): Observable<ResultResponse[]> {
+    let params = new HttpParams();
+    for (const groupId of groupIds) params = params.append('groupIds', groupId);
+    return this.http.get<ResultResponse[]>('/api/results', { params });
   }
 
   createResult(request: CreateResultRequest): Observable<ResultResponse> {

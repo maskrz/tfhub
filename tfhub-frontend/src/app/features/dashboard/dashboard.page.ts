@@ -13,6 +13,9 @@ import { TestResponse } from '../tests/test.model';
 import { TestsApiService } from '../tests/tests-api.service';
 import { ClubRecords, DashboardOverview } from './statistics.model';
 import { StatisticsApiService } from './statistics-api.service';
+import { TrainingGroup, TrainingGroupsApiService } from '../training-groups/training-groups-api.service';
+import { AuthService } from '../../core/auth/auth.service';
+import { MultiSelectDropdownComponent } from '../../shared/multi-select-dropdown.component';
 
 @Component({
   imports: [
@@ -20,6 +23,7 @@ import { StatisticsApiService } from './statistics-api.service';
     AthleteFormModalComponent,
     ResultFormModalComponent,
     MultipleResultsFormModalComponent,
+    MultiSelectDropdownComponent,
   ],
   selector: 'app-dashboard-page',
   styleUrl: './dashboard.page.scss',
@@ -41,10 +45,14 @@ export class DashboardPage implements OnInit {
   readonly isMultipleResultFormOpen = signal(false);
   readonly athletes = signal<AthleteResponse[]>([]);
   readonly tests = signal<TestResponse[]>([]);
+  readonly groups = signal<TrainingGroup[]>([]);
+  readonly selectedGroupIds = signal<number[]>([]);
 
   private readonly statisticsApi = inject(StatisticsApiService);
   private readonly athletesApi = inject(AthletesApiService);
   private readonly testsApi = inject(TestsApiService);
+  private readonly groupsApi = inject(TrainingGroupsApiService);
+  readonly auth = inject(AuthService);
   private readonly destroyRef = inject(DestroyRef);
   private athleteCache: AthleteResponse[] | null = null;
   private testCache: TestResponse[] | null = null;
@@ -52,7 +60,21 @@ export class DashboardPage implements OnInit {
   private recordsRequestId = 0;
 
   ngOnInit(): void {
-    this.refreshOverview();
+    if (this.auth.currentUser()?.role === 'COACH') {
+      this.groupsApi.getAccessible().pipe(
+        take(1),
+        catchError((error: unknown) => {
+          this.lookupError.set(this.getErrorMessage(error, 'lookups'));
+          return EMPTY;
+        }),
+        takeUntilDestroyed(this.destroyRef),
+      ).subscribe((groups) => {
+        this.groups.set(groups);
+        this.refreshOverview();
+      });
+    } else {
+      this.refreshOverview();
+    }
   }
 
   refreshOverview(): void {
@@ -63,7 +85,7 @@ export class DashboardPage implements OnInit {
     this.overviewError.set(null);
 
     this.statisticsApi
-      .getDashboardOverview()
+      .getDashboardOverview(this.selectedGroupIds())
       .pipe(
         take(1),
         catchError((error: unknown) => {
@@ -105,6 +127,11 @@ export class DashboardPage implements OnInit {
       this.selectedSeason.set(select.value);
       this.loadRecords();
     }
+  }
+
+  onGroupIdsChange(groupIds: number[]): void {
+    this.selectedGroupIds.set(groupIds);
+    this.refreshOverview();
   }
 
   retryOverview(): void {
@@ -185,7 +212,7 @@ export class DashboardPage implements OnInit {
 
     this.recordsLoading.set(true);
     this.statisticsApi
-      .getClubRecords(testId, season)
+      .getClubRecords(testId, season, this.selectedGroupIds())
       .pipe(
         take(1),
         catchError((error: unknown) => {

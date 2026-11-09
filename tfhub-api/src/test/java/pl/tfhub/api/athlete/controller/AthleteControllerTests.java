@@ -142,7 +142,7 @@ class AthleteControllerTests {
 				.andExpect(status().isOk())
 				.andExpect(content().json("""
 						{"id":42,"firstName":"Janusz","lastName":"Nowak","birthYear":2011,
-						"gender":"FEMALE","active":true}
+						"gender":"FEMALE","active":true,"trainingGroupId":null}
 						""", true));
 
 		verify(athleteService).updateAthlete(42L,
@@ -286,7 +286,7 @@ class AthleteControllerTests {
 				.andExpect(status().isOk())
 				.andExpect(content().json("""
 						{"id":42,"firstName":"Jan","lastName":"Kowalski","birthYear":2010,
-						"gender":"MALE","active":false}
+						"gender":"MALE","active":false,"trainingGroupId":null}
 						""", true));
 
 		verify(athleteService).changeAthleteStatus(42L, request);
@@ -362,9 +362,9 @@ class AthleteControllerTests {
 				.andExpect(content().json("""
 						[
 						  {"id":1,"firstName":"Jan","lastName":"Kowalski","birthYear":2010,
-						   "gender":"MALE","active":true},
+						   "gender":"MALE","active":true,"trainingGroupId":null},
 						  {"id":2,"firstName":"Anna","lastName":"Nowak","birthYear":2008,
-						   "gender":"FEMALE","active":false}
+						   "gender":"FEMALE","active":false,"trainingGroupId":null}
 						]
 						""", true));
 
@@ -637,7 +637,7 @@ class AthleteControllerTests {
 				.andExpect(jsonPath("$.active").value(true))
 				.andExpect(content().json("""
 						{"id":42,"firstName":"Jan","lastName":"Kowalski","birthYear":2010,
-						"gender":"MALE","active":true}
+						"gender":"MALE","active":true,"trainingGroupId":null}
 						""", true));
 
 		verify(athleteService).getAthlete(42L);

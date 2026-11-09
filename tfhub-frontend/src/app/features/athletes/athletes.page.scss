@@ -71,6 +71,8 @@ h1 {
   padding-left: .75rem;
 }
 
+.group-filter { min-width: 15rem; }
+
 .birth-year-filter input {
   width: 100%;
 }
@@ -191,6 +193,7 @@ td strong { display: block; font-size: 1.08rem; font-weight: 650; }
   .search-filter { flex-basis: 100%; }
   .gender-filter { flex: 1 1 100%; }
   .gender-filter select { flex: 1; }
+  .group-filter { flex: 1 1 100%; }
   .birth-year-filter { flex: 1 1 100%; }
   .table-surface { background: transparent; border: 0; border-radius: 0; overflow: visible; }
   table, tbody { display: block; }

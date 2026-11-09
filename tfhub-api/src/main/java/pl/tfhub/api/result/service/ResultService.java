@@ -1,6 +1,7 @@
 package pl.tfhub.api.result.service;
 
 import jakarta.persistence.criteria.Predicate;
+import jakarta.persistence.criteria.Subquery;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -11,6 +12,8 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import pl.tfhub.api.athlete.service.AthleteService;
+import pl.tfhub.api.athlete.entity.Athlete;
+import pl.tfhub.api.common.authorization.AccessScopeService;
 import pl.tfhub.api.result.dto.request.CreateMultipleResultsRequest;
 import pl.tfhub.api.result.dto.request.CreateResultEntryRequest;
 import pl.tfhub.api.result.dto.request.CreateResultRequest;
@@ -29,6 +32,7 @@ import pl.tfhub.api.result.repository.AthleteProfileRepository;
 import pl.tfhub.api.result.repository.ResultRepository;
 import pl.tfhub.api.test.dto.response.TestResponse;
 import pl.tfhub.api.test.service.TestService;
+import pl.tfhub.api.user.enums.UserRole;
 
 @Service
 public class ResultService {
@@ -37,16 +41,19 @@ public class ResultService {
 	private final TestService testService;
 	private final ResultRepository resultRepository;
 	private final AthleteProfileRepository athleteProfileRepository;
+	private final AccessScopeService accessScopeService;
 
 	public ResultService(
 			AthleteService athleteService,
 			TestService testService,
 			ResultRepository resultRepository,
-			AthleteProfileRepository athleteProfileRepository) {
+			AthleteProfileRepository athleteProfileRepository,
+			AccessScopeService accessScopeService) {
 		this.athleteService = athleteService;
 		this.testService = testService;
 		this.resultRepository = resultRepository;
 		this.athleteProfileRepository = athleteProfileRepository;
+		this.accessScopeService = accessScopeService;
 	}
 
 	@Transactional(readOnly = true)
@@ -74,6 +81,8 @@ public class ResultService {
 
 	@Transactional
 	public ResultResponse createResult(CreateResultRequest request) {
+		accessScopeService.requireCoachOrAdmin();
+		accessScopeService.requireAthleteWriteAccess(request.athleteId());
 		requireActiveAthlete(request.athleteId());
 		requireActiveTest(request.testId());
 
@@ -90,15 +99,24 @@ public class ResultService {
 	public ResultResponse getResult(long id) {
 		TestResult result = resultRepository.findById(id)
 				.orElseThrow(() -> new ResultNotFoundException(id));
+		accessScopeService.requireResultReadAccess(id, result.getAthleteId());
 		return ResultResponse.from(result);
 	}
 
 	@Transactional
 	public ResultResponse updateResult(long id, UpdateResultRequest request) {
+		accessScopeService.requireCoachOrAdmin();
 		TestResult result = resultRepository.findById(id)
 				.orElseThrow(() -> new ResultNotFoundException(id));
+		accessScopeService.requireResultReadAccess(id, result.getAthleteId());
+		accessScopeService.requireAthleteWriteAccess(result.getAthleteId());
+		accessScopeService.requireAthleteWriteAccess(request.athleteId());
 		athleteService.getAthlete(request.athleteId());
-		requireActiveTest(request.testId());
+		if (request.testId() == result.getTestId()) {
+			testService.getTestForResultUpdate(request.testId());
+		} else {
+			requireActiveTest(request.testId());
+		}
 
 		result.update(
 				request.athleteId(),
@@ -111,8 +129,11 @@ public class ResultService {
 
 	@Transactional
 	public void deleteResult(long id) {
+		accessScopeService.requireCoachOrAdmin();
 		TestResult result = resultRepository.findById(id)
 				.orElseThrow(() -> new ResultNotFoundException(id));
+		accessScopeService.requireResultReadAccess(id, result.getAthleteId());
+		accessScopeService.requireAthleteWriteAccess(result.getAthleteId());
 		resultRepository.delete(result);
 	}
 
@@ -123,9 +144,28 @@ public class ResultService {
 			LocalDate fromDate,
 			LocalDate toDate,
 			ResultType type) {
+		return searchResults(athleteId, testId, fromDate, toDate, type, null);
+	}
+
+	@Transactional(readOnly = true)
+	public List<ResultResponse> searchResults(
+			Long athleteId,
+			Long testId,
+			LocalDate fromDate,
+			LocalDate toDate,
+			ResultType type,
+			List<Long> requestedGroupIds) {
 		if (fromDate != null && toDate != null && fromDate.isAfter(toDate)) {
 			throw new InvalidResultSearchException();
 		}
+		UserRole role = accessScopeService.currentUser().role();
+		if (role == UserRole.ATHLETE) {
+			throw new org.springframework.security.access.AccessDeniedException(
+					"Athlete accounts cannot access the global results list");
+		}
+		List<Long> groupIds = role == UserRole.COACH
+				? accessScopeService.effectiveGroupIds(requestedGroupIds)
+				: requestedGroupIds;
 
 		Specification<TestResult> specification = (root, query, criteriaBuilder) -> {
 			List<Predicate> predicates = new ArrayList<>();
@@ -144,6 +184,13 @@ public class ResultService {
 			if (type != null) {
 				predicates.add(criteriaBuilder.equal(root.get("type"), type));
 			}
+			if (groupIds != null) {
+				Subquery<Long> athleteIds = query.subquery(Long.class);
+				var athlete = athleteIds.from(Athlete.class);
+				athleteIds.select(athlete.get("id"))
+						.where(athlete.get("trainingGroup").get("id").in(groupIds));
+				predicates.add(root.get("athleteId").in(athleteIds));
+			}
 			return criteriaBuilder.and(predicates.toArray(Predicate[]::new));
 		};
 
@@ -157,6 +204,7 @@ public class ResultService {
 
 	@Transactional
 	public CreateMultipleResultsResponse createMultipleResults(CreateMultipleResultsRequest request) {
+		accessScopeService.requireCoachOrAdmin();
 		requireActiveTest(request.testId());
 
 		Set<Long> athleteIds = new HashSet<>();
@@ -167,6 +215,7 @@ public class ResultService {
 		}
 
 		for (CreateResultEntryRequest entry : request.results()) {
+			accessScopeService.requireAthleteWriteAccess(entry.athleteId());
 			requireActiveAthlete(entry.athleteId());
 		}
 

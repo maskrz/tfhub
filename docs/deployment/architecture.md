@@ -150,11 +150,11 @@ Requirements:
 - provide database credentials at runtime;
 - keep `DB_PASSWORD` and other secrets out of committed files;
 - use a dedicated PostgreSQL application user rather than the database superuser;
-- store the single account's Argon2id password hash in the `users` table; never place the plaintext password in configuration or environment variables;
+- store each account's Argon2id password hash in the `users` table; never place plaintext passwords in configuration or environment variables;
 - keep Hibernate schema handling consistent with the backend architecture: Flyway manages schema changes and Hibernate validates the schema;
 - do not expose database connection details or credentials in logs.
 
-The production database must use a persistent named volume. Database initialization and schema migration must be repeatable and must not rely on manually editing the live database.
+The production database must use a persistent named volume. Flyway manages schema migrations; the initial administrator and user/group/athlete relationships are provisioned through the documented local administrative procedure and are not seeded with default credentials.
 
 ## 8. Secrets and configuration
 

@@ -7,6 +7,7 @@ export interface AthleteResponse {
   birthYear: number;
   gender: Gender;
   active: boolean;
+  trainingGroupId?: number | null;
 }
 
 export interface ChangeAthleteStatusRequest {
@@ -18,6 +19,7 @@ export interface CreateAthleteRequest {
   lastName: string;
   birthYear: number;
   gender: Gender;
+  trainingGroupId?: number | null;
 }
 
 export interface UpdateAthleteRequest {
