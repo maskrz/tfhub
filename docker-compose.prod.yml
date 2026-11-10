@@ -39,13 +39,26 @@ services:
       DB_USER: ${TFHUB_DB_USER:?Set TFHUB_DB_USER in .env.production}
       DB_PASSWORD: ${TFHUB_DB_PASSWORD:?Set TFHUB_DB_PASSWORD in .env.production}
       SESSION_COOKIE_SECURE: "true"
-      JAVA_TOOL_OPTIONS: "-Xms128m -Xmx768m -XX:+UseSerialGC"
+      RCLONE_CONFIG: /run/secrets/rclone.conf
+      TFHUB_BACKUP_RCLONE_REMOTE: ${TFHUB_BACKUP_RCLONE_REMOTE:-tfhub-crypt}
+      TFHUB_BACKUP_RCLONE_PATH: ${TFHUB_BACKUP_RCLONE_PATH:-.}
+      TFHUB_BACKUP_COMMAND_TIMEOUT_SECONDS: ${TFHUB_BACKUP_COMMAND_TIMEOUT_SECONDS:-600}
+      JAVA_TOOL_OPTIONS: "-Xms128m -Xmx768m -XX:+UseSerialGC -Djava.io.tmpdir=/tmp"
+    volumes:
+      - type: bind
+        source: ${TFHUB_BACKUP_RCLONE_CONFIG:?Set TFHUB_BACKUP_RCLONE_CONFIG in .env.production}
+        target: /run/secrets/rclone.conf
+        bind:
+          create_host_path: false
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=512m,mode=1777
     depends_on:
       db:
         condition: service_healthy
     networks:
       - backend-network
       - database-network
+      - backup-egress-network
     healthcheck:
       test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/actuator/health"]
       interval: 30s
@@ -90,6 +103,8 @@ networks:
   database-network:
     driver: bridge
     internal: true
+  backup-egress-network:
+    driver: bridge
 
 volumes:
   postgres-data:

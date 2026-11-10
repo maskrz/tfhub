@@ -33,6 +33,8 @@ import pl.tfhub.api.test.exception.TestHasResultsException;
 import pl.tfhub.api.test.exception.TestNotFoundException;
 import pl.tfhub.api.traininggroup.exception.TrainingGroupNotFoundException;
 import pl.tfhub.api.user.exception.IncorrectCurrentPasswordException;
+import pl.tfhub.api.backup.BackupAlreadyRunningException;
+import pl.tfhub.api.backup.BackupExecutionException;
 
 @RestControllerAdvice
 public class ApiExceptionHandler {
@@ -229,6 +231,22 @@ public class ApiExceptionHandler {
 	public ProblemDetail handleStatisticsTestNotFound(StatisticsTestNotFoundException exception) {
 		ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, exception.getMessage());
 		problem.setTitle("Test not found");
+		return problem;
+	}
+
+	@ExceptionHandler(BackupAlreadyRunningException.class)
+	public ProblemDetail handleBackupAlreadyRunning() {
+		ProblemDetail problem = ProblemDetail.forStatusAndDetail(
+				HttpStatus.CONFLICT, "Another backup operation is already running");
+		problem.setTitle("Backup already running");
+		return problem;
+	}
+
+	@ExceptionHandler(BackupExecutionException.class)
+	public ProblemDetail handleBackupFailure() {
+		ProblemDetail problem = ProblemDetail.forStatusAndDetail(
+				HttpStatus.BAD_GATEWAY, "The backup operation could not be completed");
+		problem.setTitle("Backup failed");
 		return problem;
 	}
 }

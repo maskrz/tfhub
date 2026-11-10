@@ -88,6 +88,7 @@ public class SecurityConfiguration {
 						.requestMatchers(HttpMethod.POST, "/api/auth/login").permitAll()
 						.requestMatchers(HttpMethod.GET, "/actuator/health").permitAll()
 						.requestMatchers("/api/accounts/**").hasRole("ADMIN")
+						.requestMatchers("/api/admin/**").hasRole("ADMIN")
 						.requestMatchers("/api/auth/**").authenticated()
 						.anyRequest().authenticated())
 				.exceptionHandling(exceptions -> exceptions

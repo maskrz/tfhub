@@ -37,10 +37,9 @@ Nginx container (Angular static files)
     | /api on backend-network
     v
 Spring Boot API
-    |
-    | database-network
-    v
-PostgreSQL container
+    | database-network                 | backup-egress-network (outbound only)
+    v                                  v
+PostgreSQL container                 Google Drive via rclone crypt
 ```
 
 Docker network membership limits which services can communicate:
@@ -83,8 +82,9 @@ Attach only the following services to each network:
 | `edge-network` | `web` (attach a future `cloudflared` service here) |
 | `backend-network` | `web`, `api` |
 | `database-network` | `api`, `db` |
+| `backup-egress-network` | `api` |
 
-The current membership permits `web → api` and `api → db`; PostgreSQL and the backend publish no host ports. If a tunnel is added later, attach it only to `edge-network`. Do not attach a service to an additional network unless a concrete requirement justifies it.
+The current membership permits `web → api`, `api → db`, and outbound backup traffic from `api`; PostgreSQL and the backend publish no host ports. The API's additional non-internal network is required for Google Drive uploads and is not shared with the web or database services. If a tunnel is added later, attach it only to `edge-network`. Do not attach a service to an additional network unless a concrete requirement justifies it.
 
 Only Nginx publishes a port, bound to host loopback. `backend-network` and `database-network` are internal.
 
@@ -165,6 +165,14 @@ For production, copy `.env.example` to `.env.production`, set the `TFHUB_*` valu
 Keep both the development `.env` and production `.env.production` untracked. `.env.example` contains placeholders for both sets of variables; never put real credentials in it.
 
 Changing PostgreSQL credentials in `.env.production` after the volume has been initialized does not change the existing database roles. Password changes must be applied to PostgreSQL itself using a controlled procedure.
+
+### TFHUB business-data backup
+
+The API image includes `rclone`. Production Compose mounts the Raspberry Pi's rclone configuration at `/run/secrets/rclone.conf`; set `TFHUB_BACKUP_RCLONE_CONFIG` in `.env.production` to its absolute host path. The file must contain an OAuth-configured Google Drive remote and an rclone `crypt` remote named by `TFHUB_BACKUP_RCLONE_REMOTE`, configured to point only to the dedicated `TFHUB_BACKUPS` destination. The crypt remote's filename encryption must remain enabled. Keep the crypt recovery secret independently of the Pi.
+
+Create the OAuth and crypt remotes on the Pi with `rclone config`. For example, configure the crypt remote's underlying path as `gdrive:TFHUB_BACKUPS`, keep filename encryption enabled, and use `tfhub-crypt` as its name. The API runs as UID/GID `10001`; make the external configuration file owned by that identity and mode `600` so rclone can persist refreshed OAuth tokens without making credentials world-readable. Never copy the config into the repository or image. Docker Compose attaches only `api` to the additional outbound-capable `backup-egress-network`; it does not publish an API or database port. This network provides internet access for rclone and does not itself restrict destinations to Google Drive.
+
+Plaintext XLSX output and Apache POI working files use the API's size-limited `/tmp` tmpfs (512 MiB) and are removed after execution. Monitor Pi memory and the maximum workbook size against this limit. The on-demand backup is synchronous; Nginx grants only `POST /api/admin/backup` a longer proxy timeout, while application authorization and CSRF protection remain enforced by Spring Security.
 
 ## 9. Security boundaries
 
