@@ -30,10 +30,17 @@ public class RcloneBackupStorage implements BackupStorage {
 		if (!Files.isRegularFile(localFile)) {
 			throw new BackupStorageException("Generated XLSX file is unavailable for upload");
 		}
+		if (!localFile.getFileName().toString().equals(fileName)) {
+			throw new BackupStorageException("Generated XLSX file name does not match the backup name");
+		}
 		String remoteFile = remotePath(fileName);
 		run("copyto", "--immutable", localFile.toString(), remoteFile);
 		try {
-			run("check", localFile.toString(), remoteFile, "--download");
+			String result = run("check", localFile.toAbsolutePath().getParent().toString(), remotePath(""),
+					"--download", "--one-way", "--include", "/" + fileName, "--combined", "-");
+			if (!result.lines().toList().equals(List.of("= " + fileName))) {
+				throw new BackupStorageException("rclone did not confirm the uploaded backup");
+			}
 		} catch (BackupStorageException exception) {
 			try {
 				run("deletefile", remoteFile);
