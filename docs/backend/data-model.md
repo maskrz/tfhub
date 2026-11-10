@@ -16,7 +16,7 @@ The application data model consists of athlete, test, result, user, and training
 - `User` – login account, role, and active status.
 - `TrainingGroup` – current athlete group and coach access scope.
 
-There is no registration or user/group-management API or UI in this release. Initial accounts and memberships are provisioned locally or directly in PostgreSQL.
+There is no public registration or account-management UI. Administrators manage accounts through the authenticated backend API; training-group and athlete CRUD remain separate use cases.
 
 ## 2. Entity Relationship Diagram
 
@@ -97,13 +97,15 @@ The `users` table stores application login accounts. `User` is distinct from `At
 | created_at | TIMESTAMP WITH TIME ZONE | Yes | Account creation time |
 | password_changed_at | TIMESTAMP WITH TIME ZONE | Yes | Time the password was last changed |
 
-The username must be unique after the chosen normalization (recommended: case-insensitive trimmed uniqueness). The initial administrator is provisioned locally without a committed/default password. Password changes and resets use local administrative procedures. Registration, user CRUD endpoints, and account-management UI are excluded.
+The username must be unique case-insensitively after trimming leading and trailing whitespace; the application stores the trimmed username. Passwords are validated using the existing non-blank, maximum-1024-character rule and hashed with the configured Argon2id encoder. Account creation, editing, role-specific assignment, activation, deactivation, and administrator password reset are available through the ADMIN-only account-management API. Password hashes and plaintext passwords are never returned or logged.
 
 The username's maximum length and case-normalization rules must be enforced consistently in the application and schema. The plaintext password must not be stored in PostgreSQL, configuration, environment variables, or logs.
 
 ## 3.1 TrainingGroup and memberships
 
-`training_groups` contains an identity, required name, and optional descriptive `coach_name`. The descriptive field does not confer access. `user_training_group` is a many-to-many join for coaches and groups; each pair is unique. `user_athlete_access` is a many-to-many association between accounts and athletes, also with unique pairs. An ATHLETE account must have exactly one linked athlete in this release; retain the many-to-many schema for future flexibility. Enforce role/membership compatibility and the first-release cardinality during provisioning and service validation.
+`training_groups` contains an identity, required name, and optional descriptive `coach_name`. The descriptive field does not confer access. `user_training_group` is a many-to-many join for coaches and groups; each pair is unique. `user_athlete_access` is a many-to-many association between accounts and athletes, also with unique pairs. An ATHLETE account must have exactly one linked athlete in this release, and an athlete may be assigned to at most one ATHLETE account. The existing relationship schema is retained; account-management service validation and serialized transactional updates enforce role/membership compatibility and these cardinality rules.
+
+Account-management writes acquire a PostgreSQL transaction-scoped advisory lock before validating assignments or changing account role/status. Under that lock, the service verifies that the committed result still contains at least one active ADMIN. This serializes competing administrator updates without changing the existing schema.
 
 ## 4. Athlete
 
@@ -345,7 +347,7 @@ The migration creates:
 - `tests`
 - `test_results`
 
-The authentication and training-group tables were introduced through `V3__add_users_and_training_groups.sql`; the migration adds a nullable athlete group reference and preserves existing athlete and result rows. Do not alter an already-applied migration. All future database modifications must be introduced through new Flyway migrations.
+The authentication and training-group tables were introduced through `V3__add_users_and_training_groups.sql`; the migration adds a nullable athlete group reference and preserves existing athlete and result rows. UC-402 reuses these tables and adds no schema migration. Do not alter an already-applied migration. All future database modifications must be introduced through new Flyway migrations.
 
 Existing applied migrations must not be modified.
 
@@ -353,9 +355,9 @@ Hibernate uses schema validation and must not modify the schema automatically.
 
 ## 10. Explicitly Excluded Entities and Capabilities
 
-The following entities and capabilities are not part of the initial model:
+The following entities and capabilities are not part of the current model:
 
-- User-management UI or public user CRUD API
+- Public registration or account-management UI
 - Training-group management UI and athlete group-reassignment UI
 - TrainingSession
 - Competition

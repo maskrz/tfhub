@@ -22,7 +22,7 @@ The requirements below are architectural direction, not a statement that the mec
 
 Use Spring Security for backend-enforced authentication. Accounts are persisted in the PostgreSQL `users` table with a unique username, Argon2id password hash, role (`ADMIN`, `COACH`, or `ATHLETE`), active status, account creation time, and password-change time. Password hashes are never plaintext and must not be stored in configuration or environment variables.
 
-The application has no public registration, user CRUD API, account-management UI, or email-based password recovery. Initial accounts and user/group/athlete associations are provisioned locally or directly in PostgreSQL. `PasswordHashGenerator` provides an interactive local password-hash utility; only its Argon2id output is inserted into PostgreSQL. Password changes and resets are performed through local administrative procedures. Never commit production credentials or seed a default password.
+The application has no public registration, account-management UI, or email-based password recovery. Administrators manage accounts through the ADMIN-only `/api/accounts` API; it validates roles and assignments and uses the existing relationship tables. `PasswordHashGenerator` remains available for local provisioning. Never commit production credentials or seed a default password.
 
 `User` is an application login account, not an `Athlete`. An athlete account is linked through `user_athlete_access`; exactly one athlete must be linked to an `ATHLETE` account for this release. The relationship remains many-to-many for future flexibility. Coaches are linked to multiple training groups through `user_training_group`; a coach's group membership, not descriptive `coach_name`, grants access. Athletes optionally belong to one current training group; group reassignment changes current access but does not alter historical results.
 
@@ -39,6 +39,7 @@ The session lifecycle must:
 - Invalidate the server-side session on logout and expire or clear the corresponding browser cookie.
 - Reject requests using missing, invalid, expired, or logged-out sessions.
 - Reject and invalidate sessions for inactive users. Check current account activity on authenticated requests so direct database deactivation takes effect on the next request.
+- Reject sessions whose role no longer matches the account's current role.
 
 Use in-memory sessions for the initial single-instance deployment. A backend restart may invalidate active sessions.
 
@@ -68,8 +69,13 @@ The authentication API contract is:
 | `GET` | `/api/auth/session` | Authentication required | Return authenticated user identity and role, or `401 Unauthorized`; never return password data. |
 | `POST` | `/api/auth/change-password` | Authentication required, CSRF required | Change the authenticated user's password after verifying the current password; invalidate the current session. |
 | `POST` | `/api/auth/logout` | Authentication required, CSRF required | Invalidate the current session; return `204 No Content`. |
+| `GET` | `/api/accounts` | ADMIN, authentication required | List accounts with optional username, role, and active-status filters. |
+| `POST` | `/api/accounts` | ADMIN, authentication and CSRF required | Create an active account with role-specific assignments. |
+| `PUT` | `/api/accounts/{id}` | ADMIN, authentication and CSRF required | Update username, role, and role-specific assignments. |
+| `PATCH` | `/api/accounts/{id}/status` | ADMIN, authentication and CSRF required | Activate or deactivate an account. |
+| `POST` | `/api/accounts/{id}/password` | ADMIN, authentication and CSRF required | Reset an account password using Argon2id. |
 
-Password changes use the existing Argon2id encoder and update `users.password_changed_at` transactionally. The current session is invalidated after the password update commits. Because the in-memory session architecture has no registry of sessions by user, other sessions cannot be enumerated or invalidated and remain active until expiry or independent invalidation.
+Password changes use the existing Argon2id encoder and update `users.password_changed_at` transactionally. The current session is invalidated after a self-service password change or when an administrator resets their own password. Deactivation and role changes are detected by the active-session filter on the next request. Because the in-memory session architecture has no registry of sessions by user, an administrator cannot immediately invalidate other sessions for a reset account; those sessions remain usable until expiry or independent invalidation.
 
 Login request body:
 
@@ -87,6 +93,7 @@ Verify token initialization, refresh, and state-changing request validation with
 ## 7. API Access Control
 
 - Require authentication for all business endpoints.
+- Require the ADMIN role for every `/api/accounts/**` endpoint.
 - Return HTTP `401 Unauthorized` for unauthenticated API requests; do not redirect API clients to an HTML login page.
 - Return HTTP `403 Forbidden` when an authenticated request is not permitted, including when CSRF validation fails.
 - Allow only `POST /api/auth/login` and `GET /api/csrf` without authentication. `GET /api/auth/session` returns `401 Unauthorized` when no authenticated session exists.

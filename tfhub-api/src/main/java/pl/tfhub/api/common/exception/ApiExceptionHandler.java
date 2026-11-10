@@ -14,6 +14,11 @@ import pl.tfhub.api.athlete.exception.AthleteAlreadyExistsException;
 import pl.tfhub.api.athlete.exception.AthleteNotFoundException;
 import pl.tfhub.api.athlete.exception.InvalidAthleteIdException;
 import pl.tfhub.api.athlete.exception.InvalidAthleteGroupException;
+import pl.tfhub.api.user.exception.AccountNotFoundException;
+import pl.tfhub.api.user.exception.DuplicateAthleteAccountException;
+import pl.tfhub.api.user.exception.DuplicateUsernameException;
+import pl.tfhub.api.user.exception.InvalidAccountAssignmentException;
+import pl.tfhub.api.user.exception.LastActiveAdministratorException;
 import pl.tfhub.api.result.exception.InactiveAthleteException;
 import pl.tfhub.api.result.exception.InactiveTestException;
 import pl.tfhub.api.result.exception.InvalidResultIdException;
@@ -163,11 +168,52 @@ public class ApiExceptionHandler {
 		return problem;
 	}
 
-	@ExceptionHandler({InvalidAthleteIdException.class, MethodArgumentTypeMismatchException.class})
+	@ExceptionHandler(AccountNotFoundException.class)
+	public ProblemDetail handleAccountNotFound(AccountNotFoundException exception) {
+		ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, exception.getMessage());
+		problem.setTitle("Account not found");
+		return problem;
+	}
+
+	@ExceptionHandler({DuplicateUsernameException.class, DuplicateAthleteAccountException.class})
+	public ProblemDetail handleAccountConflict(RuntimeException exception) {
+		ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, exception.getMessage());
+		problem.setTitle("Account conflict");
+		return problem;
+	}
+
+	@ExceptionHandler(LastActiveAdministratorException.class)
+	public ProblemDetail handleLastActiveAdministrator(LastActiveAdministratorException exception) {
+		ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, exception.getMessage());
+		problem.setTitle("Administrator required");
+		return problem;
+	}
+
+	@ExceptionHandler(InvalidAccountAssignmentException.class)
+	public ProblemDetail handleInvalidAccountAssignment(InvalidAccountAssignmentException exception) {
+		ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, exception.getMessage());
+		problem.setTitle("Invalid account assignments");
+		return problem;
+	}
+
+	@ExceptionHandler(InvalidAthleteIdException.class)
 	public ProblemDetail handleInvalidAthleteId() {
 		ProblemDetail problem = ProblemDetail.forStatusAndDetail(
 				HttpStatus.BAD_REQUEST, "Athlete ID must be a positive integer");
 		problem.setTitle("Invalid athlete ID");
+		return problem;
+	}
+
+	@ExceptionHandler(MethodArgumentTypeMismatchException.class)
+	public ProblemDetail handleTypeMismatch(MethodArgumentTypeMismatchException exception) {
+		if ("id".equals(exception.getName())
+				&& (Long.class.equals(exception.getRequiredType())
+						|| long.class.equals(exception.getRequiredType()))) {
+			return handleInvalidAthleteId();
+		}
+		ProblemDetail problem = ProblemDetail.forStatusAndDetail(
+				HttpStatus.BAD_REQUEST, "Request parameter has an invalid value");
+		problem.setTitle("Invalid request parameter");
 		return problem;
 	}
 

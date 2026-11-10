@@ -41,6 +41,15 @@ public class User {
 	protected User() {
 	}
 
+	public User(String username, String passwordHash, UserRole role, OffsetDateTime createdAt) {
+		this.username = username;
+		this.passwordHash = passwordHash;
+		this.role = role;
+		this.active = true;
+		this.createdAt = createdAt;
+		this.passwordChangedAt = createdAt;
+	}
+
 	public Long getId() {
 		return id;
 	}
@@ -59,6 +68,15 @@ public class User {
 
 	public boolean isActive() {
 		return active;
+	}
+
+	public void updateAccount(String username, UserRole role) {
+		this.username = username;
+		this.role = role;
+	}
+
+	public void changeStatus(boolean active) {
+		this.active = active;
 	}
 
 	public void changePassword(String passwordHash, OffsetDateTime passwordChangedAt) {

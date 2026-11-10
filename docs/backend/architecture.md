@@ -19,9 +19,9 @@ The application allows a coach to:
 
 ### 1.1 Current scope
 
-The application supports administrator, coach, and athlete accounts. Spring Security provides session authentication; backend services and queries enforce role and data-scope authorization.
+The application supports administrator, coach, and athlete accounts. Spring Security provides session authentication; backend services and queries enforce role and data-scope authorization. Administrators can manage accounts through the backend account-management API; public registration and a user-management screen are not included.
 
-Public registration and user/group management screens are outside the initial scope. Accounts and relationships are provisioned locally or managed directly in PostgreSQL. Coaches access only athletes in assigned training groups; athlete accounts access only linked athlete records. The security architecture and implementation requirements are defined in [`docs/security.md`](../security.md).
+Coaches access only athletes in assigned training groups; athlete accounts access only linked athlete records. The security architecture and implementation requirements are defined in [`docs/security.md`](../security.md).
 
 ### 1.2 Technology stack
 
@@ -117,8 +117,12 @@ pl.tfhub.api/
 │   ├── repository/
 │   └── service/
 ├── user/
+│   ├── controller/
+│   ├── dto/request/
+│   ├── dto/response/
 │   ├── entity/
 │   ├── enums/
+│   ├── exception/
 │   ├── repository/
 │   └── service/
 ├── traininggroup/
@@ -238,7 +242,7 @@ Avoid circular dependencies between modules.
 
 ### 3.4 Authentication and authorization boundary
 
-Spring Security configuration belongs in application-wide `config/`. Login, logout, and current-session endpoints expose safe DTOs only. `user/` contains account identity and role persistence, not public user-management endpoints. Services and repository queries must enforce role, group, and athlete ownership for both reads and writes; URL rules alone are insufficient. No registration or user/group-management UI is included.
+Spring Security configuration belongs in application-wide `config/`. Login, logout, current-session, and administrator account-management endpoints expose safe DTOs only. Account management is implemented in `user/`; every `/api/accounts/**` endpoint requires the ADMIN role. Services and repository queries must enforce role, group, and athlete ownership for both reads and writes; URL rules alone are insufficient. No registration or account-management UI is included.
 
 ## 4. Frontend Architecture
 
@@ -320,6 +324,11 @@ GET    /api/athletes/{id}
 POST   /api/athletes
 PUT    /api/athletes/{id}
 PATCH  /api/athletes/{id}/deactivate
+GET    /api/accounts
+POST   /api/accounts
+PUT    /api/accounts/{id}
+PATCH  /api/accounts/{id}/status
+POST   /api/accounts/{id}/password
 
 GET    /api/tests
 POST   /api/tests

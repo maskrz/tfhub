@@ -88,6 +88,17 @@ Provides read-only dashboard aggregates and club records.
 Detailed specification:
 - [BE-STAT-001 Dashboard Statistics](UC-301-dashboard-stats.md)
 
+## 5. Account Management Module
+
+Administrators manage application accounts and their existing group/athlete assignments.
+
+| ID | Use Case | Description | Status |
+|---|---|---|---|
+| UC-402 | Account Management | List, filter, create, update, activate, deactivate, and reset account passwords. | Verified |
+
+Detailed specification:
+- [UC-402 Account Management](uc-402-account-management.md)
+
 ---
 
 ## Future Modules

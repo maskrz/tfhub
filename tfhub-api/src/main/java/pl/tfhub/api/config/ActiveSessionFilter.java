@@ -35,10 +35,11 @@ final class ActiveSessionFilter extends OncePerRequestFilter {
 					: session.getAttribute(SecurityConfiguration.AUTHENTICATED_AT);
 			boolean expired = !(authenticatedAt instanceof Long timestamp)
 					|| Instant.now().isAfter(Instant.ofEpochMilli(timestamp).plus(ABSOLUTE_SESSION_LIFETIME));
-			boolean active = !expired && userRepository.findById(user.id())
-					.map(account -> account.isActive())
+			boolean valid = !expired && userRepository.findById(user.id())
+					.map(account -> account.isActive()
+							&& account.getRole() == user.role())
 					.orElse(false);
-			if (!active) {
+			if (!valid) {
 				if (session != null) {
 					session.invalidate();
 				}
