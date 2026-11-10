@@ -7,6 +7,7 @@ import java.util.Locale;
 import org.hibernate.exception.ConstraintViolationException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -152,7 +153,11 @@ public class AthleteService {
 			return criteriaBuilder.and(predicates.toArray(Predicate[]::new));
 		};
 
-		return athleteRepository.findAll(specification)
+		Sort sort = Sort.by(
+				Sort.Order.asc("lastName").ignoreCase(),
+				Sort.Order.asc("firstName").ignoreCase(),
+				Sort.Order.asc("id"));
+		return athleteRepository.findAll(specification, sort)
 				.stream()
 				.map(AthleteResponse::from)
 				.toList();

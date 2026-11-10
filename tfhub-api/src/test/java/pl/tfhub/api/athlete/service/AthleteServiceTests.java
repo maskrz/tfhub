@@ -16,6 +16,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.test.util.ReflectionTestUtils;
 import pl.tfhub.api.athlete.dto.request.ChangeAthleteStatusRequest;
@@ -67,12 +68,27 @@ class AthleteServiceTests {
 		Athlete athlete = new Athlete("Jan", "Kowalski", 2010, Gender.MALE);
 		ReflectionTestUtils.setField(athlete, "id", 1L);
 		SearchAthletesRequest request = new SearchAthletesRequest("Jan", "Kow", true, Gender.MALE, null);
-		when(athleteRepository.findAll(any(Specification.class))).thenReturn(List.of(athlete));
+		when(athleteRepository.findAll(any(Specification.class), any(Sort.class))).thenReturn(List.of(athlete));
 
 		List<AthleteResponse> responses = athleteService.searchAthletes(request);
 
 		assertEquals(List.of(new AthleteResponse(1L, "Jan", "Kowalski", 2010, Gender.MALE, true)), responses);
-		verify(athleteRepository).findAll(any(Specification.class));
+		verify(athleteRepository).findAll(any(Specification.class), any(Sort.class));
+	}
+
+	@Test
+	void sortsAthletesBySurnameThenFirstNameIgnoringCase() {
+		when(athleteRepository.findAll(any(Specification.class), any(Sort.class))).thenReturn(List.of());
+
+		athleteService.searchAthletes(new SearchAthletesRequest(null, null, null, null, null));
+
+		ArgumentCaptor<Sort> sortCaptor = ArgumentCaptor.forClass(Sort.class);
+		verify(athleteRepository).findAll(any(Specification.class), sortCaptor.capture());
+		List<Sort.Order> orders = sortCaptor.getValue().toList();
+		assertEquals(List.of("lastName", "firstName", "id"), orders.stream().map(Sort.Order::getProperty).toList());
+		assertTrue(orders.stream().allMatch(Sort.Order::isAscending));
+		assertTrue(orders.get(0).isIgnoreCase());
+		assertTrue(orders.get(1).isIgnoreCase());
 	}
 
 	@Test
@@ -81,7 +97,7 @@ class AthleteServiceTests {
 		when(group.getId()).thenReturn(7L);
 		Athlete athlete = new Athlete("Jan", "Kowalski", 2010, Gender.MALE, group);
 		ReflectionTestUtils.setField(athlete, "id", 1L);
-		when(athleteRepository.findAll(any(Specification.class))).thenReturn(List.of(athlete));
+		when(athleteRepository.findAll(any(Specification.class), any(Sort.class))).thenReturn(List.of(athlete));
 
 		List<AthleteResponse> responses = athleteService.searchAthletes(
 				new SearchAthletesRequest(null, null, null, null, null));
@@ -91,21 +107,21 @@ class AthleteServiceTests {
 
 	@Test
 	void searchesAllAthletesWhenCriteriaAreAbsent() {
-		when(athleteRepository.findAll(any(Specification.class))).thenReturn(List.of());
+		when(athleteRepository.findAll(any(Specification.class), any(Sort.class))).thenReturn(List.of());
 
 		assertEquals(List.of(), athleteService.searchAthletes(
 				new SearchAthletesRequest(null, null, null, null, null)));
 
-		verify(athleteRepository).findAll(any(Specification.class));
+		verify(athleteRepository).findAll(any(Specification.class), any(Sort.class));
 	}
 
 	@Test
 	void searchSpecificationAddsExactBirthYearAndOmitsItWhenNotProvided() {
-		when(athleteRepository.findAll(any(Specification.class))).thenReturn(List.of());
+		when(athleteRepository.findAll(any(Specification.class), any(Sort.class))).thenReturn(List.of());
 		athleteService.searchAthletes(new SearchAthletesRequest(null, null, null, null, 2010));
 
 		ArgumentCaptor<Specification<Athlete>> specificationCaptor = ArgumentCaptor.forClass(Specification.class);
-		verify(athleteRepository).findAll(specificationCaptor.capture());
+		verify(athleteRepository).findAll(specificationCaptor.capture(), any(Sort.class));
 		Root<Athlete> root = mock(Root.class);
 		CriteriaQuery<?> query = mock(CriteriaQuery.class);
 		CriteriaBuilder criteriaBuilder = mock(CriteriaBuilder.class);
@@ -119,10 +135,10 @@ class AthleteServiceTests {
 
 		verify(criteriaBuilder).equal(birthYearPath, 2010);
 
-		when(athleteRepository.findAll(any(Specification.class))).thenReturn(List.of());
+		when(athleteRepository.findAll(any(Specification.class), any(Sort.class))).thenReturn(List.of());
 		athleteService.searchAthletes(new SearchAthletesRequest(null, null, null, null, null));
 		ArgumentCaptor<Specification<Athlete>> noBirthYearCaptor = ArgumentCaptor.forClass(Specification.class);
-		verify(athleteRepository, org.mockito.Mockito.times(2)).findAll(noBirthYearCaptor.capture());
+		verify(athleteRepository, org.mockito.Mockito.times(2)).findAll(noBirthYearCaptor.capture(), any(Sort.class));
 
 		Root<Athlete> rootWithoutBirthYear = mock(Root.class);
 		CriteriaBuilder criteriaBuilderWithoutBirthYear = mock(CriteriaBuilder.class);
