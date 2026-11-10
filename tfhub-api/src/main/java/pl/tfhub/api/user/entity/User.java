@@ -60,4 +60,9 @@ public class User {
 	public boolean isActive() {
 		return active;
 	}
+
+	public void changePassword(String passwordHash, OffsetDateTime passwordChangedAt) {
+		this.passwordHash = passwordHash;
+		this.passwordChangedAt = passwordChangedAt;
+	}
 }

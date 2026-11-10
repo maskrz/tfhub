@@ -28,10 +28,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import pl.tfhub.api.config.SecurityErrorResponse;
 import pl.tfhub.api.config.SecurityConfiguration;
+import pl.tfhub.api.user.dto.request.ChangePasswordRequest;
 import pl.tfhub.api.user.dto.request.LoginRequest;
 import pl.tfhub.api.user.dto.response.AuthenticatedUserResponse;
 import pl.tfhub.api.user.service.AuthenticatedUser;
 import pl.tfhub.api.user.service.LoginAttemptService;
+import pl.tfhub.api.user.service.PasswordChangeService;
 import pl.tfhub.api.user.enums.UserRole;
 
 @RestController
@@ -45,6 +47,7 @@ public class AuthController {
 	private final SessionAuthenticationStrategy sessionAuthenticationStrategy;
 	private final CsrfTokenRepository csrfTokenRepository;
 	private final LoginAttemptService loginAttemptService;
+	private final PasswordChangeService passwordChangeService;
 	private final JdbcClient jdbcClient;
 
 	public AuthController(
@@ -53,12 +56,14 @@ public class AuthController {
 			SessionAuthenticationStrategy sessionAuthenticationStrategy,
 			CsrfTokenRepository csrfTokenRepository,
 			LoginAttemptService loginAttemptService,
+			PasswordChangeService passwordChangeService,
 			JdbcClient jdbcClient) {
 		this.authenticationManager = authenticationManager;
 		this.securityContextRepository = securityContextRepository;
 		this.sessionAuthenticationStrategy = sessionAuthenticationStrategy;
 		this.csrfTokenRepository = csrfTokenRepository;
 		this.loginAttemptService = loginAttemptService;
+		this.passwordChangeService = passwordChangeService;
 		this.jdbcClient = jdbcClient;
 	}
 
@@ -106,6 +111,22 @@ public class AuthController {
 	@GetMapping("/auth/session")
 	public AuthenticatedUserResponse session(Authentication authentication) {
 		return toResponse((AuthenticatedUser) authentication.getPrincipal());
+	}
+
+	@PostMapping("/auth/change-password")
+	public ResponseEntity<Void> changePassword(
+			@Valid @RequestBody ChangePasswordRequest request,
+			Authentication authentication,
+			HttpServletRequest servletRequest) {
+		AuthenticatedUser user = (AuthenticatedUser) authentication.getPrincipal();
+		passwordChangeService.changePassword(user.id(), request);
+
+		HttpSession session = servletRequest.getSession(false);
+		if (session != null) {
+			session.invalidate();
+		}
+		SecurityContextHolder.clearContext();
+		return ResponseEntity.noContent().build();
 	}
 
 	@PostMapping("/auth/logout")

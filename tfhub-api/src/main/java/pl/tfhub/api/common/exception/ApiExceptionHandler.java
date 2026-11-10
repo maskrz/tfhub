@@ -27,6 +27,7 @@ import pl.tfhub.api.test.exception.TestAlreadyExistsException;
 import pl.tfhub.api.test.exception.TestHasResultsException;
 import pl.tfhub.api.test.exception.TestNotFoundException;
 import pl.tfhub.api.traininggroup.exception.TrainingGroupNotFoundException;
+import pl.tfhub.api.user.exception.IncorrectCurrentPasswordException;
 
 @RestControllerAdvice
 public class ApiExceptionHandler {
@@ -50,6 +51,14 @@ public class ApiExceptionHandler {
 		ProblemDetail problem = ProblemDetail.forStatusAndDetail(
 				HttpStatus.BAD_REQUEST, "Request body contains invalid or malformed values");
 		problem.setTitle("Invalid request");
+		return problem;
+	}
+
+	@ExceptionHandler(IncorrectCurrentPasswordException.class)
+	public ProblemDetail handleIncorrectCurrentPassword() {
+		ProblemDetail problem = ProblemDetail.forStatusAndDetail(
+				HttpStatus.BAD_REQUEST, "Current password is incorrect");
+		problem.setTitle("Incorrect current password");
 		return problem;
 	}
 

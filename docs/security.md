@@ -66,7 +66,10 @@ The authentication API contract is:
 | `GET` | `/api/csrf` | Public | Initialize or refresh the CSRF token; return `200 OK` and set the `XSRF-TOKEN` cookie. |
 | `POST` | `/api/auth/login` | Public, CSRF required | Accept `username` and `password`; establish a session on success. |
 | `GET` | `/api/auth/session` | Authentication required | Return authenticated user identity and role, or `401 Unauthorized`; never return password data. |
+| `POST` | `/api/auth/change-password` | Authentication required, CSRF required | Change the authenticated user's password after verifying the current password; invalidate the current session. |
 | `POST` | `/api/auth/logout` | Authentication required, CSRF required | Invalidate the current session; return `204 No Content`. |
+
+Password changes use the existing Argon2id encoder and update `users.password_changed_at` transactionally. The current session is invalidated after the password update commits. Because the in-memory session architecture has no registry of sessions by user, other sessions cannot be enumerated or invalidated and remain active until expiry or independent invalidation.
 
 Login request body:
 

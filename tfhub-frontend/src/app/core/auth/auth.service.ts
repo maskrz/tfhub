@@ -41,6 +41,10 @@ export class AuthService {
     );
   }
 
+  changePassword(currentPassword: string, newPassword: string): Observable<void> {
+    return this.http.post<void>('/api/auth/change-password', { currentPassword, newPassword });
+  }
+
   clearSession(): void {
     this.currentUser.set(null);
   }

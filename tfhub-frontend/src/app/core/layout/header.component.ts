@@ -1,10 +1,12 @@
-import { Component, inject } from '@angular/core';
+import { HttpErrorResponse } from '@angular/common/http';
+import { Component, ElementRef, HostListener, OnDestroy, inject, signal } from '@angular/core';
 import { Router, RouterLink, RouterLinkActive } from '@angular/router';
 import { EMPTY, catchError, finalize, take } from 'rxjs';
 import { AuthService } from '../auth/auth.service';
+import { ChangePasswordModalComponent } from '../auth/change-password-modal.component';
 
 @Component({
-  imports: [RouterLink, RouterLinkActive],
+  imports: [ChangePasswordModalComponent, RouterLink, RouterLinkActive],
   selector: 'app-header',
   template: `
     <header class="app-header">
@@ -27,8 +29,25 @@ import { AuthService } from '../auth/auth.service';
         }
       </nav>
       @if (user(); as account) {
-        <span class="username">{{ account.username }}</span>
-        <button class="logout" type="button" (click)="logout()">Wyloguj</button>
+        <div class="account-menu" (click)="$event.stopPropagation()">
+          <button
+            class="username"
+            type="button"
+            aria-haspopup="menu"
+            [attr.aria-expanded]="menuOpen()"
+            (click)="toggleMenu()"
+          >
+            {{ account.username }}
+          </button>
+          @if (menuOpen()) {
+            <div class="user-menu" role="menu" aria-label="Menu użytkownika">
+              <button type="button" role="menuitem" (click)="openPasswordChange()">
+                Zmień hasło
+              </button>
+              <button type="button" role="menuitem" (click)="logout()">Wyloguj</button>
+            </div>
+          }
+        </div>
       } @else {
         <a class="login-link" routerLink="/login">Zaloguj</a>
         <span class="account" aria-label="Konto" title="Konto">
@@ -39,6 +58,18 @@ import { AuthService } from '../auth/auth.service';
         </span>
       }
     </header>
+    @if (passwordChangeOpen()) {
+      <app-change-password-modal
+        (cancelled)="passwordChangeOpen.set(false)"
+        (changed)="onPasswordChanged()"
+      />
+    }
+    @if (successMessage(); as message) {
+      <div class="success-toast" role="status" aria-live="polite">
+        <span>{{ message }}</span>
+        <button type="button" aria-label="Zamknij powiadomienie" (click)="dismissSuccessMessage()">×</button>
+      </div>
+    }
   `,
   styles: `
     :host { display: block; }
@@ -91,7 +122,41 @@ import { AuthService } from '../auth/auth.service';
       justify-content: center;
       width: 2.7rem;
     }
-    .username { color: #d3d8e0; font-size: .9rem; }
+    .account-menu { position: relative; }
+    .username {
+      background: transparent;
+      border: 0;
+      color: #d3d8e0;
+      cursor: pointer;
+      font: inherit;
+      font-size: .9rem;
+      padding: .5rem;
+    }
+    .username:hover, .username:focus-visible { color: #fff; text-decoration: underline; }
+    .user-menu {
+      background: #fff;
+      border: 1px solid #dce1ea;
+      border-radius: .55rem;
+      box-shadow: 0 .7rem 2rem rgb(15 23 42 / 20%);
+      display: grid;
+      min-width: 11rem;
+      padding: .35rem;
+      position: absolute;
+      right: 0;
+      top: calc(100% + .4rem);
+      z-index: 20;
+    }
+    .user-menu button {
+      background: transparent;
+      border: 0;
+      border-radius: .35rem;
+      color: #172033;
+      cursor: pointer;
+      font: inherit;
+      padding: .65rem .75rem;
+      text-align: left;
+    }
+    .user-menu button:hover, .user-menu button:focus-visible { background: #f2f4f8; }
     .logout, .login-link {
       background: transparent;
       border: 1px solid #66707c;
@@ -110,20 +175,97 @@ import { AuthService } from '../auth/auth.service';
       stroke-width: 1.7;
       width: 1.6rem;
     }
+    .success-toast {
+      align-items: center;
+      background: #edf8f0;
+      border: 1px solid #b8dfc3;
+      border-radius: .55rem;
+      box-shadow: 0 .7rem 2rem rgb(15 23 42 / 16%);
+      color: #236b3a;
+      display: flex;
+      gap: 1rem;
+      justify-content: space-between;
+      padding: .8rem 1rem;
+      position: fixed;
+      right: 1rem;
+      top: 1rem;
+      z-index: 50;
+    }
+    .success-toast button {
+      background: transparent;
+      border: 0;
+      color: inherit;
+      cursor: pointer;
+      font: inherit;
+      font-size: 1.25rem;
+      line-height: 1;
+    }
     @media (max-width: 650px) {
       .app-header { flex-wrap: wrap; gap: .25rem 1rem; padding-block: .6rem 0; }
       nav { flex-basis: 100%; gap: .5rem; height: 3.25rem; justify-content: space-between; order: 1; }
       nav a { font-size: .82rem; padding: 0 .15rem; }
-      .account { margin-left: auto; }
+      .account-menu, .account { margin-left: auto; }
     }
   `,
 })
-export class HeaderComponent {
+export class HeaderComponent implements OnDestroy {
   private readonly auth = inject(AuthService);
   private readonly router = inject(Router);
+  private readonly element = inject(ElementRef<HTMLElement>);
   readonly user = this.auth.currentUser;
+  readonly menuOpen = signal(false);
+  readonly passwordChangeOpen = signal(false);
+  readonly successMessage = signal<string | null>(null);
+  private successTimeout: ReturnType<typeof setTimeout> | null = null;
+
+  @HostListener('document:click', ['$event'])
+  closeMenuOnOutsideClick(event: MouseEvent): void {
+    if (!this.element.nativeElement.querySelector('.account-menu')?.contains(event.target as Node)) {
+      this.menuOpen.set(false);
+    }
+  }
+
+  @HostListener('document:keydown.escape')
+  closeMenuOnEscape(): void {
+    this.menuOpen.set(false);
+  }
+
+  ngOnDestroy(): void {
+    if (this.successTimeout !== null) {
+      clearTimeout(this.successTimeout);
+    }
+  }
+
+  toggleMenu(): void {
+    this.menuOpen.update((open) => !open);
+  }
+
+  openPasswordChange(): void {
+    this.menuOpen.set(false);
+    this.passwordChangeOpen.set(true);
+  }
+
+  onPasswordChanged(): void {
+    this.passwordChangeOpen.set(false);
+    this.auth.clearSession();
+    this.successMessage.set('Hasło zostało zmienione.');
+    if (this.successTimeout !== null) {
+      clearTimeout(this.successTimeout);
+    }
+    this.successTimeout = setTimeout(() => this.dismissSuccessMessage(), 6000);
+    void this.router.navigate(['/login']);
+  }
+
+  dismissSuccessMessage(): void {
+    this.successMessage.set(null);
+    if (this.successTimeout !== null) {
+      clearTimeout(this.successTimeout);
+      this.successTimeout = null;
+    }
+  }
 
   logout(): void {
+    this.menuOpen.set(false);
     this.auth.logout().pipe(
       take(1),
       finalize(() => void this.router.navigate(['/login'])),
