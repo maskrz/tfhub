@@ -13,11 +13,16 @@ public record UpdateAthleteRequest(
 		@NotBlank @Size(max = 100) String lastName,
 		@NotNull @Min(1900) @ValidBirthYear
 		@JsonDeserialize(using = StrictIntegerDeserializer.class) Integer birthYear,
-		@NotNull Gender gender) {
+		@NotNull Gender gender,
+		Long trainingGroupId) {
 
 	public UpdateAthleteRequest {
 		firstName = trim(firstName);
 		lastName = trim(lastName);
+	}
+
+	public UpdateAthleteRequest(String firstName, String lastName, Integer birthYear, Gender gender) {
+		this(firstName, lastName, birthYear, gender, null);
 	}
 
 	private static String trim(String value) {

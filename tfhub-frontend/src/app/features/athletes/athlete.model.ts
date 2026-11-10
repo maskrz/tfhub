@@ -27,6 +27,7 @@ export interface UpdateAthleteRequest {
   lastName: string;
   birthYear: number;
   gender: Gender;
+  trainingGroupId?: number | null;
 }
 
 export type AthleteFormMode = 'CREATE' | 'EDIT';

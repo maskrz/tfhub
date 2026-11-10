@@ -186,6 +186,38 @@ class AthleteServiceTests {
 	}
 
 	@Test
+	void changesTrainingGroupOnUpdateAfterCheckingGroupAssignment() {
+		TrainingGroup group = mock(TrainingGroup.class);
+		when(group.getId()).thenReturn(7L);
+		Athlete athlete = new Athlete("Jan", "Kowalski", 2010, Gender.MALE);
+		ReflectionTestUtils.setField(athlete, "id", 12L);
+		when(athleteRepository.findById(12L)).thenReturn(Optional.of(athlete));
+		when(trainingGroupRepository.findById(7L)).thenReturn(Optional.of(group));
+		when(athleteRepository.saveAndFlush(athlete)).thenReturn(athlete);
+
+		AthleteResponse response = athleteService.updateAthlete(
+				12L, new UpdateAthleteRequest("Jan", "Kowalski", 2010, Gender.MALE, 7L));
+
+		verify(accessScopeService).requireGroupAssignment(7L);
+		assertEquals(7L, response.trainingGroupId());
+	}
+
+	@Test
+	void keepsTrainingGroupOnUpdateWhenNoneIsProvided() {
+		TrainingGroup group = mock(TrainingGroup.class);
+		when(group.getId()).thenReturn(3L);
+		Athlete athlete = new Athlete("Jan", "Kowalski", 2010, Gender.MALE, group);
+		ReflectionTestUtils.setField(athlete, "id", 12L);
+		when(athleteRepository.findById(12L)).thenReturn(Optional.of(athlete));
+		when(athleteRepository.saveAndFlush(athlete)).thenReturn(athlete);
+
+		AthleteResponse response = athleteService.updateAthlete(
+				12L, new UpdateAthleteRequest("Jan", "Kowalski", 2010, Gender.MALE));
+
+		assertEquals(3L, response.trainingGroupId());
+	}
+
+	@Test
 	void allowsUnchangedUniqueFieldsAndPreservesActiveStatus() {
 		Athlete athlete = new Athlete("Jan", "Kowalski", 2010, Gender.MALE);
 		ReflectionTestUtils.setField(athlete, "id", 12L);

@@ -73,34 +73,32 @@ export class AthleteFormComponent {
   readonly auth = inject(AuthService);
 
   ngOnInit(): void {
-    if (this.mode === 'CREATE') {
-      if (this.auth.currentUser()?.role === 'COACH') {
-        this.form.controls.trainingGroupId.addValidators(Validators.required);
-      }
-      this.groupsLoading.set(true);
-      this.groupsApi.getAccessible().pipe(
-        take(1),
-        catchError((error: unknown) => {
-          this.errorMessage.set(error instanceof HttpErrorResponse && error.status === 403
-            ? 'Brak dostępu do przypisania grupy zawodnikowi.'
-            : 'Nie udało się pobrać dostępnych grup treningowych.');
-          return EMPTY;
-        }),
-        finalize(() => this.groupsLoading.set(false)),
-      ).subscribe((groups) => {
-        this.groups.set(groups);
-        if (this.auth.currentUser()?.role === 'COACH' && groups.length === 0) {
-          this.errorMessage.set('Nie masz przypisanej grupy. Skontaktuj się z administratorem.');
-        }
-      });
+    if (this.auth.currentUser()?.role === 'COACH') {
+      this.form.controls.trainingGroupId.addValidators(Validators.required);
     }
+    this.groupsLoading.set(true);
+    this.groupsApi.getAccessible().pipe(
+      take(1),
+      catchError((error: unknown) => {
+        this.errorMessage.set(error instanceof HttpErrorResponse && error.status === 403
+          ? 'Brak dostępu do przypisania grupy zawodnikowi.'
+          : 'Nie udało się pobrać dostępnych grup treningowych.');
+        return EMPTY;
+      }),
+      finalize(() => this.groupsLoading.set(false)),
+    ).subscribe((groups) => {
+      this.groups.set(groups);
+      if (this.auth.currentUser()?.role === 'COACH' && groups.length === 0) {
+        this.errorMessage.set('Nie masz przypisanej grupy. Skontaktuj się z administratorem.');
+      }
+    });
     if (this.mode === 'EDIT' && this.athlete) {
       this.form.setValue({
         firstName: this.athlete.firstName,
         lastName: this.athlete.lastName,
         birthYear: this.athlete.birthYear,
         gender: this.athlete.gender,
-        trainingGroupId: null,
+        trainingGroupId: this.athlete.trainingGroupId ?? null,
       });
     }
   }

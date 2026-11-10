@@ -632,6 +632,7 @@ describe('AthletesPage', () => {
       lastName: 'Nowak',
       birthYear: 2012,
       gender: 'MALE',
+      trainingGroupId: 1,
     });
     expect(fixture.nativeElement.querySelector('app-athlete-form-modal')).toBeNull();
     expect(fixture.nativeElement.textContent).toContain('Janusz Nowak');

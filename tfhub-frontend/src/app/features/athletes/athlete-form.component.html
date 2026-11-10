@@ -70,7 +70,7 @@
       <span class="field-error" id="athlete-gender-error">{{ message }}</span>
     }
   </div>
-  @if (mode === 'CREATE') {
+  @if (mode === 'CREATE' || mode === 'EDIT') {
     <div class="field">
       <label for="athlete-training-group">
         Grupa treningowa

@@ -97,6 +97,10 @@ public class Athlete {
 		this.gender = gender;
 	}
 
+	public void changeTrainingGroup(TrainingGroup trainingGroup) {
+		this.trainingGroup = trainingGroup;
+	}
+
 	public void changeStatus(boolean active) {
 		this.active = active;
 	}

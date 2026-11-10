@@ -96,11 +96,21 @@ public class AthleteService {
 			throw new AthleteAlreadyExistsException();
 		}
 
+		TrainingGroup newGroup = null;
+		if (request.trainingGroupId() != null) {
+			accessScopeService.requireGroupAssignment(request.trainingGroupId());
+			newGroup = trainingGroupRepository.findById(request.trainingGroupId())
+					.orElseThrow(() -> new TrainingGroupNotFoundException(request.trainingGroupId()));
+		}
+
 		athlete.updatePersonalInformation(
 				request.firstName(),
 				request.lastName(),
 				request.birthYear(),
 				request.gender());
+		if (newGroup != null) {
+			athlete.changeTrainingGroup(newGroup);
+		}
 
 		try {
 			return AthleteResponse.from(athleteRepository.saveAndFlush(athlete));
