@@ -50,6 +50,36 @@ describe('HeaderComponent', () => {
     expect(fixture.nativeElement.querySelector('[role="menu"]')).toBeNull();
   });
 
+  it('shows account management only in the user menu for administrators', () => {
+    expect(fixture.nativeElement.textContent).not.toContain('Zarządzanie kontami');
+
+    auth.currentUser.set({
+      authenticated: true,
+      userId: 1,
+      username: 'admin',
+      role: 'ADMIN',
+      athleteId: null,
+    });
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelector('nav a[href="/accounts"]')).toBeNull();
+    fixture.nativeElement.querySelector('.username').click();
+    fixture.detectChanges();
+    const link = fixture.nativeElement.querySelector('[role="menu"] a[href="/accounts"]') as HTMLAnchorElement;
+    expect(link).toBeTruthy();
+    expect(link.textContent).toContain('Zarządzanie kontami');
+
+    auth.currentUser.set({
+      authenticated: true,
+      userId: 1,
+      username: 'coach',
+      role: 'COACH',
+      athleteId: null,
+    });
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('[role="menu"] a[href="/accounts"]')).toBeNull();
+  });
+
   it('closes the menu and opens the change-password dialog when selected', () => {
     fixture.nativeElement.querySelector('.username').click();
     fixture.detectChanges();

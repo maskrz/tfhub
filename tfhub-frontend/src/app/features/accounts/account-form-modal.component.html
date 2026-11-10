@@ -1,0 +1,26 @@
+<dialog #dialog class="modal" aria-labelledby="modal-title" (cancel)="onDialogCancel($event)">
+  <div class="modal-header">
+    <h2 id="modal-title">{{ mode === 'CREATE' ? 'Utwórz konto' : 'Edytuj konto' }}</h2>
+    <button
+      type="button"
+      class="button button--icon close-button"
+      aria-label="Anuluj i zamknij okno"
+      [disabled]="saving()"
+      (click)="cancel()"
+    >×</button>
+  </div>
+  <div class="modal-content">
+    <app-account-form
+      [mode]="mode"
+      [account]="account"
+      (saved)="onSaved($event)"
+      (savingChange)="saving.set($event)"
+    />
+  </div>
+  <footer class="modal-footer">
+    <button type="button" class="button button--secondary" [disabled]="saving()" (click)="cancel()">Anuluj</button>
+    <button type="submit" form="account-form" class="button button--primary" [disabled]="saving()">
+      {{ saving() ? 'Zapisywanie...' : 'Zapisz' }}
+    </button>
+  </footer>
+</dialog>

@@ -12,6 +12,9 @@ import { AuthService } from './auth.service';
     <main class="login-page">
       <form class="login-card" [formGroup]="form" (ngSubmit)="submit()">
         <h1>Logowanie do TFHUB</h1>
+        @if (notice()) {
+          <p class="notice" role="status">{{ notice() }}</p>
+        }
         <label>
           <span>Nazwa użytkownika</span>
           <input type="text" formControlName="username" autocomplete="username" required />
@@ -38,11 +41,13 @@ import { AuthService } from './auth.service';
     button { background: #198754; border: 0; border-radius: .5rem; color: white; cursor: pointer; font: inherit; font-weight: 650; padding: .8rem; }
     button:disabled { cursor: not-allowed; opacity: .6; }
     .error { color: #a3222b; margin: 0; }
+    .notice { background: #edf8f0; border-radius: .45rem; color: #236b3a; margin: 0; padding: .75rem; }
   `,
 })
 export class LoginPage implements OnInit {
   readonly submitting = signal(false);
   readonly errorMessage = signal<string | null>(null);
+  readonly notice = signal<string | null>(null);
   readonly form = new FormGroup({
     username: new FormControl('', { nonNullable: true, validators: [Validators.required] }),
     password: new FormControl('', { nonNullable: true, validators: [Validators.required] }),
@@ -53,6 +58,9 @@ export class LoginPage implements OnInit {
   private readonly route = inject(ActivatedRoute);
 
   ngOnInit(): void {
+    if (this.route.snapshot.queryParamMap.get('notice') === 'account-password-reset') {
+      this.notice.set('Hasło zostało zmienione. Zaloguj się ponownie.');
+    }
     this.auth.ensureSession().pipe(
       take(1),
       catchError(() => of(null)),

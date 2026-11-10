@@ -1,0 +1,143 @@
+<section class="page" aria-labelledby="page-title">
+  <div class="page-heading">
+    <div><h1 id="page-title">Zarządzanie kontami</h1></div>
+    <button type="button" class="button button--primary" (click)="openCreateForm()">Utwórz konto</button>
+  </div>
+
+  @if (successMessage(); as message) {
+    <p class="feedback success" role="status" aria-live="polite">{{ message }}</p>
+  }
+
+  <div class="filters">
+    <label class="filter-field username-filter">
+      <span>Nazwa użytkownika</span>
+      <input
+        class="field-control"
+        type="search"
+        aria-label="Filtruj według nazwy użytkownika"
+        placeholder="Szukaj konta..."
+        [value]="usernameFilter()"
+        (input)="onUsernameInput($event)"
+      />
+    </label>
+    <label class="filter-field">
+      <span>Rola</span>
+      <select class="field-control select-with-arrow" aria-label="Filtruj według roli" [value]="roleFilter()" (change)="onRoleChange($event)">
+        <option value="">Wszystkie role</option>
+        <option value="ADMIN">Administrator</option>
+        <option value="COACH">Trener</option>
+        <option value="ATHLETE">Zawodnik</option>
+      </select>
+    </label>
+    <label class="filter-field">
+      <span>Status</span>
+      <select class="field-control select-with-arrow" aria-label="Filtruj według statusu" [value]="activeFilter()" (change)="onStatusChange($event)">
+        <option value="">Wszystkie statusy</option>
+        <option value="true">Aktywne</option>
+        <option value="false">Nieaktywne</option>
+      </select>
+    </label>
+  </div>
+
+  @if (statusError(); as message) {
+    <p class="feedback error status-error" role="alert">{{ message }}</p>
+  }
+
+  @if (pendingDeactivation(); as account) {
+    <div class="confirmation" role="alert" aria-labelledby="deactivation-title">
+      <div>
+        <h2 id="deactivation-title">Dezaktywować konto „{{ account.username }}”?</h2>
+        <p>Użytkownik nie będzie mógł się zalogować. Konto i jego przypisania pozostaną zachowane.</p>
+      </div>
+      <div class="confirmation-actions">
+        <button type="button" class="button button--secondary" [disabled]="statusUpdatingId() !== null" (click)="cancelDeactivation()">Anuluj</button>
+        <button type="button" class="button button--danger" [disabled]="statusUpdatingId() !== null" (click)="confirmDeactivation()">
+          {{ statusUpdatingId() === account.id ? 'Zapisywanie...' : 'Dezaktywuj konto' }}
+        </button>
+      </div>
+    </div>
+  }
+
+  @if (loading()) {
+    <p class="feedback" role="status">Ładowanie kont...</p>
+  } @else if (errorMessage(); as message) {
+    <div class="feedback error" role="alert">
+      <p>{{ message }}</p>
+      <button type="button" class="button button--primary retry-button" (click)="retry()">Spróbuj ponownie</button>
+    </div>
+  } @else if (visibleAccounts().length === 0) {
+    <p class="feedback" role="status">Nie znaleziono kont pasujących do wybranych filtrów.</p>
+  } @else {
+    <div class="table-surface">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">Nazwa użytkownika</th>
+            <th scope="col">Rola</th>
+            <th scope="col">Przypisania</th>
+            <th scope="col">Status</th>
+            <th scope="col" aria-label="Akcje"></th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (account of visibleAccounts(); track account.id) {
+            <tr [class.inactive-row]="!account.active">
+              <td data-label="Nazwa użytkownika"><strong>{{ account.username }}</strong></td>
+              <td data-label="Rola">{{ roleLabel(account.role) }}</td>
+              <td data-label="Przypisania">
+                @if (account.role === 'COACH') {
+                  {{ trainingGroupNames(account) }}
+                } @else if (account.role === 'ATHLETE') {
+                  {{ athleteName(account) }}
+                } @else {
+                  <span class="muted">—</span>
+                }
+              </td>
+              <td data-label="Status">
+                <span class="status-badge" [class.status-badge--inactive]="!account.active">
+                  {{ account.active ? 'Aktywne' : 'Nieaktywne' }}
+                </span>
+              </td>
+              <td data-label="Akcje" class="action-cell">
+                <button type="button" class="button button--secondary" (click)="openEditForm(account)">Edytuj</button>
+                <button type="button" class="button button--secondary" (click)="openPasswordReset(account)">Zmień hasło</button>
+                @if (account.active) {
+                  <button
+                    type="button"
+                    class="button button--danger"
+                    [disabled]="statusUpdatingId() !== null"
+                    (click)="askToDeactivate(account)"
+                  >Dezaktywuj</button>
+                } @else {
+                  <button
+                    type="button"
+                    class="button button--primary"
+                    [disabled]="statusUpdatingId() !== null"
+                    (click)="activate(account)"
+                  >Aktywuj</button>
+                }
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  }
+</section>
+
+@if (formOpen()) {
+  <app-account-form-modal
+    [mode]="formMode()"
+    [account]="selectedAccount()"
+    (saved)="onAccountSaved($event)"
+    (cancelled)="closeForm()"
+  />
+}
+
+@if (resetAccount(); as account) {
+  <app-reset-account-password-modal
+    [account]="account"
+    (reset)="onPasswordReset()"
+    (cancelled)="resetAccount.set(null)"
+  />
+}

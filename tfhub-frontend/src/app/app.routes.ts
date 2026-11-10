@@ -12,6 +12,12 @@ export const routes: Routes = [
   { path: 'login', component: LoginPage, title: 'Logowanie' },
   { path: 'dashboard', component: DashboardPage, canActivate: [staffGuard], title: 'Panel główny' },
   { path: 'tests', component: TestManagementPage, canActivate: [adminGuard], title: 'Testy' },
+  {
+    path: 'accounts',
+    loadComponent: () => import('./features/accounts/accounts.page').then((module) => module.AccountsPage),
+    canActivate: [adminGuard],
+    title: 'Zarządzanie kontami',
+  },
   { path: 'athletes/:id', component: AthleteProfilePage, canActivate: [authenticatedGuard], title: 'Profil zawodnika' },
   { path: 'athletes', component: AthletesPage, canActivate: [staffGuard], title: 'Zawodnicy' },
   { path: 'results', component: ResultsPage, canActivate: [staffGuard], title: 'Wyniki' },

@@ -41,6 +41,11 @@ import { ChangePasswordModalComponent } from '../auth/change-password-modal.comp
           </button>
           @if (menuOpen()) {
             <div class="user-menu" role="menu" aria-label="Menu użytkownika">
+              @if (account.role === 'ADMIN') {
+                <a routerLink="/accounts" routerLinkActive="active" role="menuitem" (click)="menuOpen.set(false)">
+                  Zarządzanie kontami
+                </a>
+              }
               <button type="button" role="menuitem" (click)="openPasswordChange()">
                 Zmień hasło
               </button>
@@ -124,15 +129,17 @@ import { ChangePasswordModalComponent } from '../auth/change-password-modal.comp
     }
     .account-menu { position: relative; }
     .username {
-      background: transparent;
-      border: 0;
-      color: #d3d8e0;
+      background: #35404e;
+      border: 1px solid #596575;
+      border-radius: .45rem;
+      color: #fff;
       cursor: pointer;
       font: inherit;
       font-size: .9rem;
-      padding: .5rem;
+      padding: .55rem .75rem;
     }
-    .username:hover, .username:focus-visible { color: #fff; text-decoration: underline; }
+    .username:hover { background: #414e5e; }
+    .username:focus-visible { outline: 2px solid #42c66f; outline-offset: 2px; }
     .user-menu {
       background: #fff;
       border: 1px solid #dce1ea;
@@ -146,17 +153,20 @@ import { ChangePasswordModalComponent } from '../auth/change-password-modal.comp
       top: calc(100% + .4rem);
       z-index: 20;
     }
-    .user-menu button {
+    .user-menu button, .user-menu a {
       background: transparent;
       border: 0;
       border-radius: .35rem;
       color: #172033;
       cursor: pointer;
+      display: block;
       font: inherit;
       padding: .65rem .75rem;
       text-align: left;
+      text-decoration: none;
     }
-    .user-menu button:hover, .user-menu button:focus-visible { background: #f2f4f8; }
+    .user-menu button:hover, .user-menu button:focus-visible,
+    .user-menu a:hover, .user-menu a:focus-visible, .user-menu a.active { background: #f2f4f8; }
     .logout, .login-link {
       background: transparent;
       border: 1px solid #66707c;

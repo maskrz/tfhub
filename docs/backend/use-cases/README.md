@@ -97,7 +97,7 @@ Administrators manage application accounts and their existing group/athlete assi
 | UC-402 | Account Management | List, filter, create, update, activate, deactivate, and reset account passwords. | Verified |
 
 Detailed specification:
-- [UC-402 Account Management](uc-402-account-management.md)
+- [UC-402 Account Management](UC-402-account-management.md)
 
 ---
 

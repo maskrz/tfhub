@@ -1,0 +1,105 @@
+<form id="account-form" [formGroup]="form" (ngSubmit)="submit()" novalidate>
+  @if (errorMessage(); as message) {
+    <p class="form-error" role="alert">{{ message }}</p>
+  }
+  <div class="field">
+    <label for="account-username">Nazwa użytkownika <span aria-hidden="true">*</span></label>
+    <input
+      id="account-username"
+      class="field-control"
+      type="text"
+      autocomplete="username"
+      formControlName="username"
+      [attr.aria-invalid]="fieldError('username') ? 'true' : null"
+      aria-describedby="account-username-error"
+    />
+    @if (fieldError('username'); as message) {
+      <span class="field-error" id="account-username-error">{{ message }}</span>
+    }
+  </div>
+
+  @if (mode === 'CREATE') {
+    <div class="field">
+      <label for="account-password">Hasło początkowe <span aria-hidden="true">*</span></label>
+      <input
+        id="account-password"
+        class="field-control"
+        type="password"
+        autocomplete="new-password"
+        formControlName="password"
+        [attr.aria-invalid]="fieldError('password') ? 'true' : null"
+        aria-describedby="account-password-error"
+      />
+      @if (fieldError('password'); as message) {
+        <span class="field-error" id="account-password-error">{{ message }}</span>
+      }
+    </div>
+  }
+
+  <div class="field">
+    <label for="account-role">Rola <span aria-hidden="true">*</span></label>
+    <select id="account-role" class="field-control select-with-arrow" formControlName="role">
+      @for (role of roles; track role) {
+        <option [value]="role">{{ roleLabel(role) }}</option>
+      }
+    </select>
+  </div>
+
+  @if (form.controls.role.value === 'COACH') {
+    <div class="field">
+      <span id="account-groups-label">Grupy treningowe <span aria-hidden="true">*</span></span>
+      @if (groupsError(); as message) {
+        <p class="field-error" role="alert">{{ message }}</p>
+      } @else if (groupsLoading()) {
+        <p class="field-hint" role="status">Ładowanie grup treningowych...</p>
+      } @else if (groups().length === 0) {
+        <p class="field-error" role="alert">Brak dostępnych grup treningowych.</p>
+      } @else {
+        <app-multi-select-dropdown
+          [options]="groupOptions"
+          [selectedIds]="form.controls.trainingGroupIds.value"
+          [label]="'Grupy treningowe'"
+          [controlId]="'account-training-groups'"
+          [emptySummary]="'Wybierz co najmniej jedną grupę'"
+          (selectedIdsChange)="onGroupIdsChange($event)"
+        />
+      }
+      @if (fieldError('trainingGroupIds'); as message) {
+        <span class="field-error">{{ message }}</span>
+      }
+    </div>
+  }
+
+  @if (form.controls.role.value === 'ATHLETE') {
+    <div class="field">
+      <label for="account-athlete">Zawodnik <span aria-hidden="true">*</span></label>
+      @if (athletesError(); as message) {
+        <p class="field-error" role="alert">{{ message }}</p>
+      } @else if (athletesLoading()) {
+        <p class="field-hint" role="status">Ładowanie zawodników...</p>
+      } @else {
+        <app-searchable-select-dropdown
+          id="account-athlete"
+          [options]="athleteOptions"
+          [selectedId]="form.controls.athleteId.value"
+          [label]="'Zawodnik'"
+          [controlId]="'account-athlete-options'"
+          [placeholder]="'Wybierz zawodnika'"
+          [ariaInvalid]="!!fieldError('athleteId')"
+          [describedBy]="'account-athlete-error'"
+          (selectedIdChange)="onAthleteIdChange($event)"
+        />
+      }
+      @if (fieldError('athleteId'); as message) {
+        <span class="field-error" id="account-athlete-error">{{ message }}</span>
+      }
+    </div>
+  }
+
+  @if (mode === 'EDIT' && account) {
+    <p class="account-status">
+      Status konta:
+      <strong>{{ account.active ? 'Aktywne' : 'Nieaktywne' }}</strong>
+    </p>
+  }
+</form>

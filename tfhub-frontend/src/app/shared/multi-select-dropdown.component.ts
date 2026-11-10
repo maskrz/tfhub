@@ -11,14 +11,13 @@ export interface MultiSelectOption {
     <div class="multi-select">
       <button
         #trigger
-        class="field-control trigger"
+        class="field-control select-with-arrow trigger"
         type="button"
         [attr.aria-expanded]="open()"
         [attr.aria-controls]="controlId()"
         (click)="open.update((value) => !value)"
       >
         <span>{{ selectionSummary() }}</span>
-        <span class="chevron" aria-hidden="true">⌄</span>
       </button>
       @if (open()) {
         <div class="options" [id]="controlId()" role="group" [attr.aria-label]="label()">
@@ -54,7 +53,6 @@ export interface MultiSelectOption {
       outline: 3px solid #159c68;
       outline-offset: 2px;
     }
-    .chevron { color: #657080; font-size: 1.15rem; line-height: 1; }
     .options {
       background: #fff;
       border: 1px solid #d6dbe2;
