@@ -27,13 +27,14 @@ class RcloneBackupStorageTests {
 	Path directory;
 
 	private Path workbook;
+	private BackupProperties properties;
 	private RcloneBackupStorage storage;
 
 	@BeforeEach
 	void setUp() throws Exception {
 		workbook = Files.writeString(directory.resolve(FILE_NAME), "backup data");
 		Path config = Files.createFile(directory.resolve("rclone.conf"));
-		BackupProperties properties = new BackupProperties();
+		properties = new BackupProperties();
 		properties.setRcloneConfig(config.toString());
 		storage = new RcloneBackupStorage(properties);
 	}
@@ -46,9 +47,9 @@ class RcloneBackupStorageTests {
 		}
 
 		assertEquals(2, commands.size());
-		assertEquals(List.of("copyto", "--immutable", workbook.toString(), "tfhub-crypt:./" + FILE_NAME),
+		assertEquals(List.of("copyto", "--immutable", workbook.toString(), "tfhub-crypt:" + FILE_NAME),
 				arguments(commands.get(0)));
-		assertEquals(List.of("check", directory.toAbsolutePath().toString(), "tfhub-crypt:.",
+		assertEquals(List.of("check", directory.toAbsolutePath().toString(), "tfhub-crypt:",
 				"--download", "--one-way", "--include", "/" + FILE_NAME, "--combined", "-"),
 				arguments(commands.get(1)));
 	}
@@ -61,7 +62,7 @@ class RcloneBackupStorageTests {
 		}
 
 		assertEquals(3, commands.size());
-		assertEquals(List.of("deletefile", "tfhub-crypt:./" + FILE_NAME), arguments(commands.get(2)));
+		assertEquals(List.of("deletefile", "tfhub-crypt:" + FILE_NAME), arguments(commands.get(2)));
 	}
 
 	@Test
@@ -72,7 +73,54 @@ class RcloneBackupStorageTests {
 		}
 
 		assertEquals(3, commands.size());
-		assertEquals(List.of("deletefile", "tfhub-crypt:./" + FILE_NAME), arguments(commands.get(2)));
+		assertEquals(List.of("deletefile", "tfhub-crypt:" + FILE_NAME), arguments(commands.get(2)));
+	}
+
+	@Test
+	void listsAndDeletesAtTheRemoteRoot() throws Exception {
+		for (String path : List.of(".", "")) {
+			properties.setRclonePath(path);
+			List<List<String>> commands = new ArrayList<>();
+			try (MockedConstruction<ProcessBuilder> ignored = processes(commands, "", 0)) {
+				storage.listBackupFiles();
+				storage.deleteBackupFile(FILE_NAME);
+			}
+
+			assertEquals(List.of("mkdir", "tfhub-crypt:"), arguments(commands.get(0)));
+			assertEquals(List.of("lsf", "--files-only", "--format", "p", "tfhub-crypt:"),
+					arguments(commands.get(1)));
+			assertEquals(List.of("deletefile", "tfhub-crypt:" + FILE_NAME), arguments(commands.get(2)));
+		}
+	}
+
+	@Test
+	void preservesConfiguredSubdirectoryForAllOperations() throws Exception {
+		properties.setRclonePath("archive/nested/");
+		List<List<String>> commands = new ArrayList<>();
+		try (MockedConstruction<ProcessBuilder> ignored = processes(commands, "= " + FILE_NAME + "\n", 0)) {
+			storage.uploadAndVerify(workbook, FILE_NAME);
+			storage.listBackupFiles();
+			storage.deleteBackupFile(FILE_NAME);
+		}
+
+		assertEquals(List.of("copyto", "--immutable", workbook.toString(),
+				"tfhub-crypt:archive/nested/" + FILE_NAME), arguments(commands.get(0)));
+		assertEquals(List.of("check", directory.toAbsolutePath().toString(), "tfhub-crypt:archive/nested",
+				"--download", "--one-way", "--include", "/" + FILE_NAME, "--combined", "-"),
+				arguments(commands.get(1)));
+		assertEquals(List.of("mkdir", "tfhub-crypt:archive/nested"), arguments(commands.get(2)));
+		assertEquals(List.of("lsf", "--files-only", "--format", "p", "tfhub-crypt:archive/nested"),
+				arguments(commands.get(3)));
+		assertEquals(List.of("deletefile", "tfhub-crypt:archive/nested/" + FILE_NAME),
+				arguments(commands.get(4)));
+	}
+
+	@Test
+	void rejectsPathsThatEscapeTheConfiguredRemote() {
+		for (String path : List.of("/absolute", "../other", "archive/../other")) {
+			properties.setRclonePath(path);
+			assertThrows(BackupStorageException.class, () -> storage.listBackupFiles());
+		}
 	}
 
 	@Test

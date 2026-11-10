@@ -76,7 +76,7 @@ public class RcloneBackupStorage implements BackupStorage {
 		if (!remote.matches("[A-Za-z0-9_-]+")) {
 			throw new BackupStorageException("Configured rclone remote name is invalid");
 		}
-		String root = remote + ":" + path.replaceAll("^/+|/+$", "");
+		String root = remote + ":" + (path.equals(".") ? "" : path.replaceAll("/+$", ""));
 		if (fileName.isEmpty()) {
 			return root;
 		}
