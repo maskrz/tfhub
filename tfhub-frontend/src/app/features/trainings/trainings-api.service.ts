@@ -1,7 +1,7 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
-import { TrainingListItem } from './training.model';
+import { CreateTrainingRequest, CreateTrainingResponse, TrainingListItem } from './training.model';
 
 @Injectable({ providedIn: 'root' })
 export class TrainingsApiService {
@@ -9,5 +9,9 @@ export class TrainingsApiService {
 
   getAll(): Observable<TrainingListItem[]> {
     return this.http.get<TrainingListItem[]>('/api/trainings');
+  }
+
+  create(request: CreateTrainingRequest): Observable<CreateTrainingResponse> {
+    return this.http.post<CreateTrainingResponse>('/api/trainings', request);
   }
 }

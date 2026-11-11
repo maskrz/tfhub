@@ -57,4 +57,38 @@ describe('MultiSelectDropdownComponent', () => {
 
     expect(selection).toHaveBeenCalledWith([]);
   });
+
+  it('filters searchable options by name and restores all options when closed', async () => {
+    await TestBed.configureTestingModule({
+      imports: [MultiSelectDropdownComponent],
+    }).compileComponents();
+
+    const fixture = TestBed.createComponent(MultiSelectDropdownComponent);
+    fixture.componentRef.setInput('options', [
+      { id: 1, name: 'Jan Kowalski' },
+      { id: 2, name: 'Anna Nowak' },
+    ]);
+    fixture.componentRef.setInput('selectedIds', []);
+    fixture.componentRef.setInput('label', 'Zawodnicy');
+    fixture.componentRef.setInput('controlId', 'athlete-options');
+    fixture.componentRef.setInput('searchable', true);
+    fixture.detectChanges();
+
+    fixture.nativeElement.querySelector('button').click();
+    fixture.detectChanges();
+    const search = fixture.nativeElement.querySelector('input[type="search"]') as HTMLInputElement;
+    search.value = 'anna';
+    search.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelectorAll('.option')).toHaveLength(1);
+    expect(fixture.nativeElement.textContent).toContain('Anna Nowak');
+    expect(fixture.nativeElement.textContent).not.toContain('Jan Kowalski');
+
+    fixture.nativeElement.querySelector('button.trigger').click();
+    fixture.detectChanges();
+    fixture.nativeElement.querySelector('button.trigger').click();
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelectorAll('.option')).toHaveLength(2);
+  });
 });

@@ -1,0 +1,160 @@
+:host { display: block; }
+
+.page {
+  margin: 0 auto;
+  max-width: 100rem;
+  padding: clamp(1.5rem, 4vw, 3.5rem) clamp(1rem, 3.25vw, 3.25rem);
+}
+
+.page-heading {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  justify-content: space-between;
+  margin-bottom: 1.5rem;
+}
+
+h1 {
+  color: #141c2b;
+  font-size: clamp(2.4rem, 5vw, 3.4rem);
+  font-weight: 700;
+  letter-spacing: -.045em;
+  line-height: 1.05;
+  margin: .4rem 0 0;
+}
+
+.back-link {
+  color: #365b48;
+  font-weight: 600;
+  text-decoration: none;
+}
+.back-link:hover { text-decoration: underline; }
+.back-link:focus-visible { outline: 3px solid var(--button-focus); outline-offset: 3px; }
+
+form { display: grid; gap: 1rem; }
+.form-section, .definition-card {
+  background: #fff;
+  border: 1px solid #d8deea;
+  border-radius: .9rem;
+  padding: clamp(1rem, 2.5vw, 1.7rem);
+}
+
+.form-section > h2,
+.section-heading h2 {
+  color: #20283a;
+  font-size: 1.3rem;
+  margin: 0;
+}
+
+.details-grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-top: 1.15rem;
+}
+
+.field { display: grid; gap: .45rem; min-width: 0; }
+.field label { color: #20283a; font-weight: 650; }
+.field label span { color: #bd3434; }
+.field-error { color: #a12e2e; font-size: .88rem; }
+.field-hint { color: #59667e; font-size: .9rem; margin: 0; }
+
+.form-error {
+  background: #fff1f1;
+  border: 1px solid #eccaca;
+  border-radius: .55rem;
+  color: #8d2929;
+  margin: 0;
+  padding: .75rem .85rem;
+}
+.page-error { margin-bottom: 1rem; }
+
+.section-heading,
+.definition-heading,
+.subsection-heading {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: .75rem;
+  justify-content: space-between;
+}
+
+.section-heading { margin-bottom: 1rem; }
+.section-heading p { color: #59667e; margin: .35rem 0 0; }
+.definition-card { display: grid; gap: 1.25rem; }
+.definition-card + .definition-card { margin-top: 1rem; }
+.definition-heading h3 { color: #20283a; font-size: 1.1rem; margin: 0; }
+.item-actions { align-items: center; display: flex; flex-wrap: wrap; gap: .4rem; }
+.item-actions .button { min-width: 2.6rem; padding-inline: .75rem; }
+.remove-button { margin-left: .2rem; }
+
+.segments-section,
+.athletes-section {
+  border-top: 1px solid #e1e5ec;
+  display: grid;
+  gap: .85rem;
+  padding-top: 1rem;
+}
+
+.subsection-heading h4,
+.athletes-section h4 {
+  color: #20283a;
+  font-size: 1rem;
+  margin: 0;
+}
+
+.segment-row {
+  align-items: center;
+  background: #f7f8fa;
+  border: 1px solid #e1e5ec;
+  border-radius: .65rem;
+  display: grid;
+  gap: .75rem;
+  grid-template-columns: auto minmax(8rem, 1fr) minmax(8rem, 1fr) auto;
+  padding: .85rem;
+}
+
+.segment-order,
+.segment-actions {
+  align-self: center;
+  transform: translateY(calc((1.2rem + .45rem) / 2));
+}
+.segment-number { color: #526078; font-weight: 650; }
+.segment-actions { justify-content: flex-end; }
+.segment-action-button { min-height: var(--field-height); }
+.athletes-section app-multi-select-dropdown { max-width: 30rem; }
+
+.form-actions {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: .75rem;
+  justify-content: flex-end;
+  padding-bottom: .5rem;
+}
+
+@media (max-width: 850px) {
+  .details-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .details-grid .field:last-child { grid-column: 1 / -1; }
+  .segment-row { grid-template-columns: auto minmax(0, 1fr) minmax(0, 1fr); }
+  .segment-actions {
+    align-self: start;
+    grid-column: 1 / -1;
+    justify-content: flex-start;
+    transform: none;
+  }
+}
+
+@media (max-width: 600px) {
+  .page-heading { margin-bottom: 1rem; }
+  .details-grid { grid-template-columns: minmax(0, 1fr); }
+  .details-grid .field:last-child { grid-column: auto; }
+  .section-heading { align-items: stretch; }
+  .section-heading > button { width: 100%; }
+  .segment-row { grid-template-columns: minmax(0, 1fr); }
+  .segment-order { justify-self: start; transform: none; }
+  .segment-actions { grid-column: 1; }
+  .form-actions { display: grid; grid-template-columns: 1fr 1fr; }
+  .form-actions .button { width: 100%; }
+}

@@ -15,15 +15,15 @@ import { ChangePasswordModalComponent } from '../auth/change-password-modal.comp
       </a>
       <nav aria-label="Nawigacja główna">
         @if (user()?.role !== 'ATHLETE') {
-          <a routerLink="/dashboard" routerLinkActive="active" ariaCurrentWhenActive="page">Panel główny</a>
+          <a routerLink="/dashboard" routerLinkActive="active" ariaCurrentWhenActive="page">Dashboard</a>
         }
         @if (user()?.role === 'ADMIN') {
-          <a routerLink="/tests" routerLinkActive="active" ariaCurrentWhenActive="page">Testy</a>
+          <a routerLink="/tests" routerLinkActive="active" ariaCurrentWhenActive="page">Sprawdziany</a>
         }
         @if (user()?.role === 'ADMIN' || user()?.role === 'COACH') {
           <a routerLink="/athletes" routerLinkActive="active" ariaCurrentWhenActive="page">Zawodnicy</a>
           <a routerLink="/trainings" routerLinkActive="active" ariaCurrentWhenActive="page">Treningi</a>
-          <a routerLink="/results" routerLinkActive="active" ariaCurrentWhenActive="page">Wyniki</a>
+          <a routerLink="/results" routerLinkActive="active" ariaCurrentWhenActive="page">Wyniki sprawdzianów</a>
         }
         @if (user()?.role === 'ATHLETE') {
           <a [routerLink]="['/athletes', user()?.athleteId]" routerLinkActive="active" ariaCurrentWhenActive="page">Moje wyniki</a>

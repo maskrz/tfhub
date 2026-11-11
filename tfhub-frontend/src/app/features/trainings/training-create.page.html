@@ -1,0 +1,264 @@
+<section class="page" aria-labelledby="page-title">
+  <div class="page-heading">
+    <div>
+      <a class="back-link" routerLink="/trainings">← Wróć do treningów</a>
+      <h1 id="page-title">Dodaj trening</h1>
+    </div>
+  </div>
+
+  @if (errorMessage(); as message) {
+    <p class="form-error page-error" role="alert">{{ message }}</p>
+  }
+
+  <form [formGroup]="form" (ngSubmit)="submit()" novalidate>
+    <section class="form-section" aria-labelledby="training-details-heading">
+      <h2 id="training-details-heading">Dane treningu</h2>
+      <div class="details-grid">
+        <div class="field">
+          <label for="training-name">Nazwa <span aria-hidden="true">*</span></label>
+          <input
+            id="training-name"
+            class="field-control"
+            type="text"
+            maxlength="255"
+            autocomplete="off"
+            [formControl]="form.controls.name"
+            [attr.aria-invalid]="fieldError(form.controls.name, 'Wpisz nazwę treningu.', '') ? 'true' : null"
+            aria-describedby="training-name-error"
+          />
+          @if (fieldError(form.controls.name, 'Wpisz nazwę treningu.', '')) {
+            <span class="field-error" id="training-name-error">
+              {{ fieldError(form.controls.name, 'Wpisz nazwę treningu.', '') }}
+            </span>
+          } @else if (form.controls.name.hasError('maxlength') && attemptedSubmit()) {
+            <span class="field-error" id="training-name-error">Nazwa może mieć maksymalnie 255 znaków.</span>
+          }
+        </div>
+
+        <div class="field">
+          <label for="training-date">Data <span aria-hidden="true">*</span></label>
+          <input
+            id="training-date"
+            class="field-control"
+            type="date"
+            [formControl]="form.controls.trainingDate"
+            [attr.aria-invalid]="fieldError(form.controls.trainingDate, 'Wybierz prawidłową datę.', 'Wybierz prawidłową datę.') ? 'true' : null"
+            aria-describedby="training-date-error"
+          />
+          @if (fieldError(form.controls.trainingDate, 'Wybierz prawidłową datę.', 'Wybierz prawidłową datę.'); as message) {
+            <span class="field-error" id="training-date-error">{{ message }}</span>
+          }
+        </div>
+
+        <div class="field">
+          <label for="training-group">Grupa treningowa <span aria-hidden="true">*</span></label>
+          <select
+            id="training-group"
+            class="field-control select-with-arrow"
+            [value]="trainingGroupId ?? ''"
+            [disabled]="groupsLoading() || groups().length === 0"
+            [attr.aria-invalid]="fieldError(form.controls.trainingGroupId, 'Wybierz grupę treningową.', '') ? 'true' : null"
+            aria-describedby="training-group-error"
+            (change)="onGroupChange($event)"
+          >
+            <option value="" disabled>Wybierz grupę</option>
+            @for (group of groups(); track group.id) {
+              <option [value]="group.id">{{ group.name }}</option>
+            }
+          </select>
+          @if (groupsLoading()) {
+            <span class="field-hint" role="status">Ładowanie grup treningowych...</span>
+          }
+          @if (fieldError(form.controls.trainingGroupId, 'Wybierz grupę treningową.', '')) {
+            <span class="field-error" id="training-group-error">
+              {{ fieldError(form.controls.trainingGroupId, 'Wybierz grupę treningową.', '') }}
+            </span>
+          }
+          @if (groupError(); as message) {
+            <span class="field-error" role="alert">{{ message }}</span>
+          }
+        </div>
+      </div>
+    </section>
+
+    <section class="form-section definitions-section" aria-labelledby="definitions-heading">
+      <div class="section-heading">
+        <div>
+          <h2 id="definitions-heading">Definiuj podgrupy</h2>
+          <p>Dodaj warianty treningu, odcinki i przypisanych zawodników.</p>
+        </div>
+        <button type="button" class="button button--secondary" (click)="addDefinition()">
+          Dodaj podgrupę
+        </button>
+      </div>
+
+      @if (definitions.hasError('minlength') && attemptedSubmit()) {
+        <p class="field-error" role="alert">Dodaj co najmniej jedną podgrupę.</p>
+      }
+
+      @for (definition of definitions.controls; track definition; let definitionIndex = $index) {
+        <article class="definition-card" [attr.aria-labelledby]="'definition-heading-' + definitionIndex">
+          <div class="definition-heading">
+            <h3 [id]="'definition-heading-' + definitionIndex">Podgrupa {{ definitionIndex + 1 }}</h3>
+            <div class="item-actions">
+              <button
+                type="button"
+                class="button button--secondary segment-action-button"
+                [attr.aria-label]="'Przenieś podgrupę ' + (definitionIndex + 1) + ' w górę'"
+                [disabled]="definitionIndex === 0"
+                (click)="moveDefinition(definitionIndex, -1)"
+              >↑</button>
+              <button
+                type="button"
+                class="button button--secondary segment-action-button"
+                [attr.aria-label]="'Przenieś podgrupę ' + (definitionIndex + 1) + ' w dół'"
+                [disabled]="definitionIndex === definitions.length - 1"
+                (click)="moveDefinition(definitionIndex, 1)"
+              >↓</button>
+              <button
+                type="button"
+                class="button button--secondary remove-button segment-action-button"
+                [disabled]="definitions.length === 1"
+                (click)="removeDefinition(definitionIndex)"
+              >Usuń</button>
+            </div>
+          </div>
+
+          <div class="field">
+            <label [for]="'definition-name-' + definitionIndex">Nazwa podgrupy <span aria-hidden="true">*</span></label>
+            <input
+              class="field-control"
+              type="text"
+              maxlength="255"
+              [id]="'definition-name-' + definitionIndex"
+              [formControl]="definition.controls.name"
+              [attr.aria-invalid]="fieldError(definition.controls.name, 'Wpisz nazwę podgrupy.', '') ? 'true' : null"
+              [attr.aria-describedby]="'definition-name-error-' + definitionIndex"
+            />
+            @if (fieldError(definition.controls.name, 'Wpisz nazwę podgrupy.', ''); as message) {
+              <span class="field-error" [id]="'definition-name-error-' + definitionIndex">{{ message }}</span>
+            }
+            @if (definition.controls.name.hasError('maxlength') && attemptedSubmit()) {
+              <span class="field-error" [id]="'definition-name-error-' + definitionIndex">
+                Nazwa może mieć maksymalnie 255 znaków.
+              </span>
+            }
+          </div>
+
+          <section class="segments-section" [attr.aria-labelledby]="'segments-heading-' + definitionIndex">
+            <div class="subsection-heading">
+              <h4 [id]="'segments-heading-' + definitionIndex">Odcinki</h4>
+              <button type="button" class="button button--secondary" (click)="addSegment(definitionIndex)">
+                Dodaj odcinek
+              </button>
+            </div>
+            @if (definition.controls.segments.hasError('minlength') && attemptedSubmit()) {
+              <p class="field-error" role="alert">Dodaj co najmniej jeden odcinek.</p>
+            }
+            @for (segment of definition.controls.segments.controls; track segment; let segmentIndex = $index) {
+              <div class="segment-row">
+                <div class="field segment-order">
+                  <span class="segment-number">Odcinek {{ segmentIndex + 1 }}</span>
+                </div>
+                <div class="field">
+                  <label [for]="'segment-distance-' + definitionIndex + '-' + segmentIndex">Dystans (m) <span aria-hidden="true">*</span></label>
+                  <input
+                    class="field-control"
+                    type="number"
+                    min="1"
+                    max="2147483647"
+                    step="1"
+                    inputmode="numeric"
+                    [id]="'segment-distance-' + definitionIndex + '-' + segmentIndex"
+                    [formControl]="segment.controls.distanceM"
+                    [attr.aria-invalid]="fieldError(segment.controls.distanceM, 'Wpisz dystans.', 'Dystans musi być dodatnią liczbą całkowitą.') ? 'true' : null"
+                    [attr.aria-describedby]="'segment-distance-error-' + definitionIndex + '-' + segmentIndex"
+                  />
+                  @if (fieldError(segment.controls.distanceM, 'Wpisz dystans.', 'Dystans musi być dodatnią liczbą całkowitą.'); as message) {
+                    <span class="field-error" [id]="'segment-distance-error-' + definitionIndex + '-' + segmentIndex">{{ message }}</span>
+                  }
+                </div>
+                <div class="field">
+                  <label [for]="'segment-rest-' + definitionIndex + '-' + segmentIndex">Przerwa po odcinku (s)</label>
+                  <input
+                    class="field-control"
+                    type="number"
+                    min="0"
+                    max="2147483647"
+                    step="1"
+                    inputmode="numeric"
+                    [id]="'segment-rest-' + definitionIndex + '-' + segmentIndex"
+                    [formControl]="segment.controls.restAfterSeconds"
+                    [attr.aria-invalid]="fieldError(segment.controls.restAfterSeconds, '', 'Przerwa musi być nieujemną liczbą całkowitą.') ? 'true' : null"
+                    [attr.aria-describedby]="'segment-rest-error-' + definitionIndex + '-' + segmentIndex"
+                  />
+                  @if (fieldError(segment.controls.restAfterSeconds, '', 'Przerwa musi być nieujemną liczbą całkowitą.'); as message) {
+                    <span class="field-error" [id]="'segment-rest-error-' + definitionIndex + '-' + segmentIndex">{{ message }}</span>
+                  }
+                </div>
+                <div class="item-actions segment-actions">
+                  <button
+                    type="button"
+                    class="button button--secondary"
+                    [attr.aria-label]="'Przenieś odcinek ' + (segmentIndex + 1) + ' w górę'"
+                    [disabled]="segmentIndex === 0"
+                    (click)="moveSegment(definitionIndex, segmentIndex, -1)"
+                  >↑</button>
+                  <button
+                    type="button"
+                    class="button button--secondary"
+                    [attr.aria-label]="'Przenieś odcinek ' + (segmentIndex + 1) + ' w dół'"
+                    [disabled]="segmentIndex === definition.controls.segments.length - 1"
+                    (click)="moveSegment(definitionIndex, segmentIndex, 1)"
+                  >↓</button>
+                  <button
+                    type="button"
+                    class="button button--secondary remove-button"
+                    [disabled]="definition.controls.segments.length === 1"
+                    (click)="removeSegment(definitionIndex, segmentIndex)"
+                  >Usuń</button>
+                </div>
+              </div>
+            }
+          </section>
+
+          <section class="athletes-section" [attr.aria-labelledby]="'athletes-heading-' + definitionIndex">
+            <h4 [id]="'athletes-heading-' + definitionIndex">Zawodnicy</h4>
+            @if (trainingGroupId === null) {
+              <p class="field-hint">Najpierw wybierz grupę treningową.</p>
+            } @else if (athletesLoading()) {
+              <p class="field-hint" role="status">Ładowanie zawodników...</p>
+            } @else if (groupError()) {
+              <p class="field-hint">Nie można załadować listy zawodników.</p>
+            } @else if (athletes().length === 0) {
+              <p class="field-hint">W wybranej grupie nie ma zawodników.</p>
+            } @else {
+              <app-multi-select-dropdown
+                [options]="athleteOptionsFor(definitionIndex)"
+                [selectedIds]="definition.controls.athleteIds.value"
+                [label]="'Wybierz zawodników dla definicji ' + (definitionIndex + 1)"
+                [controlId]="'definition-athletes-' + definitionIndex"
+                [emptySummary]="'Wybierz zawodników'"
+                [searchable]="true"
+                [searchLabel]="'Szukaj zawodników dla definicji ' + (definitionIndex + 1)"
+                [searchPlaceholder]="'Wyszukaj zawodnika...'"
+                (selectedIdsChange)="onAthleteIdsChange(definitionIndex, $event)"
+              />
+            }
+          </section>
+        </article>
+      }
+
+      @if (assignmentError(); as message) {
+        <p class="field-error" role="alert">{{ message }}</p>
+      }
+    </section>
+
+    <footer class="form-actions">
+      <a class="button button--secondary" routerLink="/trainings">Anuluj</a>
+      <button type="submit" class="button button--primary" [disabled]="submitting() || groupsLoading()">
+        {{ submitting() ? 'Zapisywanie...' : 'Zapisz trening' }}
+      </button>
+    </footer>
+  </form>
+</section>

@@ -22,6 +22,12 @@ export const routes: Routes = [
   { path: 'athletes', component: AthletesPage, canActivate: [staffGuard], title: 'Zawodnicy' },
   { path: 'results', component: ResultsPage, canActivate: [staffGuard], title: 'Wyniki' },
   {
+    path: 'trainings/new',
+    loadComponent: () => import('./features/trainings/training-create.page').then((module) => module.TrainingCreatePage),
+    canActivate: [staffGuard],
+    title: 'Dodaj trening',
+  },
+  {
     path: 'trainings',
     loadComponent: () => import('./features/trainings/trainings.page').then((module) => module.TrainingsPage),
     canActivate: [staffGuard],

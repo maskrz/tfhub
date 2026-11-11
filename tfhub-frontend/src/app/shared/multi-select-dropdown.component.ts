@@ -15,13 +15,23 @@ export interface MultiSelectOption {
         type="button"
         [attr.aria-expanded]="open()"
         [attr.aria-controls]="controlId()"
-        (click)="open.update((value) => !value)"
+        (click)="toggleOpen()"
       >
         <span>{{ selectionSummary() }}</span>
       </button>
       @if (open()) {
         <div class="options" [id]="controlId()" role="group" [attr.aria-label]="label()">
-          @for (option of options(); track option.id) {
+          @if (searchable()) {
+            <input
+              class="field-control option-search"
+              type="search"
+              [attr.aria-label]="searchLabel()"
+              [placeholder]="searchPlaceholder()"
+              [value]="searchQuery()"
+              (input)="onSearchInput($event)"
+            />
+          }
+          @for (option of filteredOptions(); track option.id) {
             <label class="option">
               <input
                 type="checkbox"
@@ -30,6 +40,9 @@ export interface MultiSelectOption {
               />
               <span>{{ option.name }}</span>
             </label>
+          }
+          @if (filteredOptions().length === 0) {
+            <p class="no-options">{{ searchQuery() ? 'Nie znaleziono pasujących pozycji.' : 'Brak dostępnych pozycji.' }}</p>
           }
           @if (selectedIds().length > 0) {
             <button class="clear" type="button" (click)="clearSelection()">Wyczyść wybór</button>
@@ -67,6 +80,13 @@ export interface MultiSelectOption {
       top: calc(100% + .35rem);
       z-index: 20;
     }
+    .option-search {
+      margin: .25rem;
+      position: sticky;
+      top: 0;
+      width: calc(100% - .5rem);
+      z-index: 1;
+    }
     .option {
       align-items: center;
       border-radius: .35rem;
@@ -79,6 +99,7 @@ export interface MultiSelectOption {
     }
     .option:hover { background: #f2f4f8; }
     .option input { accent-color: #198754; height: 1rem; width: 1rem; }
+    .no-options { color: #59667e; font-size: .9rem; margin: .5rem; }
     .clear {
       background: transparent;
       border: 0;
@@ -100,8 +121,18 @@ export class MultiSelectDropdownComponent {
   readonly label = input.required<string>();
   readonly controlId = input.required<string>();
   readonly emptySummary = input('Wszystkie przypisane grupy');
+  readonly searchable = input(false);
+  readonly searchLabel = input('Szukaj');
+  readonly searchPlaceholder = input('Szukaj...');
   readonly selectedIdsChange = output<number[]>();
   readonly open = signal(false);
+  readonly searchQuery = signal('');
+  readonly filteredOptions = () => {
+    const query = this.searchQuery().trim().toLocaleLowerCase('pl');
+    return query
+      ? this.options().filter((option) => option.name.toLocaleLowerCase('pl').includes(query))
+      : this.options();
+  };
   private readonly trigger = viewChild<ElementRef<HTMLButtonElement>>('trigger');
 
   selectionSummary(): string {
@@ -124,6 +155,19 @@ export class MultiSelectDropdownComponent {
     this.selectedIdsChange.emit([]);
   }
 
+  onSearchInput(event: Event): void {
+    const input = event.target;
+    if (input instanceof HTMLInputElement) this.searchQuery.set(input.value);
+  }
+
+  toggleOpen(): void {
+    if (this.open()) {
+      this.close();
+    } else {
+      this.open.set(true);
+    }
+  }
+
   @HostListener('document:click', ['$event'])
   closeOnOutsideClick(event: MouseEvent): void {
     const element = this.trigger()?.nativeElement;
@@ -141,5 +185,6 @@ export class MultiSelectDropdownComponent {
 
   private close(): void {
     this.open.set(false);
+    this.searchQuery.set('');
   }
 }
