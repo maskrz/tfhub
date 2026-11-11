@@ -8,6 +8,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.containers.PostgreSQLContainer;
@@ -22,8 +25,11 @@ import pl.tfhub.api.training.entity.TrainingDefinition;
 import pl.tfhub.api.training.entity.TrainingSegment;
 import pl.tfhub.api.training.entity.TrainingSegmentExecution;
 import pl.tfhub.api.training.enums.TrainingExecutionStatus;
+import pl.tfhub.api.training.service.TrainingQueryService;
 import pl.tfhub.api.traininggroup.entity.TrainingGroup;
 import pl.tfhub.api.traininggroup.repository.TrainingGroupRepository;
+import pl.tfhub.api.user.enums.UserRole;
+import pl.tfhub.api.user.service.AuthenticatedUser;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -69,18 +75,29 @@ class TrainingDomainIntegrationTests {
     @Autowired
     private TrainingSegmentExecutionRepository executionRepository;
 
+    @Autowired
+    private TrainingQueryService trainingQueryService;
+
     @BeforeEach
     void resetDatabase() {
+        SecurityContextHolder.getContext().setAuthentication(
+                UsernamePasswordAuthenticationToken.authenticated(
+                        new AuthenticatedUser(1, "test-admin", "", UserRole.ADMIN, true), null, java.util.List.of()));
         jdbcTemplate.execute("""
                 TRUNCATE TABLE training_segment_executions, training_athlete_participations,
                     training_segments, training_definitions, training_sessions,
-                    athletes, training_groups RESTART IDENTITY CASCADE
+                    athletes, training_groups, users RESTART IDENTITY CASCADE
                 """);
         jdbcTemplate.update("INSERT INTO training_groups (name) VALUES ('Group A')");
         jdbcTemplate.update("""
                 INSERT INTO athletes (first_name, last_name, birth_year, gender, training_group_id)
-                VALUES ('Alex', 'Runner', 2000, 'MALE', 1)
+                VALUES ('Alex', 'Runner', 2000, 'MALE', 1), ('Sam', 'Runner', 2001, 'MALE', 1)
                 """);
+    }
+
+    @org.junit.jupiter.api.AfterEach
+    void clearSecurityContext() {
+                SecurityContextHolder.clearContext();
     }
 
     @Test
@@ -199,6 +216,76 @@ class TrainingDomainIntegrationTests {
                 """, rows.participationId(), rows.segmentId(), rows.definitionId()));
     }
 
+    @Test
+    void adminGetsAllActiveTrainingsWithDefinitionsAndParticipantCountsInDateOrder() {
+        long older = insertTraining("Older", 1, LocalDate.parse("2026-01-01"));
+        long newerFirst = insertTraining("Newer first", 1, LocalDate.parse("2026-03-01"));
+        long newerSecond = insertTraining("Newer second", 1, LocalDate.parse("2026-03-01"));
+        long inactive = insertTraining("Inactive", 1, LocalDate.parse("2026-04-01"));
+        jdbcTemplate.update("UPDATE training_sessions SET active = FALSE WHERE id = ?", inactive);
+
+        long firstDefinition = insertDefinition(newerFirst, "Main", 1);
+        insertDefinition(newerFirst, "Alternative", 2);
+        long segmentId = insertSegment(firstDefinition, 1);
+        long participationId = insertParticipation(newerFirst, firstDefinition, 1);
+        insertParticipation(newerFirst, firstDefinition, 2);
+        insertExecution(participationId, segmentId, firstDefinition, "PENDING");
+
+        var trainings = trainingQueryService.listTrainings();
+        assertEquals(java.util.List.of(newerSecond, newerFirst, older),
+                trainings.stream().map(item -> item.id()).toList());
+        var newer = trainings.get(1);
+        assertEquals("Newer first", newer.name());
+        assertEquals(LocalDate.parse("2026-03-01"), newer.trainingDate());
+        assertEquals(1L, newer.trainingGroup().id());
+        assertEquals("Group A", newer.trainingGroup().name());
+        assertEquals(2L, newer.definitionCount());
+        assertEquals(2L, newer.participantCount());
+        assertEquals(0L, trainings.get(0).definitionCount());
+        assertEquals(0L, trainings.get(0).participantCount());
+    }
+
+    @Test
+    void coachOnlyGetsActiveTrainingsInAssignedGroupsAndCountsHistoricalParticipants() {
+        long assignedGroup = insertGroup("Assigned group");
+        long unassignedGroup = insertGroup("Unassigned group");
+        long firstTraining = insertTraining("Assigned recent", assignedGroup, LocalDate.parse("2026-05-01"));
+        long secondTraining = insertTraining("Assigned older", 1, LocalDate.parse("2026-02-01"));
+        long hiddenTraining = insertTraining("Unassigned", unassignedGroup, LocalDate.parse("2026-06-01"));
+        long inactiveTraining = insertTraining("Inactive", assignedGroup, LocalDate.parse("2026-07-01"));
+        jdbcTemplate.update("UPDATE training_sessions SET active = FALSE WHERE id = ?", inactiveTraining);
+
+        jdbcTemplate.update("""
+                INSERT INTO users (username, password_hash, role) VALUES ('coach-one', 'hash', 'COACH')
+                """);
+        jdbcTemplate.update("""
+                INSERT INTO user_training_group (user_id, training_group_id) VALUES (1, ?), (1, 1)
+                """, assignedGroup);
+
+        long definitionId = insertDefinition(firstTraining, "Plan", 1);
+        long participationId = insertParticipation(firstTraining, definitionId, 1);
+        insertParticipant(firstTraining, definitionId, 2);
+        long segmentId = insertSegment(definitionId, 1);
+        insertExecution(participationId, segmentId, definitionId, "PENDING");
+        jdbcTemplate.update("UPDATE athletes SET training_group_id = ? WHERE id = 1", unassignedGroup);
+
+        authenticate(1, UserRole.COACH, "coach-one");
+        var trainings = trainingQueryService.listTrainings();
+
+        assertEquals(java.util.List.of(firstTraining, secondTraining),
+                trainings.stream().map(item -> item.id()).toList());
+        assertEquals(2L, trainings.get(0).participantCount());
+        assertEquals(1L, trainings.get(0).definitionCount());
+        assertEquals(assignedGroup, trainings.get(0).trainingGroup().id());
+    }
+
+    @Test
+    void rejectsAuthenticatedUsersWithoutCoachOrAdminRole() {
+        authenticate(1, UserRole.ATHLETE, "athlete-one");
+
+        assertThrows(AccessDeniedException.class, () -> trainingQueryService.listTrainings());
+    }
+
     private TrainingRows insertTrainingRows() {
         long trainingId = insertTraining("Training");
         long definitionId = insertDefinition(trainingId, "Plan", 1);
@@ -213,10 +300,20 @@ class TrainingDomainIntegrationTests {
     }
 
     private long insertTraining(String name) {
+        return insertTraining(name, 1, LocalDate.now());
+    }
+
+    private long insertTraining(String name, long groupId, LocalDate trainingDate) {
         return jdbcTemplate.queryForObject("""
                 INSERT INTO training_sessions (name, training_date, training_group_id)
-                VALUES (?, CURRENT_DATE, 1)
+                VALUES (?, ?, ?)
                 RETURNING id
+                """, Long.class, name, trainingDate, groupId);
+    }
+
+    private long insertGroup(String name) {
+        return jdbcTemplate.queryForObject("""
+                INSERT INTO training_groups (name) VALUES (?) RETURNING id
                 """, Long.class, name);
     }
 
@@ -235,6 +332,33 @@ class TrainingDomainIntegrationTests {
                 VALUES (?, ?, 400)
                 RETURNING id
                 """, Long.class, definitionId, sequenceNumber);
+    }
+
+    private long insertParticipation(long trainingId, long definitionId, long athleteId) {
+        return jdbcTemplate.queryForObject("""
+                INSERT INTO training_athlete_participations
+                    (training_session_id, training_definition_id, athlete_id)
+                VALUES (?, ?, ?)
+                RETURNING id
+                """, Long.class, trainingId, definitionId, athleteId);
+    }
+
+    private void insertParticipant(long trainingId, long definitionId, long athleteId) {
+        insertParticipation(trainingId, definitionId, athleteId);
+    }
+
+    private void insertExecution(long participationId, long segmentId, long definitionId, String status) {
+        jdbcTemplate.update("""
+                INSERT INTO training_segment_executions
+                    (participation_id, training_segment_id, training_definition_id, status)
+                VALUES (?, ?, ?, ?)
+                """, participationId, segmentId, definitionId, status);
+    }
+
+    private void authenticate(long userId, UserRole role, String username) {
+        SecurityContextHolder.getContext().setAuthentication(
+                UsernamePasswordAuthenticationToken.authenticated(
+                        new AuthenticatedUser(userId, username, "", role, true), null, java.util.List.of()));
     }
 
     private record TrainingRows(
