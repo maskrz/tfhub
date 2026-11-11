@@ -5,6 +5,7 @@ import {
   CreateTrainingRequest,
   CreateTrainingResponse,
   CompleteTrainingRequest,
+  DeactivateTrainingResponse,
   EditTrainingRequest,
   TrainingDetails,
   UpdateTrainingResponse,
@@ -129,5 +130,18 @@ describe('TrainingsApiService', () => {
     expect(request.request.body).toEqual(body);
     request.flush({ id: 12 });
     expect(actual).toEqual({ id: 12 });
+  });
+
+  it('deactivates a training through the UC-505 endpoint', () => {
+    const response: DeactivateTrainingResponse = { id: 12 };
+    let actual: DeactivateTrainingResponse | undefined;
+
+    service.deactivate(12).subscribe((result) => (actual = result));
+
+    const request = httpTesting.expectOne('/api/trainings/12/deactivate');
+    expect(request.request.method).toBe('PATCH');
+    expect(request.request.body).toBeNull();
+    request.flush(response);
+    expect(actual).toEqual(response);
   });
 });

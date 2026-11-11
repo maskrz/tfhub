@@ -113,6 +113,10 @@ export interface UpdateTrainingResponse {
   id: number;
 }
 
+export interface DeactivateTrainingResponse {
+  id: number;
+}
+
 export interface NewTrainingExecutionRequest {
   segmentId: number;
   status: TrainingExecutionStatus;

@@ -34,9 +34,27 @@
           <a class="button button--primary" [routerLink]="['/trainings', currentTraining.id, 'complete']">
             Uzupełnij trening
           </a>
+          <button
+            type="button"
+            class="button button--secondary deactivate-training-button"
+            (click)="openDeactivationConfirmation()"
+          >
+            Dezaktywuj trening
+          </button>
         </div>
       }
     </section>
+
+    @if (deactivationDialogOpen()) {
+      @if (training(); as currentTraining) {
+        <app-training-deactivate-confirmation
+          [trainingId]="currentTraining.id"
+          [trainingName]="currentTraining.name"
+          (deactivated)="onTrainingDeactivated($event)"
+          (cancelled)="closeDeactivationConfirmation()"
+        />
+      }
+    }
 
     @if (currentTraining.definitions.length === 0) {
       <p class="feedback" role="status">Ten trening nie ma jeszcze podgrup.</p>

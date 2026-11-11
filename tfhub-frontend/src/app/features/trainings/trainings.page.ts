@@ -7,9 +7,10 @@ import { AuthService } from '../../core/auth/auth.service';
 import { MultiSelectDropdownComponent, MultiSelectOption } from '../../shared/multi-select-dropdown.component';
 import { TrainingListItem } from './training.model';
 import { TrainingsApiService } from './trainings-api.service';
+import { TrainingDeactivateConfirmationComponent } from './training-deactivate-confirmation.component';
 
 @Component({
-  imports: [MultiSelectDropdownComponent, RouterLink],
+  imports: [MultiSelectDropdownComponent, RouterLink, TrainingDeactivateConfirmationComponent],
   selector: 'app-trainings-page',
   styleUrl: './trainings.page.scss',
   templateUrl: './trainings.page.html',
@@ -18,6 +19,8 @@ export class TrainingsPage implements OnInit {
   readonly allTrainings = signal<TrainingListItem[]>([]);
   readonly loading = signal(false);
   readonly errorMessage = signal<string | null>(null);
+  readonly successMessage = signal<string | null>(null);
+  readonly trainingPendingDeactivation = signal<TrainingListItem | null>(null);
   readonly query = signal('');
   readonly selectedGroupIds = signal<number[]>([]);
   readonly trainingDateFrom = signal('');
@@ -114,6 +117,21 @@ export class TrainingsPage implements OnInit {
 
   retry(): void {
     this.loadTrainings();
+  }
+
+  openDeactivationConfirmation(training: TrainingListItem): void {
+    this.successMessage.set(null);
+    this.trainingPendingDeactivation.set(training);
+  }
+
+  closeDeactivationConfirmation(): void {
+    this.trainingPendingDeactivation.set(null);
+  }
+
+  onTrainingDeactivated(trainingId: number): void {
+    this.allTrainings.update((current) => current.filter((training) => training.id !== trainingId));
+    this.trainingPendingDeactivation.set(null);
+    this.successMessage.set('Trening został dezaktywowany.');
   }
 
   formatDate(date: string): string {

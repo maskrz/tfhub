@@ -8,6 +8,10 @@
     }
   </div>
 
+  @if (successMessage(); as message) {
+    <p class="feedback success" role="status" aria-live="polite">{{ message }}</p>
+  }
+
   <div class="filters">
     <label class="filter-field search-filter">
       <span>Szukaj treningu</span>
@@ -138,6 +142,12 @@
                   [routerLink]="['/trainings', training.id, 'complete']"
                   [attr.aria-label]="'Uzupełnij trening: ' + training.name"
                 >Uzupełnij trening</a>
+                <button
+                  type="button"
+                  class="button button--secondary deactivate-training-button"
+                  [attr.aria-label]="'Dezaktywuj trening: ' + training.name"
+                  (click)="openDeactivationConfirmation(training)"
+                >Dezaktywuj trening</button>
               </td>
             </tr>
           }
@@ -146,3 +156,12 @@
     </div>
   }
 </section>
+
+@if (trainingPendingDeactivation(); as training) {
+  <app-training-deactivate-confirmation
+    [trainingId]="training.id"
+    [trainingName]="training.name"
+    (deactivated)="onTrainingDeactivated($event)"
+    (cancelled)="closeDeactivationConfirmation()"
+  />
+}

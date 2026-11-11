@@ -1,6 +1,6 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { ActivatedRoute, provideRouter } from '@angular/router';
+import { ActivatedRoute, provideRouter, Router } from '@angular/router';
 import { Observable, Subject, of, throwError } from 'rxjs';
 import { TrainingDetails } from './training.model';
 import { TrainingDetailsPage } from './training-details.page';
@@ -50,13 +50,19 @@ const training: TrainingDetails = {
 
 describe('TrainingDetailsPage', () => {
   let fixture: ComponentFixture<TrainingDetailsPage>;
-  let api: { getById: ReturnType<typeof vi.fn> };
+  let api: {
+    getById: ReturnType<typeof vi.fn>;
+    deactivate: ReturnType<typeof vi.fn>;
+  };
 
   async function createPage(
     loader: () => Observable<TrainingDetails> = () => of(training),
     id = '12',
   ): Promise<void> {
-    api = { getById: vi.fn(loader) };
+    api = {
+      getById: vi.fn(loader),
+      deactivate: vi.fn((id: number) => of({ id })),
+    };
     await TestBed.configureTestingModule({
       imports: [TrainingDetailsPage],
       providers: [
@@ -97,6 +103,7 @@ describe('TrainingDetailsPage', () => {
     expect(fixture.nativeElement.querySelectorAll('.spikes-label')).toHaveLength(1);
     expect(fixture.nativeElement.querySelector('a[href="/trainings/12/edit"]')?.textContent.trim()).toBe('Edytuj trening');
     expect(fixture.nativeElement.querySelector('a[href="/trainings/12/complete"]')?.textContent.trim()).toBe('Uzupełnij trening');
+    expect(fixture.nativeElement.querySelector('.deactivate-training-button')?.textContent).toContain('Dezaktywuj trening');
   });
 
   it('shows inactive training as view-only', async () => {
@@ -106,7 +113,23 @@ describe('TrainingDetailsPage', () => {
     expect(text).toContain('Nieaktywny');
     expect(fixture.nativeElement.querySelector('a[href="/trainings/12/edit"]')).toBeNull();
     expect(fixture.nativeElement.querySelector('a[href="/trainings/12/complete"]')).toBeNull();
+    expect(fixture.nativeElement.querySelector('.deactivate-training-button')).toBeNull();
+    expect(fixture.nativeElement.querySelector('app-training-deactivate-confirmation')).toBeNull();
     expect(text).toContain('Jan Kowalski');
+  });
+
+  it('deactivates an active training after confirmation and returns to the list', async () => {
+    await createPage();
+    const navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+    (fixture.nativeElement.querySelector('.deactivate-training-button') as HTMLButtonElement).click();
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.textContent).toContain('wszystkie jego dane');
+    (fixture.nativeElement.querySelector('app-training-deactivate-confirmation .button--danger') as HTMLButtonElement).click();
+    fixture.detectChanges();
+
+    expect(api.deactivate).toHaveBeenCalledWith(12);
+    expect(navigate).toHaveBeenCalledWith(['/trainings']);
   });
 
   it('displays empty definitions and participant collections without errors', async () => {
@@ -147,7 +170,10 @@ describe('TrainingDetailsPage', () => {
 
   it('shows loading then error state and can retry', async () => {
     const pending = new Subject<TrainingDetails>();
-    api = { getById: vi.fn(() => pending.asObservable()) };
+    api = {
+      getById: vi.fn(() => pending.asObservable()),
+      deactivate: vi.fn((id: number) => of({ id })),
+    };
     await TestBed.configureTestingModule({
       imports: [TrainingDetailsPage],
       providers: [

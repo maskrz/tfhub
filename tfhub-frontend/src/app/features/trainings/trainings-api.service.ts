@@ -5,6 +5,7 @@ import {
   CreateTrainingRequest,
   CreateTrainingResponse,
   CompleteTrainingRequest,
+  DeactivateTrainingResponse,
   EditTrainingRequest,
   TrainingDetails,
   TrainingListItem,
@@ -33,5 +34,9 @@ export class TrainingsApiService {
 
   complete(id: number, request: CompleteTrainingRequest): Observable<UpdateTrainingResponse> {
     return this.http.patch<UpdateTrainingResponse>(`/api/trainings/${id}/participations`, request);
+  }
+
+  deactivate(id: number): Observable<DeactivateTrainingResponse> {
+    return this.http.patch<DeactivateTrainingResponse>(`/api/trainings/${id}/deactivate`, null);
   }
 }

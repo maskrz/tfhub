@@ -1,7 +1,7 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component, DestroyRef, OnInit, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { ActivatedRoute, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { EMPTY, catchError, finalize, take } from 'rxjs';
 import {
   TrainingDetails,
@@ -9,9 +9,10 @@ import {
   TrainingParticipationDetails,
 } from './training.model';
 import { TrainingsApiService } from './trainings-api.service';
+import { TrainingDeactivateConfirmationComponent } from './training-deactivate-confirmation.component';
 
 @Component({
-  imports: [RouterLink],
+  imports: [RouterLink, TrainingDeactivateConfirmationComponent],
   selector: 'app-training-details-page',
   styleUrl: './training-details.page.scss',
   templateUrl: './training-details.page.html',
@@ -20,8 +21,10 @@ export class TrainingDetailsPage implements OnInit {
   readonly training = signal<TrainingDetails | null>(null);
   readonly loading = signal(true);
   readonly errorMessage = signal<string | null>(null);
+  readonly deactivationDialogOpen = signal(false);
 
   private readonly route = inject(ActivatedRoute);
+  private readonly router = inject(Router);
   private readonly trainingsApi = inject(TrainingsApiService);
   private readonly destroyRef = inject(DestroyRef);
   private trainingId = 0;
@@ -39,6 +42,20 @@ export class TrainingDetailsPage implements OnInit {
 
   retry(): void {
     this.loadTraining();
+  }
+
+  openDeactivationConfirmation(): void {
+    if (this.training()?.active) this.deactivationDialogOpen.set(true);
+  }
+
+  closeDeactivationConfirmation(): void {
+    this.deactivationDialogOpen.set(false);
+  }
+
+  onTrainingDeactivated(trainingId: number): void {
+    if (trainingId !== this.training()?.id) return;
+    this.deactivationDialogOpen.set(false);
+    void this.router.navigate(['/trainings']);
   }
 
   formatDate(date: string): string {
