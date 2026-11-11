@@ -60,6 +60,7 @@ describe('HeaderComponent', () => {
       role: 'ADMIN',
       athleteId: null,
     });
+
     fixture.detectChanges();
 
     expect(fixture.nativeElement.querySelector('nav a[href="/accounts"]')).toBeNull();
@@ -78,6 +79,22 @@ describe('HeaderComponent', () => {
     });
     fixture.detectChanges();
     expect(fixture.nativeElement.querySelector('[role="menu"] a[href="/accounts"]')).toBeNull();
+  });
+
+  it('shows the training navigation link to staff accounts', () => {
+    expect(fixture.nativeElement.querySelector('nav a[href="/trainings"]')?.textContent).toContain(
+      'Treningi',
+    );
+
+    auth.currentUser.set({
+      authenticated: true,
+      userId: 1,
+      username: 'athlete',
+      role: 'ATHLETE',
+      athleteId: 2,
+    });
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('nav a[href="/trainings"]')).toBeNull();
   });
 
   it('closes the menu and opens the change-password dialog when selected', () => {

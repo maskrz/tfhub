@@ -22,6 +22,7 @@ import { ChangePasswordModalComponent } from '../auth/change-password-modal.comp
         }
         @if (user()?.role === 'ADMIN' || user()?.role === 'COACH') {
           <a routerLink="/athletes" routerLinkActive="active" ariaCurrentWhenActive="page">Zawodnicy</a>
+          <a routerLink="/trainings" routerLinkActive="active" ariaCurrentWhenActive="page">Treningi</a>
           <a routerLink="/results" routerLinkActive="active" ariaCurrentWhenActive="page">Wyniki</a>
         }
         @if (user()?.role === 'ATHLETE') {

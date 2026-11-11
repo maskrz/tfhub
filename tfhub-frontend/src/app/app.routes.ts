@@ -21,5 +21,11 @@ export const routes: Routes = [
   { path: 'athletes/:id', component: AthleteProfilePage, canActivate: [authenticatedGuard], title: 'Profil zawodnika' },
   { path: 'athletes', component: AthletesPage, canActivate: [staffGuard], title: 'Zawodnicy' },
   { path: 'results', component: ResultsPage, canActivate: [staffGuard], title: 'Wyniki' },
+  {
+    path: 'trainings',
+    loadComponent: () => import('./features/trainings/trainings.page').then((module) => module.TrainingsPage),
+    canActivate: [staffGuard],
+    title: 'Treningi',
+  },
   { path: '**', redirectTo: 'dashboard' },
 ];

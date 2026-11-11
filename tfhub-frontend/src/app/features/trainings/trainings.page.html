@@ -1,0 +1,135 @@
+<section class="page" aria-labelledby="page-title">
+  <div class="page-heading">
+    <div>
+      <h1 id="page-title">Treningi</h1>
+    </div>
+    @if (auth.currentUser()?.role === 'ADMIN' || auth.currentUser()?.role === 'COACH') {
+      <a class="button button--primary" routerLink="/trainings/new">Dodaj trening</a>
+    }
+  </div>
+
+  <div class="filters">
+    <label class="filter-field search-filter">
+      <span>Szukaj treningu</span>
+      <span class="search-field field-control-shell">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <circle cx="10.8" cy="10.8" r="6.8"></circle>
+          <path d="m16 16 5 5"></path>
+        </svg>
+        <input
+          class="field-control__search"
+          type="search"
+          aria-label="Szukaj treningu"
+          placeholder="Szukaj treningu..."
+          [value]="query()"
+          (input)="onSearchInput($event)"
+        />
+      </span>
+    </label>
+
+    <div class="filter-field group-filter">
+      <span>Grupa treningowa</span>
+      <app-multi-select-dropdown
+        [options]="groupOptions()"
+        [selectedIds]="selectedGroupIds()"
+        [label]="'Filtruj treningi według grup treningowych'"
+        [controlId]="'trainings-group-options'"
+        [emptySummary]="'Wszystkie grupy'"
+        (selectedIdsChange)="onGroupIdsChange($event)"
+      />
+    </div>
+
+    <div class="date-range">
+      <label class="filter-field">
+        <span>Od</span>
+        <input
+          class="field-control"
+          type="date"
+          aria-label="Data treningu od"
+          [value]="trainingDateFrom()"
+          (input)="onTrainingDateChange($event, 'from')"
+        />
+      </label>
+      <label class="filter-field">
+        <span>Do</span>
+        <input
+          class="field-control"
+          type="date"
+          aria-label="Data treningu do"
+          [value]="trainingDateTo()"
+          (input)="onTrainingDateChange($event, 'to')"
+        />
+      </label>
+    </div>
+  </div>
+
+  @if (loading()) {
+    <p class="feedback" role="status">Ładowanie treningów...</p>
+  } @else if (errorMessage(); as message) {
+    <div class="feedback error" role="alert">
+      <p>{{ message }}</p>
+      <button type="button" class="button button--primary retry-button" (click)="retry()">
+        Spróbuj ponownie
+      </button>
+    </div>
+  } @else if (visibleTrainings().length === 0) {
+    <p class="feedback" role="status">
+      {{ hasSearchQuery ? 'Nie znaleziono treningów pasujących do wyszukiwania.' : 'Brak treningów do wyświetlenia.' }}
+    </p>
+  } @else {
+    <div class="table-surface">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col" [attr.aria-sort]="sortColumn() === 'name' ? (sortDirection() === 'asc' ? 'ascending' : 'descending') : 'none'">
+              <button type="button" class="sort-button" (click)="sortBy('name')">
+                Trening
+                <span class="sort-indicator" [class.active]="sortColumn() === 'name'" aria-hidden="true">
+                  {{ sortColumn() === 'name' ? (sortDirection() === 'asc' ? '↑' : '↓') : '↕' }}
+                </span>
+              </button>
+            </th>
+            <th scope="col" [attr.aria-sort]="sortColumn() === 'date' ? (sortDirection() === 'asc' ? 'ascending' : 'descending') : 'none'">
+              <button type="button" class="sort-button" (click)="sortBy('date')">
+                Data
+                <span class="sort-indicator" [class.active]="sortColumn() === 'date'" aria-hidden="true">
+                  {{ sortColumn() === 'date' ? (sortDirection() === 'asc' ? '↑' : '↓') : '↕' }}
+                </span>
+              </button>
+            </th>
+            <th scope="col" [attr.aria-sort]="sortColumn() === 'group' ? (sortDirection() === 'asc' ? 'ascending' : 'descending') : 'none'">
+              <button type="button" class="sort-button" (click)="sortBy('group')">
+                Grupa treningowa
+                <span class="sort-indicator" [class.active]="sortColumn() === 'group'" aria-hidden="true">
+                  {{ sortColumn() === 'group' ? (sortDirection() === 'asc' ? '↑' : '↓') : '↕' }}
+                </span>
+              </button>
+            </th>
+            <th scope="col" [attr.aria-sort]="sortColumn() === 'participants' ? (sortDirection() === 'asc' ? 'ascending' : 'descending') : 'none'">
+              <button type="button" class="sort-button" (click)="sortBy('participants')">
+                Liczba uczestników
+                <span class="sort-indicator" [class.active]="sortColumn() === 'participants'" aria-hidden="true">
+                  {{ sortColumn() === 'participants' ? (sortDirection() === 'asc' ? '↑' : '↓') : '↕' }}
+                </span>
+              </button>
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (training of visibleTrainings(); track training.id) {
+            <tr>
+              <td data-label="Trening">
+                <a class="training-link" [routerLink]="['/trainings', training.id]">
+                  <strong>{{ training.name }}</strong>
+                </a>
+              </td>
+              <td data-label="Data">{{ formatDate(training.trainingDate) }}</td>
+              <td data-label="Grupa treningowa">{{ training.trainingGroup.name }}</td>
+              <td data-label="Liczba uczestników">{{ training.participantCount }}</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  }
+</section>
