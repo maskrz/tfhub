@@ -47,6 +47,7 @@ Deactivation must preserve the training session and all its related historical d
 ### 4.3 Editing After Deactivation
 
 - An inactive training session cannot be edited through UC-503.
+- An inactive training session cannot have its athlete participations or execution data changed through UC-510.
 - Its definitions, segments, participants and execution data remain unchanged.
 - Historical details remain available through UC-504.
 
@@ -108,7 +109,7 @@ The exact response structure and field types will be defined during API design.
 6. No related historical data is physically deleted or modified.
 7. Inactive training sessions are excluded from UC-501.
 8. Authorized users can still retrieve inactive training session details through UC-504.
-9. Inactive training sessions cannot be edited through UC-503.
+9. Inactive training sessions cannot be edited through UC-503 or completed through UC-510.
 10. An already inactive training session cannot be deactivated again.
 11. Inaccessible and nonexistent training sessions produce the same not-found response.
 12. Deactivation is performed atomically.

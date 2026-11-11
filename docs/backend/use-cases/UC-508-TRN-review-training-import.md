@@ -58,7 +58,7 @@ The authorized user must be able to correct all recognized training information,
 - Measured results.
 - Spike usage.
 
-The corrected draft must satisfy the same business validation rules that apply when creating a training session through UC-502.
+The corrected draft must satisfy the plan rules defined in UC-502 and the athlete participation/execution rules defined in UC-510.
 
 ### 4.3 Training Group
 
@@ -130,7 +130,7 @@ The corrected draft must satisfy the same business validation rules that apply w
 - All athlete rows must be explicitly matched or skipped.
 - An athlete must not be assigned to multiple definitions within the same training session.
 - All execution data must reference valid draft entities.
-- All execution statuses and measured results must satisfy the rules defined in UC-502.
+- All execution statuses and measured results must satisfy the rules defined in UC-510.
 - Recognition uncertainty flags may remain as historical information after the user has manually corrected the corresponding values.
 - The backend must distinguish between unresolved recognition issues and corrected data.
 - The import must not become ready for acceptance while any mandatory validation issue remains.

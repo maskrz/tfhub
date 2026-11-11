@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import pl.tfhub.api.training.dto.request.EditTrainingRequest;
 import pl.tfhub.api.training.dto.request.CreateTrainingRequest;
+import pl.tfhub.api.training.dto.request.CompleteTrainingRequest;
 import pl.tfhub.api.training.dto.response.CreateTrainingResponse;
 import pl.tfhub.api.training.dto.response.DeactivateTrainingResponse;
 import pl.tfhub.api.training.dto.response.TrainingListItemResponse;
@@ -22,6 +23,7 @@ import pl.tfhub.api.training.dto.response.UpdateTrainingResponse;
 import pl.tfhub.api.training.service.TrainingCreationService;
 import pl.tfhub.api.training.service.TrainingDetailsService;
 import pl.tfhub.api.training.service.TrainingDeactivationService;
+import pl.tfhub.api.training.service.TrainingCompletionService;
 import pl.tfhub.api.training.service.TrainingQueryService;
 import pl.tfhub.api.training.service.TrainingUpdateService;
 
@@ -34,18 +36,21 @@ public class TrainingController {
     private final TrainingUpdateService trainingUpdateService;
     private final TrainingDetailsService trainingDetailsService;
     private final TrainingDeactivationService trainingDeactivationService;
+    private final TrainingCompletionService trainingCompletionService;
 
     public TrainingController(
             TrainingQueryService trainingQueryService,
             TrainingCreationService trainingCreationService,
             TrainingUpdateService trainingUpdateService,
             TrainingDetailsService trainingDetailsService,
-            TrainingDeactivationService trainingDeactivationService) {
+            TrainingDeactivationService trainingDeactivationService,
+            TrainingCompletionService trainingCompletionService) {
         this.trainingQueryService = trainingQueryService;
         this.trainingCreationService = trainingCreationService;
         this.trainingUpdateService = trainingUpdateService;
         this.trainingDetailsService = trainingDetailsService;
         this.trainingDeactivationService = trainingDeactivationService;
+        this.trainingCompletionService = trainingCompletionService;
     }
 
     @GetMapping
@@ -75,5 +80,12 @@ public class TrainingController {
             @PathVariable long trainingId,
             @Valid @RequestBody EditTrainingRequest request) {
         return trainingUpdateService.updateTraining(trainingId, request);
+    }
+
+    @PatchMapping("/{trainingId}/participations")
+    public UpdateTrainingResponse completeTraining(
+            @PathVariable long trainingId,
+            @Valid @RequestBody CompleteTrainingRequest request) {
+        return trainingCompletionService.completeTraining(trainingId, request);
     }
 }

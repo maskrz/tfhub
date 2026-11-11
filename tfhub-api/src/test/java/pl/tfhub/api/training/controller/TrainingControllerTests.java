@@ -16,6 +16,7 @@ import pl.tfhub.api.training.dto.response.TrainingDetailsResponse;
 import pl.tfhub.api.training.dto.response.DeactivateTrainingResponse;
 import pl.tfhub.api.training.dto.response.UpdateTrainingResponse;
 import pl.tfhub.api.training.service.TrainingCreationService;
+import pl.tfhub.api.training.service.TrainingCompletionService;
 import pl.tfhub.api.training.service.TrainingDetailsService;
 import pl.tfhub.api.training.service.TrainingDeactivationService;
 import pl.tfhub.api.training.service.TrainingQueryService;
@@ -49,6 +50,9 @@ class TrainingControllerTests {
     @MockitoBean
     private TrainingDeactivationService trainingDeactivationService;
 
+    @MockitoBean
+    private TrainingCompletionService trainingCompletionService;
+
     @Test
     void createsTrainingAndReturnsItsIdentifierAndLocation() throws Exception {
         when(trainingCreationService.createTraining(org.mockito.ArgumentMatchers.any()))
@@ -66,8 +70,7 @@ class TrainingControllerTests {
                                     "sequenceNumber": 1,
                                     "segments": [
                                       {"sequenceNumber": 1, "distanceM": 400, "restAfterSeconds": 60}
-                                    ],
-                                    "athleteIds": [11]
+                                    ]
                                   }]
                                 }
                                 """))
@@ -128,8 +131,7 @@ class TrainingControllerTests {
                                     "segments": [{
                                       "sequenceNumber": 1,
                                       "distanceM": 400
-                                    }],
-                                    "participations": []
+                                    }]
                                   }]
                                 }
                                 """))
@@ -137,6 +139,28 @@ class TrainingControllerTests {
                 .andExpect(content().json("{\"id\":42}", true));
 
         verify(trainingUpdateService).updateTraining(
+                org.mockito.ArgumentMatchers.eq(42L), org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
+    void completesTrainingUsingExplicitParticipationOperations() throws Exception {
+        when(trainingCompletionService.completeTraining(
+                org.mockito.ArgumentMatchers.eq(42L), org.mockito.ArgumentMatchers.any()))
+                .thenReturn(new UpdateTrainingResponse(42));
+
+        mockMvc.perform(MockMvcRequestBuilders.patch("/api/trainings/42/participations")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "add": [{"definitionId": 5, "athleteId": 11, "executionUpdates": []}],
+                                  "update": [],
+                                  "removeParticipationIds": []
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(content().json("{\"id\":42}", true));
+
+        verify(trainingCompletionService).completeTraining(
                 org.mockito.ArgumentMatchers.eq(42L), org.mockito.ArgumentMatchers.any());
     }
 

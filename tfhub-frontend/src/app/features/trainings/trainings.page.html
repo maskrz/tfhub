@@ -113,6 +113,7 @@
                 </span>
               </button>
             </th>
+            <th scope="col">Akcje</th>
           </tr>
         </thead>
         <tbody>
@@ -126,6 +127,18 @@
               <td data-label="Data">{{ formatDate(training.trainingDate) }}</td>
               <td data-label="Grupa treningowa">{{ training.trainingGroup.name }}</td>
               <td data-label="Liczba uczestników">{{ training.participantCount }}</td>
+              <td data-label="Akcje" class="training-actions">
+                <a
+                  class="button button--secondary edit-training-link"
+                  [routerLink]="['/trainings', training.id, 'edit']"
+                  [attr.aria-label]="'Edytuj trening: ' + training.name"
+                >Edytuj</a>
+                <a
+                  class="button button--secondary complete-training-link"
+                  [routerLink]="['/trainings', training.id, 'complete']"
+                  [attr.aria-label]="'Uzupełnij trening: ' + training.name"
+                >Uzupełnij trening</a>
+              </td>
             </tr>
           }
         </tbody>

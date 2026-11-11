@@ -122,7 +122,7 @@ The exact response structure and field types will be defined during API design.
 
 ## 9. Consistency Requirements
 
-- Training visibility rules must be consistent with UC-501 – List Trainings and UC-503 – Edit Training.
+- Training visibility rules must be consistent with UC-501 – List Trainings, UC-503 – Edit Training Plan, and UC-510 – Complete Training.
 - An active training session visible in the standard list must also be accessible through this operation to the same authorized user.
 - Inactive training sessions are excluded from the standard list but remain accessible through this operation.
 - Historical participation and execution data must remain visible after an athlete changes their current group.

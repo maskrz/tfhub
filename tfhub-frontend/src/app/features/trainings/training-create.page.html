@@ -85,7 +85,7 @@
       <div class="section-heading">
         <div>
           <h2 id="definitions-heading">Definiuj podgrupy</h2>
-          <p>Dodaj warianty treningu, odcinki i przypisanych zawodników.</p>
+          <p>Dodaj warianty treningu i zaplanuj ich odcinki.</p>
         </div>
         <button type="button" class="button button--secondary" (click)="addDefinition()">
           Dodaj podgrupę
@@ -222,35 +222,7 @@
             }
           </section>
 
-          <section class="athletes-section" [attr.aria-labelledby]="'athletes-heading-' + definitionIndex">
-            <h4 [id]="'athletes-heading-' + definitionIndex">Zawodnicy</h4>
-            @if (trainingGroupId === null) {
-              <p class="field-hint">Najpierw wybierz grupę treningową.</p>
-            } @else if (athletesLoading()) {
-              <p class="field-hint" role="status">Ładowanie zawodników...</p>
-            } @else if (groupError()) {
-              <p class="field-hint">Nie można załadować listy zawodników.</p>
-            } @else if (athletes().length === 0) {
-              <p class="field-hint">W wybranej grupie nie ma zawodników.</p>
-            } @else {
-              <app-multi-select-dropdown
-                [options]="athleteOptionsFor(definitionIndex)"
-                [selectedIds]="definition.controls.athleteIds.value"
-                [label]="'Wybierz zawodników dla definicji ' + (definitionIndex + 1)"
-                [controlId]="'definition-athletes-' + definitionIndex"
-                [emptySummary]="'Wybierz zawodników'"
-                [searchable]="true"
-                [searchLabel]="'Szukaj zawodników dla definicji ' + (definitionIndex + 1)"
-                [searchPlaceholder]="'Wyszukaj zawodnika...'"
-                (selectedIdsChange)="onAthleteIdsChange(definitionIndex, $event)"
-              />
-            }
-          </section>
         </article>
-      }
-
-      @if (assignmentError(); as message) {
-        <p class="field-error" role="alert">{{ message }}</p>
       }
     </section>
 

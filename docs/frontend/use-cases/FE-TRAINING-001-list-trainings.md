@@ -23,7 +23,8 @@ The view must follow the existing TFHUB visual design and interaction patterns.
 3. The view displays the available trainings.
 4. The user can browse the list and use the available search and filtering controls.
 5. The user selects a training to open its details (FE-TRAINING-004).
-6. The user can initiate training creation (FE-TRAINING-002), subject to the existing role permissions.
+6. For each training, the user can navigate directly to **Edytuj trening** (FE-TRAINING-003) or **Uzupełnij trening** (FE-TRAINING-009).
+7. The user can initiate training creation (FE-TRAINING-002), subject to the existing role permissions.
 
 ## 5. Displayed Information
 
@@ -50,7 +51,8 @@ Only active trainings are displayed. Filtering by active/inactive status is not 
 
 - Selecting a training opens its details view (FE-TRAINING-004).
 - Provide an action to create a new training (FE-TRAINING-002) for authorized users.
-- Do not implement editing or deactivation actions in this use case unless an existing shared navigation pattern requires a simple link to another view.
+- Provide separate **Edytuj trening** and **Uzupełnij trening** links for each active list item. These links only navigate to FE-TRAINING-003 and FE-TRAINING-009; authorization and active-state checks remain backend-enforced.
+- Do not provide a deactivation action in this use case.
 
 ## 8. UI and UX Requirements
 
@@ -91,7 +93,7 @@ The view must be mobile-first and consistent with the existing TFHUB application
 
 ## 11. Out of Scope
 
-- Creating, editing, or deactivating trainings.
+- Creating or editing training data, completing a training, or deactivating a training. This use case provides navigation links only.
 - Training details implementation.
 - OCR and training imports.
 - Any backend changes.
@@ -103,6 +105,7 @@ The view must be mobile-first and consistent with the existing TFHUB application
 - All returned trainings display the required information.
 - Search and filters follow existing TFHUB patterns and work correctly.
 - Selecting a training navigates to its details.
+- Each listed training provides distinct links to edit its plan and complete its athlete participation/results.
 - Authorized users can initiate training creation.
 - Loading, empty, and error states are handled.
 - The view is responsive and usable on mobile devices.

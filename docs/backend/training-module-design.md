@@ -1,6 +1,6 @@
 # TFHub Training Module — Data Model Design
 
-**Status:** Agreed design decisions; implementation basis pending UC updates
+**Status:** Agreed design decisions
 **Scope:** Running training sessions, named variants, segment execution, printable sheets, and reviewed OCR imports.
 
 ## 1. Design decisions
@@ -273,6 +273,17 @@ Follow UC-503 using the current persisted state only:
 
 Do not track whether a value was recorded in the past or add audit/history mechanisms.
 
+## 5.1 Separate plan editing from training completion
+
+The persisted schema continues to support both workflows without a migration:
+
+- UC-502 creates only the training session, definitions, and segments. It does not create athlete participations or execution rows.
+- UC-503 edits only the training name/date and definition/segment plan. Retained participation and execution rows are not supplied by the request and are not rewritten. Adding a segment initializes a `PENDING` execution for each currently assigned participant in that definition. Removing a definition or segment is allowed only when it has no `RECORDED` executions; the operation removes its dependent participations/executions as applicable.
+- UC-510 manages participation and execution values using explicit add/update/remove operations. Omitted participants/executions are unchanged, avoiding accidental removal by a stale form. A move is an explicit removal plus addition and is prohibited when the participant has a `RECORDED` execution.
+- Normal create/edit-plan and completion flows use separate API endpoints and frontend tasks. UC-509 acceptance remains an explicitly atomic import path that creates a complete reviewed training, including participants and executions.
+
+No ownership, snapshot, audit, revision, or new lifecycle tables are needed for this separation.
+
 ## 6. Image storage
 
 Store one image per import on a persistent filesystem volume, not in PostgreSQL. Compress/optimize before saving: JPEG at approximately 85% quality, resize oversized images to a maximum 2560-pixel long edge without upscaling. The proposed settings are confirmed; validate with representative handwritten sheets during implementation to ensure OCR quality is not noticeably degraded. Do not retain the uncompressed original absent a concrete technical need.
@@ -306,6 +317,7 @@ Any failure rolls back the session and all children and leaves the import unacce
 
 ## 9. Required UC documentation corrections
 
+- **UC-503/UC-510:** plan editing and participant/execution completion are separate operations; update cross-references and API contracts accordingly.
 - **UC-508:** remove permission to change the selected group and all group-change/revalidation requirements. The upload-selected group remains immutable through review and finalization.
 - **UC-502, UC-506, UC-508, UC-509:** remove requirements that groups be “active” and errors for inactive groups. Existing `training_groups` has no lifecycle; groups are treated as active.
 - **UC-506, UC-507, UC-508, UC-509:** clarify that the retained source document is the immutable optimized JPEG; the uncompressed upload is not retained by default. Retry uses the same stored JPEG.

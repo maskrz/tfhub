@@ -1,0 +1,179 @@
+:host { display: block; }
+
+.page {
+  margin: 0 auto;
+  max-width: 100rem;
+  padding: clamp(1.5rem, 4vw, 3.5rem) clamp(1rem, 3.25vw, 3.25rem);
+}
+
+.page-heading {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  justify-content: space-between;
+  margin-bottom: 1.5rem;
+}
+
+h1 {
+  color: #141c2b;
+  font-size: clamp(2.4rem, 5vw, 3.4rem);
+  font-weight: 700;
+  letter-spacing: -.045em;
+  line-height: 1.05;
+  margin: .4rem 0 0;
+}
+
+.back-link {
+  color: #365b48;
+  font-weight: 600;
+  text-decoration: none;
+}
+.back-link:hover { text-decoration: underline; }
+.back-link:focus-visible { outline: 3px solid var(--button-focus); outline-offset: 3px; }
+
+form { display: grid; gap: 1rem; }
+.form-section {
+  background: #fff;
+  border: 1px solid #d8deea;
+  border-radius: .9rem;
+  min-width: 0;
+  padding: clamp(1rem, 2.5vw, 1.7rem);
+}
+
+.form-section > h2,
+.section-heading h2 {
+  color: #20283a;
+  font-size: 1.3rem;
+  margin: 0;
+}
+
+.section-heading {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: .75rem;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+}
+.section-heading p { color: #59667e; margin: .35rem 0 0; }
+.field-hint { color: #59667e; font-size: .9rem; margin: 0; }
+.empty-participants { margin-top: 1rem; }
+
+.form-error {
+  background: #fff1f1;
+  border: 1px solid #eccaca;
+  border-radius: .55rem;
+  color: #8d2929;
+  margin: 0;
+  padding: .75rem .85rem;
+}
+.form-error > p { margin: 0 0 .75rem; }
+.page-error { margin-bottom: 1rem; }
+.field-error { color: #a12e2e; font-size: .88rem; }
+
+.results-table-scroll {
+  max-width: 100%;
+  min-width: 0;
+  margin-top: 1rem;
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+  width: 100%;
+}
+
+.results-table {
+  border-collapse: separate;
+  border-spacing: 0;
+  min-width: 100%;
+  text-align: left;
+  width: max-content;
+}
+
+.results-table th,
+.results-table td {
+  border-bottom: 1px solid #e1e5ec;
+  padding: .7rem;
+  vertical-align: middle;
+}
+
+.results-table thead th,
+.results-table tfoot th {
+  background: #f7f8fa;
+  color: #20283a;
+  font-size: .9rem;
+  font-weight: 650;
+  white-space: nowrap;
+}
+
+.results-table thead th:first-child { border-radius: .55rem 0 0; }
+.results-table thead th:last-child { border-radius: 0 .55rem 0 0; }
+.results-table tfoot th:first-child { border-radius: 0 0 0 .55rem; }
+.results-table tfoot th:last-child { border-radius: 0 0 .55rem; }
+.athlete-column,
+.athlete-name { min-width: 10rem; }
+.athlete-name { color: #20283a; font-weight: 600; }
+.segment-distance { color: #59667e; display: block; font-size: .82rem; font-weight: 400; margin-top: .15rem; }
+.results-table td { min-width: 11rem; }
+
+.result-cell {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: .65rem;
+}
+
+.result-input { max-width: 9rem; }
+.spikes-control {
+  align-items: center;
+  color: #20283a;
+  display: inline-flex;
+  gap: .35rem;
+  min-height: var(--field-height);
+  white-space: nowrap;
+}
+.spikes-control input { accent-color: #198754; height: 1rem; width: 1rem; }
+.form-actions {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: .75rem;
+  justify-content: flex-end;
+  padding-bottom: .5rem;
+}
+
+.success-toast {
+  align-items: center;
+  background: #edf8f0;
+  border: 1px solid #b8dfc3;
+  border-radius: .55rem;
+  box-shadow: 0 .7rem 2rem rgb(15 23 42 / 16%);
+  color: #236b3a;
+  display: flex;
+  gap: 1rem;
+  justify-content: space-between;
+  max-width: calc(100vw - 2rem);
+  padding: .8rem 1rem;
+  position: fixed;
+  right: 1rem;
+  bottom: 1rem;
+  z-index: 50;
+}
+.success-toast button {
+  background: transparent;
+  border: 0;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  font-size: 1.25rem;
+  line-height: 1;
+}
+.success-toast button:focus-visible { outline: 2px solid #236b3a; outline-offset: 2px; }
+
+@media (max-width: 600px) {
+  .page-heading { margin-bottom: 1rem; }
+  .form-actions { display: grid; grid-template-columns: 1fr 1fr; }
+  .form-actions .button { width: 100%; }
+  .results-table th,
+  .results-table td { padding: .55rem; }
+  .success-toast { left: 1rem; }
+}

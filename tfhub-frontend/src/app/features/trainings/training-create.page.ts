@@ -5,9 +5,6 @@ import { AbstractControl, FormArray, FormControl, FormGroup, ReactiveFormsModule
 import { Router, RouterLink } from '@angular/router';
 import { EMPTY, catchError, finalize, take } from 'rxjs';
 import { AuthService } from '../../core/auth/auth.service';
-import { MultiSelectDropdownComponent, MultiSelectOption } from '../../shared/multi-select-dropdown.component';
-import { AthleteResponse } from '../athletes/athlete.model';
-import { AthletesApiService } from '../athletes/athletes-api.service';
 import { TrainingGroup, TrainingGroupsApiService } from '../training-groups/training-groups-api.service';
 import {
   CreateTrainingDefinitionRequest,
@@ -24,7 +21,6 @@ type SegmentForm = FormGroup<{
 type DefinitionForm = FormGroup<{
   name: FormControl<string>;
   segments: FormArray<SegmentForm>;
-  athleteIds: FormControl<number[]>;
 }>;
 
 const trimmedRequired: ValidatorFn = (control) =>
@@ -52,12 +48,6 @@ const validDate: ValidatorFn = (control) => {
     : { date: true };
 };
 
-const uniqueAthletes: ValidatorFn = (control) => {
-  const definitions = control as FormArray<DefinitionForm>;
-  const ids = definitions.controls.flatMap((definition) => definition.controls.athleteIds.value);
-  return new Set(ids).size === ids.length ? null : { duplicateAthletes: true };
-};
-
 function createSegmentForm(): SegmentForm {
   return new FormGroup({
     distanceM: new FormControl<number | null>(null, {
@@ -78,21 +68,18 @@ function createDefinitionForm(): DefinitionForm {
     segments: new FormArray<SegmentForm>([createSegmentForm()], {
       validators: [Validators.minLength(1)],
     }),
-    athleteIds: new FormControl<number[]>([], { nonNullable: true }),
   });
 }
 
 @Component({
-  imports: [MultiSelectDropdownComponent, ReactiveFormsModule, RouterLink],
+  imports: [ReactiveFormsModule, RouterLink],
   selector: 'app-training-create-page',
   styleUrl: './training-create.page.scss',
   templateUrl: './training-create.page.html',
 })
 export class TrainingCreatePage implements OnInit {
   readonly groups = signal<TrainingGroup[]>([]);
-  readonly athletes = signal<AthleteResponse[]>([]);
   readonly groupsLoading = signal(false);
-  readonly athletesLoading = signal(false);
   readonly submitting = signal(false);
   readonly attemptedSubmit = signal(false);
   readonly errorMessage = signal<string | null>(null);
@@ -108,17 +95,15 @@ export class TrainingCreatePage implements OnInit {
     }),
     trainingGroupId: new FormControl<number | null>(null, Validators.required),
     definitions: new FormArray<DefinitionForm>([createDefinitionForm()], {
-      validators: [Validators.minLength(1), uniqueAthletes],
+      validators: [Validators.minLength(1)],
     }),
   });
 
   readonly auth = inject(AuthService);
   private readonly groupsApi = inject(TrainingGroupsApiService);
-  private readonly athletesApi = inject(AthletesApiService);
   private readonly trainingsApi = inject(TrainingsApiService);
   private readonly router = inject(Router);
   private readonly destroyRef = inject(DestroyRef);
-  private athleteLoadId = 0;
 
   get definitions(): FormArray<DefinitionForm> {
     return this.form.controls.definitions;
@@ -136,11 +121,6 @@ export class TrainingCreatePage implements OnInit {
 
     this.form.controls.trainingGroupId.setValue(groupId);
     this.groupError.set(null);
-    this.athletes.set([]);
-    for (const definition of this.definitions.controls) {
-      definition.controls.athleteIds.setValue([]);
-    }
-    if (groupId !== null) this.loadAthletes(groupId);
   }
 
   addDefinition(): void {
@@ -182,25 +162,6 @@ export class TrainingCreatePage implements OnInit {
     segments.updateValueAndValidity();
   }
 
-  onAthleteIdsChange(definitionIndex: number, athleteIds: number[]): void {
-    const options = new Set(this.athleteOptionsFor(definitionIndex).map((athlete) => athlete.id));
-    this.definitions.at(definitionIndex).controls.athleteIds.setValue(
-      athleteIds.filter((athleteId) => options.has(athleteId)),
-    );
-    this.definitions.updateValueAndValidity();
-  }
-
-  athleteOptionsFor(definitionIndex: number): MultiSelectOption[] {
-    const assignedElsewhere = new Set(
-      this.definitions.controls
-        .filter((_, index) => index !== definitionIndex)
-        .flatMap((definition) => definition.controls.athleteIds.value),
-    );
-    return this.athletes()
-      .filter((athlete) => !assignedElsewhere.has(athlete.id))
-      .map((athlete) => ({ id: athlete.id, name: `${athlete.firstName} ${athlete.lastName}` }));
-  }
-
   fieldError(
     control: AbstractControl,
     requiredMessage: string,
@@ -216,22 +177,6 @@ export class TrainingCreatePage implements OnInit {
     return null;
   }
 
-  assignmentError(): string | null {
-    if (!this.attemptedSubmit()) return null;
-    if (this.definitions.hasError('duplicateAthletes')) {
-      return 'Zawodnik może być przypisany tylko do jednej definicji.';
-    }
-    if (this.athletesLoading()) return 'Poczekaj na załadowanie listy zawodników.';
-    if (this.trainingGroupId !== null) {
-      const availableIds = new Set(this.athletes().map((athlete) => athlete.id));
-      if (this.definitions.controls.some((definition) =>
-        definition.controls.athleteIds.value.some((athleteId) => !availableIds.has(athleteId)))) {
-        return 'Wybierz zawodników z aktualnie wybranej grupy.';
-      }
-    }
-    return null;
-  }
-
   get trainingGroupId(): number | null {
     return this.form.controls.trainingGroupId.value;
   }
@@ -242,7 +187,7 @@ export class TrainingCreatePage implements OnInit {
     this.errorMessage.set(null);
     this.form.markAllAsTouched();
     this.definitions.updateValueAndValidity();
-    if (this.form.invalid || this.assignmentError()) return;
+    if (this.form.invalid) return;
 
     this.submitting.set(true);
     this.trainingsApi.create(this.toRequest()).pipe(
@@ -275,35 +220,6 @@ export class TrainingCreatePage implements OnInit {
     });
   }
 
-  private loadAthletes(groupId: number): void {
-    const loadId = ++this.athleteLoadId;
-    this.athletesLoading.set(true);
-    this.groupError.set(null);
-    this.athletesApi.getAll().pipe(
-      take(1),
-      catchError((error: unknown) => {
-        if (loadId === this.athleteLoadId) {
-          this.groupError.set(this.getResourceError(error, 'zawodników dla wybranej grupy'));
-        }
-        return EMPTY;
-      }),
-      finalize(() => {
-        if (loadId === this.athleteLoadId) this.athletesLoading.set(false);
-      }),
-      takeUntilDestroyed(this.destroyRef),
-    ).subscribe((athletes) => {
-      if (loadId !== this.athleteLoadId || this.trainingGroupId !== groupId) return;
-      const eligibleAthletes = athletes.filter((athlete) => athlete.trainingGroupId === groupId);
-      this.athletes.set(eligibleAthletes);
-      const eligibleIds = new Set(eligibleAthletes.map((athlete) => athlete.id));
-      for (const definition of this.definitions.controls) {
-        definition.controls.athleteIds.setValue(
-          definition.controls.athleteIds.value.filter((athleteId) => eligibleIds.has(athleteId)),
-        );
-      }
-    });
-  }
-
   private toRequest(): CreateTrainingRequest {
     const value = this.form.getRawValue();
     const definitions: CreateTrainingDefinitionRequest[] = value.definitions.map((definition, index) => ({
@@ -314,7 +230,6 @@ export class TrainingCreatePage implements OnInit {
         distanceM: segment.distanceM!,
         restAfterSeconds: segment.restAfterSeconds,
       })),
-      athleteIds: [...definition.athleteIds],
     }));
     return {
       name: value.name.trim(),

@@ -123,6 +123,11 @@ describe('TrainingsPage', () => {
     expect(fixture.nativeElement.textContent).toContain('12.11.2026');
     expect(fixture.nativeElement.textContent).toContain('0');
     expect(fixture.nativeElement.querySelector('a[href="/trainings/2"]')).toBeTruthy();
+    expect(fixture.nativeElement.querySelector('a[href="/trainings/2/edit"]')?.textContent).toContain(
+      'Edytuj',
+    );
+    expect(fixture.nativeElement.querySelector('a[href="/trainings/2/complete"]')?.textContent)
+      .toContain('Uzupełnij trening');
     expect(fixture.nativeElement.querySelector('a[href="/trainings/new"]')?.textContent).toContain(
       'Dodaj trening',
     );

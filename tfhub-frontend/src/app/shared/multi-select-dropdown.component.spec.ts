@@ -32,7 +32,7 @@ describe('MultiSelectDropdownComponent', () => {
     expect(selection).toHaveBeenCalledWith([1]);
   });
 
-  it('summarizes selected groups and emits an empty selection when cleared', async () => {
+  it('lists selected groups and emits an empty selection when cleared', async () => {
     await TestBed.configureTestingModule({
       imports: [MultiSelectDropdownComponent],
     }).compileComponents();
@@ -50,12 +50,36 @@ describe('MultiSelectDropdownComponent', () => {
     fixture.componentInstance.selectedIdsChange.subscribe(selection);
     fixture.detectChanges();
 
-    expect(fixture.nativeElement.textContent).toContain('Wybrano grup: 3');
+    expect(fixture.nativeElement.textContent).toContain('Grupa 1, Grupa 2, Grupa 3');
     fixture.nativeElement.querySelector('button').click();
     fixture.detectChanges();
     (fixture.nativeElement.querySelector('.clear') as HTMLButtonElement).click();
 
     expect(selection).toHaveBeenCalledWith([]);
+  });
+
+  it('lists up to ten selected options and summarizes larger selections', async () => {
+    await TestBed.configureTestingModule({
+      imports: [MultiSelectDropdownComponent],
+    }).compileComponents();
+
+    const fixture = TestBed.createComponent(MultiSelectDropdownComponent);
+    fixture.componentRef.setInput('options', Array.from({ length: 11 }, (_, index) => ({
+      id: index + 1,
+      name: `Zawodnik ${index + 1}`,
+    })));
+    fixture.componentRef.setInput('selectedIds', Array.from({ length: 10 }, (_, index) => index + 1));
+    fixture.componentRef.setInput('label', 'Zawodnicy');
+    fixture.componentRef.setInput('controlId', 'athlete-options');
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.textContent).toContain(
+      'Zawodnik 1, Zawodnik 2, Zawodnik 3, Zawodnik 4, Zawodnik 5, Zawodnik 6, Zawodnik 7, Zawodnik 8, Zawodnik 9, Zawodnik 10',
+    );
+
+    fixture.componentRef.setInput('selectedIds', Array.from({ length: 11 }, (_, index) => index + 1));
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).toContain('Wybrano: 11');
   });
 
   it('filters searchable options by name and restores all options when closed', async () => {

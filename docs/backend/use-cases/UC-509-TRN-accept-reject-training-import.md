@@ -61,7 +61,7 @@ Rejection must preserve the import, its draft and original source image without 
 - All matched athletes must exist and belong to the selected group at the time of acceptance.
 - No athlete may be assigned to multiple definitions within the same training session.
 - All execution data must reference valid participants and segments.
-- Execution statuses and measured results must satisfy the rules defined in UC-502.
+- Execution statuses and measured results must satisfy the rules defined in UC-510.
 - A measured result must be a non-negative numeric value and may only be persisted with RECORDED status.
 - Spike usage must be persisted independently for each segment execution.
 - Recognition uncertainty may remain as historical information if the user has manually reviewed and corrected the corresponding data.
@@ -200,7 +200,7 @@ The exact response structure and field types will be defined during API design.
 8. Only existing athletes belonging to the selected group can be persisted as participants.
 9. Skipped athlete rows do not create athlete participations or execution records.
 10. Acceptance creates exactly one active training session.
-11. The created training session contains the reviewed definitions, segments, participants and execution data.
+11. The created training session contains the reviewed definitions, segments, participants and execution data. Import acceptance remains an atomic path that creates a complete session; normal post-creation participation and execution changes use UC-510.
 12. Execution statuses, measured results and spike usage are preserved.
 13. The import transitions to ACCEPTED only after successful creation of all training data.
 14. Acceptance is atomic: failure leaves no partially created training data and the import remains REVIEW_REQUIRED.

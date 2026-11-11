@@ -2,7 +2,7 @@
 
 ## 1. Purpose
 
-Allow an authorized user to create a training session, define its training variants, configure segments, and assign athletes to each variant.
+Allow an authorized user to create a training session and define its training variants and segments. Athlete assignments and execution data are added later through FE-TRAINING-009 – Complete Training.
 
 The view must follow the existing TFHUB visual design and interaction patterns.
 
@@ -15,7 +15,7 @@ The view must follow the existing TFHUB visual design and interaction patterns.
 
 - The user is authenticated.
 - The backend UC-502 endpoint is available.
-- Required training groups and athletes already exist.
+- Required training groups already exist.
 
 ## 4. Main Flow
 
@@ -28,10 +28,9 @@ The view must follow the existing TFHUB visual design and interaction patterns.
     - Enters its name.
     - Adds one or more training segments.
     - Configures the distance and rest after each segment.
-    - Assigns athletes to the definition.
 7. The user reviews the complete training structure.
 8. The user submits the form.
-9. The frontend sends the complete request to the backend UC-502 endpoint.
+9. The frontend sends the training plan to the backend UC-502 endpoint.
 10. On success, the user is redirected to the created training's details view.
 
 ## 5. Training Form
@@ -57,7 +56,7 @@ Rules:
 - Definitions can be added and removed.
 - Definitions can be reordered.
 - Each definition must contain at least one segment.
-- Each definition has its own independently managed list of segments and assigned athletes.
+- Each definition has its own independently managed list of segments.
 
 ### TrainingSegments
 
@@ -73,15 +72,6 @@ Rules:
 - The last segment may have no rest value if permitted by the backend rules.
 - Display segment order clearly.
 
-### Athlete assignment
-
-- Athletes are assigned separately to each definition.
-- Only athletes belonging to the selected training group can be assigned.
-- An athlete can belong to only one definition within the same training.
-- The UI must prevent assigning the same athlete to multiple definitions.
-- Changing the selected group must refresh the available athlete list and clear assignments that are no longer valid.
-- Use existing athlete-selection controls and patterns wherever possible.
-
 ## 6. Validation
 
 Validate the form before submission:
@@ -93,7 +83,6 @@ Validate the form before submission:
 - Every definition must contain at least one segment.
 - Segment distances must be positive.
 - Rest values must be valid.
-- Athlete assignments must be valid and unique across definitions.
 
 Display validation errors next to the relevant fields using existing TFHUB validation patterns.
 
@@ -109,7 +98,6 @@ Reuse existing components and conventions for:
 - Form layout and headings.
 - Text inputs and date pickers.
 - Select controls.
-- Athlete selection.
 - Add/remove buttons.
 - Reordering controls.
 - Validation messages.
@@ -122,7 +110,6 @@ The form should clearly distinguish:
 - Training details.
 - Individual definitions.
 - Segments within each definition.
-- Athletes assigned to each definition.
 
 The interface must remain usable on mobile devices, even when a training contains multiple definitions and segments.
 
@@ -130,7 +117,7 @@ All user-facing text must be in Polish.
 
 ## 8. Submission
 
-- Submit the complete training structure using the actual backend UC-502 request DTO.
+- Submit the training plan using the actual backend UC-502 request DTO. Do not send athlete assignments or execution data.
 - Do not invent or transform API fields beyond what the backend contract requires.
 - Prevent duplicate submissions while a request is in progress.
 - On success, navigate to the created training details view.
@@ -152,10 +139,8 @@ All user-facing text must be in Polish.
 - COACH can select only assigned groups.
 - User can create multiple definitions.
 - User can configure and reorder segments within each definition.
-- User can assign athletes to definitions.
-- Duplicate athlete assignments are prevented.
 - Form validation works correctly.
-- Successful submission creates a complete training through UC-502.
+- Successful submission creates a training plan without athlete participations through UC-502.
 - Successful creation redirects to training details.
 - Failed submission preserves entered data.
 - UI matches existing TFHUB forms and controls.

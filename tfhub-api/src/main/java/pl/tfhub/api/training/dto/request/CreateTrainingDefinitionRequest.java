@@ -11,8 +11,7 @@ import java.util.List;
 public record CreateTrainingDefinitionRequest(
         @NotBlank @Size(max = 255) String name,
         @NotNull @Positive Integer sequenceNumber,
-        @NotEmpty List<@NotNull @Valid CreateTrainingSegmentRequest> segments,
-        List<@NotNull @Positive Long> athleteIds) {
+        @NotEmpty List<@NotNull @Valid CreateTrainingSegmentRequest> segments) {
 
     public CreateTrainingDefinitionRequest {
         name = name == null ? null : name.strip();

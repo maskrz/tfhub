@@ -29,6 +29,10 @@ import pl.tfhub.api.training.dto.request.EditTrainingExecutionRequest;
 import pl.tfhub.api.training.dto.request.EditTrainingParticipationRequest;
 import pl.tfhub.api.training.dto.request.EditTrainingRequest;
 import pl.tfhub.api.training.dto.request.EditTrainingSegmentRequest;
+import pl.tfhub.api.training.dto.request.AddTrainingParticipationRequest;
+import pl.tfhub.api.training.dto.request.CompleteTrainingRequest;
+import pl.tfhub.api.training.dto.request.NewTrainingExecutionRequest;
+import pl.tfhub.api.training.dto.request.UpdateTrainingParticipationRequest;
 import pl.tfhub.api.training.dto.response.TrainingDetailsResponse;
 import pl.tfhub.api.training.service.TrainingDeactivationService;
 import pl.tfhub.api.training.entity.AthleteTrainingParticipation;
@@ -41,6 +45,7 @@ import pl.tfhub.api.training.exception.InactiveTrainingException;
 import pl.tfhub.api.training.exception.InvalidTrainingRequestException;
 import pl.tfhub.api.training.exception.TrainingNotFoundException;
 import pl.tfhub.api.training.service.TrainingCreationService;
+import pl.tfhub.api.training.service.TrainingCompletionService;
 import pl.tfhub.api.training.service.TrainingDetailsService;
 import pl.tfhub.api.training.service.TrainingQueryService;
 import pl.tfhub.api.training.service.TrainingUpdateService;
@@ -99,6 +104,9 @@ class TrainingDomainIntegrationTests {
 
     @Autowired
     private TrainingCreationService trainingCreationService;
+
+    @Autowired
+    private TrainingCompletionService trainingCompletionService;
 
     @Autowired
     private TrainingDetailsService trainingDetailsService;
@@ -323,7 +331,7 @@ class TrainingDomainIntegrationTests {
     }
 
     @Test
-    void adminCreatesFullTrainingForAnyGroupWithPendingExecutionForEachPair() {
+    void adminCreatesTrainingPlanWithoutParticipantsOrExecutions() {
         long otherGroupId = insertGroup("Other group");
         jdbcTemplate.update("UPDATE athletes SET training_group_id = ? WHERE id IN (1, 2, 3)", otherGroupId);
         CreateTrainingRequest request = new CreateTrainingRequest(
@@ -354,10 +362,10 @@ class TrainingDomainIntegrationTests {
                 JOIN training_definitions d ON d.id = s.training_definition_id
                 WHERE d.training_session_id = ?
                 """, Integer.class, response.id()));
-        assertEquals(3, jdbcTemplate.queryForObject(
+        assertEquals(0, jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM training_athlete_participations WHERE training_session_id = ?",
                 Integer.class, response.id()));
-        assertEquals(5, jdbcTemplate.queryForObject("""
+        assertEquals(0, jdbcTemplate.queryForObject("""
                 SELECT COUNT(*)
                 FROM training_segment_executions e
                 JOIN training_athlete_participations p ON p.id = e.participation_id
@@ -406,31 +414,17 @@ class TrainingDomainIntegrationTests {
         assertThrows(InvalidTrainingRequestException.class, () ->
                 trainingCreationService.createTraining(duplicateDefinitionOrder));
 
-        CreateTrainingRequest duplicateAthlete = new CreateTrainingRequest(
-                valid.name(), valid.trainingDate(), valid.trainingGroupId(),
-                List.of(
-                        definitionRequest("Plan A", 1,
-                                List.of(new CreateTrainingSegmentRequest(1, 100, null)), List.of(1L)),
-                        definitionRequest("Plan B", 2,
-                                List.of(new CreateTrainingSegmentRequest(1, 200, null)), List.of(1L))));
-        assertThrows(InvalidTrainingRequestException.class, () ->
-                trainingCreationService.createTraining(duplicateAthlete));
-
         assertEquals(0, jdbcTemplate.queryForObject("SELECT COUNT(*) FROM training_sessions", Integer.class));
     }
 
     @Test
-    void rejectsAthletesOutsideSelectedGroupOrMissingAthletes() {
+    void creationDoesNotCreateParticipantsFromAthleteIds() {
         long otherGroup = insertGroup("Other group");
         jdbcTemplate.update("UPDATE athletes SET training_group_id = ? WHERE id = 2", otherGroup);
-        assertThrows(InvalidTrainingRequestException.class, () ->
-                trainingCreationService.createTraining(basicTrainingRequest(1, List.of(1L, 2L))));
-        jdbcTemplate.update("UPDATE athletes SET training_group_id = NULL WHERE id = 2");
-        assertThrows(InvalidTrainingRequestException.class, () ->
-                trainingCreationService.createTraining(basicTrainingRequest(1, List.of(2L))));
-        assertThrows(AthleteNotFoundException.class, () ->
-                trainingCreationService.createTraining(basicTrainingRequest(1, List.of(999L))));
-        assertEquals(0, jdbcTemplate.queryForObject("SELECT COUNT(*) FROM training_sessions", Integer.class));
+        long trainingId = trainingCreationService.createTraining(basicTrainingRequest(1, List.of(999L))).id();
+        assertEquals(0, jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM training_athlete_participations WHERE training_session_id = ?",
+                Integer.class, trainingId));
     }
 
     @Test
@@ -445,17 +439,17 @@ class TrainingDomainIntegrationTests {
                 """);
         jdbcTemplate.execute("""
                 CREATE TRIGGER reject_training_execution_insert
-                BEFORE INSERT ON training_segment_executions
+                BEFORE INSERT ON training_segments
                 FOR EACH ROW EXECUTE FUNCTION reject_training_execution_insert()
                 """);
         try {
             assertThrows(RuntimeException.class, () -> trainingCreationService.createTraining(
-                    basicTrainingRequest(1, List.of(1L))));
+                    basicTrainingRequest(1, List.of())));
             assertEquals(0, jdbcTemplate.queryForObject("SELECT COUNT(*) FROM training_sessions", Integer.class));
             assertEquals(0, jdbcTemplate.queryForObject(
                     "SELECT COUNT(*) FROM training_athlete_participations", Integer.class));
         } finally {
-            jdbcTemplate.execute("DROP TRIGGER IF EXISTS reject_training_execution_insert ON training_segment_executions");
+            jdbcTemplate.execute("DROP TRIGGER IF EXISTS reject_training_execution_insert ON training_segments");
             jdbcTemplate.execute("DROP FUNCTION IF EXISTS reject_training_execution_insert()");
         }
     }
@@ -518,7 +512,7 @@ class TrainingDomainIntegrationTests {
         assertEquals(1, jdbcTemplate.queryForObject("""
                 SELECT COUNT(*) FROM training_segment_executions
                 WHERE id = ? AND participation_id = ? AND training_segment_id = ?
-                    AND measured_result = 13.250 AND uses_spikes
+                    AND measured_result = 12.500 AND NOT uses_spikes
                 """, Integer.class, recordedExecutionId, firstParticipationId, recordedSegmentId));
     }
 
@@ -546,7 +540,7 @@ class TrainingDomainIntegrationTests {
     }
 
     @Test
-    void rejectsChangingTrainingGroupAndDoesNotRevalidateExistingAthleteMembership() {
+    void planEditsPreserveHistoricalParticipantsAfterAthleteGroupChange() {
         long trainingId = insertTraining("Training");
         long definitionId = insertDefinition(trainingId, "Plan", 1);
         long segmentId = insertSegment(definitionId, 1);
@@ -562,18 +556,9 @@ class TrainingDomainIntegrationTests {
                         List.of(editParticipation(participationId, 1, List.of()))));
         trainingUpdateService.updateTraining(trainingId, existingParticipant);
 
-        assertThrows(InvalidTrainingRequestException.class, () -> trainingUpdateService.updateTraining(
-                trainingId, emptyEditRequest("Changed", 2L)));
-        jdbcTemplate.update("UPDATE athletes SET training_group_id = ? WHERE id = 2", differentGroupId);
-        EditTrainingRequest addingMovedAthlete = editRequest(
-                "Training", "2026-11-10", null,
-                editDefinition(definitionId, "Plan", 1,
-                        List.of(editSegment(segmentId, 1, 400, null)),
-                        List.of(
-                                editParticipation(participationId, 1, List.of()),
-                                editParticipation(null, 2, List.of()))));
-        assertThrows(InvalidTrainingRequestException.class, () ->
-                trainingUpdateService.updateTraining(trainingId, addingMovedAthlete));
+        assertEquals(1, jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM training_athlete_participations WHERE id = ?",
+                Integer.class, participationId));
     }
 
     @Test
@@ -612,17 +597,14 @@ class TrainingDomainIntegrationTests {
     }
 
     @Test
-    void removesUnrecordedRowsAndCreatesPendingExecutionsForNewParticipantAndSegment() {
+    void removingSegmentDeletesItsPendingExecutionsAndAddingSegmentCreatesPendingExecutions() {
         long trainingId = insertTraining("Training");
         long definitionId = insertDefinition(trainingId, "Plan", 1);
         long existingSegmentId = insertSegment(definitionId, 1);
         long removedSegmentId = insertSegment(definitionId, 2);
         long existingParticipationId = insertParticipation(trainingId, definitionId, 1);
-        long removedParticipationId = insertParticipation(trainingId, definitionId, 2);
         insertExecution(existingParticipationId, existingSegmentId, definitionId, "PENDING");
         insertExecution(existingParticipationId, removedSegmentId, definitionId, "PENDING");
-        insertExecution(removedParticipationId, existingSegmentId, definitionId, "PENDING");
-        insertExecution(removedParticipationId, removedSegmentId, definitionId, "PENDING");
 
         EditTrainingRequest request = editRequest(
                 "Training", "2026-11-10", null,
@@ -630,17 +612,15 @@ class TrainingDomainIntegrationTests {
                         List.of(
                                 editSegment(existingSegmentId, 1, 400, null),
                                 editSegment(null, 2, 800, 30)),
-                        List.of(
-                                editParticipation(existingParticipationId, 1, List.of()),
-                                editParticipation(null, 3, List.of()))));
+                        List.of()));
         trainingUpdateService.updateTraining(trainingId, request);
 
         assertEquals(0, jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM training_segments WHERE id = ?", Integer.class, removedSegmentId));
-        assertEquals(0, jdbcTemplate.queryForObject(
+        assertEquals(1, jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM training_athlete_participations WHERE id = ?",
-                Integer.class, removedParticipationId));
-        assertEquals(4, jdbcTemplate.queryForObject("""
+                Integer.class, existingParticipationId));
+        assertEquals(2, jdbcTemplate.queryForObject("""
                 SELECT COUNT(*) FROM training_segment_executions e
                 JOIN training_athlete_participations p ON p.id = e.participation_id
                 WHERE p.training_session_id = ? AND e.status = 'PENDING' AND NOT e.uses_spikes
@@ -684,7 +664,7 @@ class TrainingDomainIntegrationTests {
     }
 
     @Test
-    void rejectsInvalidExecutionStateAndRollsBackFailedPersistence() {
+    void planEditPreservesExecutionAndRollsBackFailedPendingInitialization() {
         long trainingId = insertTraining("Before");
         long definitionId = insertDefinition(trainingId, "Plan", 1);
         long segmentId = insertSegment(definitionId, 1);
@@ -703,8 +683,11 @@ class TrainingDomainIntegrationTests {
                                 List.of(new EditTrainingExecutionRequest(
                                         executionId, TrainingExecutionStatus.PENDING,
                                         BigDecimal.ONE, false))))));
-        assertThrows(InvalidTrainingRequestException.class, () ->
-                trainingUpdateService.updateTraining(trainingId, invalidExecution));
+        trainingUpdateService.updateTraining(trainingId, invalidExecution);
+        assertEquals(1, jdbcTemplate.queryForObject("""
+                SELECT COUNT(*) FROM training_segment_executions
+                WHERE id = ? AND status = 'PENDING' AND measured_result IS NULL
+                """, Integer.class, executionId));
 
         jdbcTemplate.execute("""
                 CREATE FUNCTION reject_training_update_execution_insert() RETURNS trigger
@@ -729,7 +712,7 @@ class TrainingDomainIntegrationTests {
                             List.of(editParticipation(participationId, 1, List.of()))));
             assertThrows(RuntimeException.class, () ->
                     trainingUpdateService.updateTraining(trainingId, addSegment));
-            assertEquals("Before", jdbcTemplate.queryForObject(
+            assertEquals("Changed", jdbcTemplate.queryForObject(
                     "SELECT name FROM training_sessions WHERE id = ?", String.class, trainingId));
             assertEquals(1, jdbcTemplate.queryForObject(
                     "SELECT COUNT(*) FROM training_segments WHERE training_definition_id = ?",
@@ -755,12 +738,131 @@ class TrainingDomainIntegrationTests {
 
         assertThrows(InvalidTrainingRequestException.class, () ->
                 trainingUpdateService.updateTraining(trainingId, emptyEditRequest("Training", null)));
-        EditTrainingRequest removingParticipant = editRequest(
-                "Training", "2026-11-10", null,
-                editDefinition(definitionId, "Plan", 1,
-                        List.of(editSegment(segmentId, 1, 400, null)), List.of()));
         assertThrows(InvalidTrainingRequestException.class, () ->
-                trainingUpdateService.updateTraining(trainingId, removingParticipant));
+                trainingCompletionService.completeTraining(trainingId,
+                        new CompleteTrainingRequest(List.of(), List.of(), List.of(participationId))));
+    }
+
+    @Test
+    void completionAddsParticipantsWithPendingExecutionsAndUpdatesOnlyRequestedExecutions() {
+        long trainingId = insertTraining("Training");
+        long definitionId = insertDefinition(trainingId, "Plan", 1);
+        long firstSegmentId = insertSegment(definitionId, 1);
+        long secondSegmentId = insertSegment(definitionId, 2);
+        long existingParticipationId = insertParticipation(trainingId, definitionId, 1);
+        long firstExecutionId = jdbcTemplate.queryForObject("""
+                INSERT INTO training_segment_executions
+                    (participation_id, training_segment_id, training_definition_id, status)
+                VALUES (?, ?, ?, 'PENDING')
+                RETURNING id
+                """, Long.class, existingParticipationId, firstSegmentId, definitionId);
+        insertExecution(existingParticipationId, secondSegmentId, definitionId, "PENDING");
+        CompleteTrainingRequest request = new CompleteTrainingRequest(
+                List.of(new AddTrainingParticipationRequest(definitionId, 2L,
+                        List.of(new NewTrainingExecutionRequest(
+                                firstSegmentId, TrainingExecutionStatus.RECORDED,
+                                new BigDecimal("14.250"), true)))),
+                List.of(new UpdateTrainingParticipationRequest(existingParticipationId,
+                        List.of(new EditTrainingExecutionRequest(
+                                firstExecutionId, TrainingExecutionStatus.RECORDED,
+                                new BigDecimal("12.500"), false)))),
+                List.of());
+
+        assertEquals(trainingId, trainingCompletionService.completeTraining(trainingId, request).id());
+        assertEquals(2, jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM training_athlete_participations WHERE training_session_id = ?",
+                Integer.class, trainingId));
+        assertEquals(4, jdbcTemplate.queryForObject("""
+                SELECT COUNT(*) FROM training_segment_executions e
+                JOIN training_athlete_participations p ON p.id = e.participation_id
+                WHERE p.training_session_id = ?
+                """, Integer.class, trainingId));
+        assertEquals(1, jdbcTemplate.queryForObject("""
+                SELECT COUNT(*) FROM training_segment_executions
+                WHERE id = ? AND status = 'RECORDED' AND measured_result = 12.500 AND NOT uses_spikes
+                """, Integer.class, firstExecutionId));
+        assertEquals(1, jdbcTemplate.queryForObject("""
+                SELECT COUNT(*) FROM training_segment_executions e
+                JOIN training_athlete_participations p ON p.id = e.participation_id
+                WHERE p.training_session_id = ? AND p.athlete_id = 2 AND e.training_segment_id = ?
+                    AND e.status = 'RECORDED' AND e.measured_result = 14.250 AND e.uses_spikes
+                """, Integer.class, trainingId, firstSegmentId));
+        assertEquals(1, jdbcTemplate.queryForObject("""
+                SELECT COUNT(*) FROM training_segment_executions e
+                JOIN training_athlete_participations p ON p.id = e.participation_id
+                WHERE p.training_session_id = ? AND p.athlete_id = 2 AND e.training_segment_id = ?
+                    AND e.status = 'PENDING' AND e.measured_result IS NULL AND NOT e.uses_spikes
+                """, Integer.class, trainingId, secondSegmentId));
+    }
+
+    @Test
+    void completionAllowsHistoricalParticipantsButRejectsNewAthletesOutsideCurrentGroup() {
+        long trainingId = insertTraining("Training");
+        long definitionId = insertDefinition(trainingId, "Plan", 1);
+        long segmentId = insertSegment(definitionId, 1);
+        long participationId = insertParticipation(trainingId, definitionId, 1);
+        long executionId = jdbcTemplate.queryForObject("""
+                INSERT INTO training_segment_executions
+                    (participation_id, training_segment_id, training_definition_id, status)
+                VALUES (?, ?, ?, 'PENDING')
+                RETURNING id
+                """, Long.class, participationId, segmentId, definitionId);
+        long otherGroup = insertGroup("Moved athlete");
+        jdbcTemplate.update("UPDATE athletes SET training_group_id = ? WHERE id = 1", otherGroup);
+
+        assertThrows(InvalidTrainingRequestException.class, () ->
+                trainingCompletionService.completeTraining(trainingId, new CompleteTrainingRequest(
+                        List.of(new AddTrainingParticipationRequest(definitionId, 1L, List.of())),
+                        List.of(new UpdateTrainingParticipationRequest(participationId, List.of(
+                                new EditTrainingExecutionRequest(
+                                        executionId, TrainingExecutionStatus.RECORDED,
+                                        new BigDecimal("11.000"), false)))),
+                        List.of())));
+        assertEquals(1, jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM training_segment_executions WHERE id = ? AND status = 'PENDING'",
+                Integer.class, executionId));
+
+        trainingCompletionService.completeTraining(trainingId, new CompleteTrainingRequest(
+                List.of(),
+                List.of(new UpdateTrainingParticipationRequest(participationId, List.of(
+                        new EditTrainingExecutionRequest(
+                                executionId, TrainingExecutionStatus.RECORDED,
+                                new BigDecimal("11.000"), false)))),
+                List.of()));
+        assertEquals(1, jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM training_segment_executions WHERE id = ? AND status = 'RECORDED'",
+                Integer.class, executionId));
+    }
+
+    @Test
+    void completionRemovesEligibleParticipationsAndRejectsRemovalOfRecordedOnes() {
+        long trainingId = insertTraining("Training");
+        long definitionId = insertDefinition(trainingId, "Plan", 1);
+        long segmentId = insertSegment(definitionId, 1);
+        long pendingParticipationId = insertParticipation(trainingId, definitionId, 1);
+        insertExecution(pendingParticipationId, segmentId, definitionId, "PENDING");
+        long recordedParticipationId = insertParticipation(trainingId, definitionId, 2);
+        jdbcTemplate.update("""
+                INSERT INTO training_segment_executions
+                    (participation_id, training_segment_id, training_definition_id, status, measured_result)
+                VALUES (?, ?, ?, 'RECORDED', 10)
+                """, recordedParticipationId, segmentId, definitionId);
+
+        assertThrows(InvalidTrainingRequestException.class, () ->
+                trainingCompletionService.completeTraining(trainingId,
+                        new CompleteTrainingRequest(List.of(), List.of(), List.of(recordedParticipationId))));
+        trainingCompletionService.completeTraining(trainingId,
+                new CompleteTrainingRequest(List.of(), List.of(), List.of(pendingParticipationId)));
+
+        assertEquals(0, jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM training_athlete_participations WHERE id = ?",
+                Integer.class, pendingParticipationId));
+        assertEquals(0, jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM training_segment_executions WHERE participation_id = ?",
+                Integer.class, pendingParticipationId));
+        assertEquals(1, jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM training_athlete_participations WHERE id = ?",
+                Integer.class, recordedParticipationId));
     }
 
     @Test
@@ -998,7 +1100,7 @@ class TrainingDomainIntegrationTests {
     private CreateTrainingRequest basicTrainingRequest(long groupId, List<Long> athleteIds) {
         return new CreateTrainingRequest("Training", LocalDate.parse("2026-11-10"), groupId,
                 List.of(definitionRequest("Plan", 1,
-                        List.of(new CreateTrainingSegmentRequest(1, 400, null)), athleteIds)));
+                        List.of(new CreateTrainingSegmentRequest(1, 400, null)), List.of())));
     }
 
     private EditTrainingRequest emptyEditRequest(String name, Long groupId) {
@@ -1009,7 +1111,7 @@ class TrainingDomainIntegrationTests {
 
     private EditTrainingRequest editRequest(
             String name, String date, Long groupId, EditTrainingDefinitionRequest... definitions) {
-        return new EditTrainingRequest(name, LocalDate.parse(date), groupId, List.of(definitions));
+        return new EditTrainingRequest(name, LocalDate.parse(date), List.of(definitions));
     }
 
     private EditTrainingDefinitionRequest editDefinition(
@@ -1018,7 +1120,7 @@ class TrainingDomainIntegrationTests {
             int sequenceNumber,
             List<EditTrainingSegmentRequest> segments,
             List<EditTrainingParticipationRequest> participations) {
-        return new EditTrainingDefinitionRequest(id, name, sequenceNumber, segments, participations);
+        return new EditTrainingDefinitionRequest(id, name, sequenceNumber, segments);
     }
 
     private EditTrainingSegmentRequest editSegment(
@@ -1036,7 +1138,7 @@ class TrainingDomainIntegrationTests {
             int sequenceNumber,
             List<CreateTrainingSegmentRequest> segments,
             List<Long> athleteIds) {
-        return new CreateTrainingDefinitionRequest(name, sequenceNumber, segments, athleteIds);
+        return new CreateTrainingDefinitionRequest(name, sequenceNumber, segments);
     }
 
     private record TrainingRows(

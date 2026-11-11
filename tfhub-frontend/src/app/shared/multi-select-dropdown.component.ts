@@ -138,8 +138,8 @@ export class MultiSelectDropdownComponent {
   selectionSummary(): string {
     const selected = this.options().filter((option) => this.selectedIds().includes(option.id));
     if (selected.length === 0) return this.emptySummary();
-    if (selected.length <= 2) return selected.map((option) => option.name).join(', ');
-    return `Wybrano grup: ${selected.length}`;
+    if (selected.length <= 10) return selected.map((option) => option.name).join(', ');
+    return `Wybrano: ${selected.length}`;
   }
 
   toggleOption(optionId: number, event: Event): void {

@@ -158,3 +158,63 @@ form { display: grid; gap: 1rem; }
   .form-actions { display: grid; grid-template-columns: 1fr 1fr; }
   .form-actions .button { width: 100%; }
 }
+
+  .edit-details-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .edit-details-grid input[readonly] { background: #f2f4f8; color: #526078; }
+  .participant-card {
+    background: #f7f8fa;
+    border: 1px solid #e1e5ec;
+    border-radius: .65rem;
+    display: grid;
+    gap: .85rem;
+    padding: .85rem;
+  }
+  .participant-heading {
+    align-items: baseline;
+    display: flex;
+    flex-wrap: wrap;
+    gap: .5rem 1rem;
+    justify-content: space-between;
+  }
+  .participant-heading h5 { color: #20283a; font-size: 1rem; margin: 0; }
+  .execution-grid { display: grid; gap: .75rem; }
+  .execution-card {
+    background: #fff;
+    border: 1px solid #e1e5ec;
+    border-radius: .55rem;
+    display: grid;
+    gap: .75rem;
+    padding: .75rem;
+  }
+  .execution-card h6 { color: #20283a; font-size: .95rem; margin: 0; }
+  .execution-fields {
+    align-items: end;
+    display: grid;
+    gap: .75rem;
+    grid-template-columns: minmax(10rem, 1.2fr) minmax(8rem, 1fr) auto;
+  }
+  .spikes-control {
+    align-items: center;
+    color: #20283a;
+    display: flex;
+    gap: .5rem;
+    min-height: var(--field-height);
+    white-space: nowrap;
+  }
+  .spikes-control input { accent-color: #198754; height: 1rem; width: 1rem; }
+  .execution-pending { align-content: start; }
+  .execution-pending p { margin: 0; }
+  .form-error > p { margin: 0 0 .75rem; }
+  .form-error ul { margin: .5rem 0 0; padding-left: 1.25rem; }
+
+  @media (max-width: 850px) {
+    .edit-details-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .edit-details-grid .field:last-child { grid-column: 1 / -1; }
+  }
+
+  @media (max-width: 600px) {
+    .edit-details-grid { grid-template-columns: minmax(0, 1fr); }
+    .edit-details-grid .field:last-child { grid-column: auto; }
+    .execution-fields { grid-template-columns: minmax(0, 1fr); }
+    .spikes-control { min-height: auto; }
+  }

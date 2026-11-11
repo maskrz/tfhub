@@ -1,7 +1,14 @@
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
-import { CreateTrainingRequest, CreateTrainingResponse } from './training.model';
+import {
+  CreateTrainingRequest,
+  CreateTrainingResponse,
+  CompleteTrainingRequest,
+  EditTrainingRequest,
+  TrainingDetails,
+  UpdateTrainingResponse,
+} from './training.model';
 import { TrainingsApiService } from './trainings-api.service';
 
 describe('TrainingsApiService', () => {
@@ -46,7 +53,6 @@ describe('TrainingsApiService', () => {
         name: 'Główna',
         sequenceNumber: 1,
         segments: [{ sequenceNumber: 1, distanceM: 200, restAfterSeconds: null }],
-        athleteIds: [8],
       }],
     };
     const response: CreateTrainingResponse = { id: 12 };
@@ -59,5 +65,69 @@ describe('TrainingsApiService', () => {
     expect(request.request.body).toEqual(body);
     request.flush(response, { status: 201, statusText: 'Created' });
     expect(actual).toEqual(response);
+  });
+
+  it('retrieves a training with all details from the UC-504 endpoint', () => {
+    const response: TrainingDetails = {
+      id: 12,
+      name: 'Trening szybkościowy',
+      trainingDate: '2026-11-11',
+      active: true,
+      trainingGroup: { id: 3, name: 'Sprint' },
+      definitions: [],
+    };
+    let actual: TrainingDetails | undefined;
+
+    service.getById(12).subscribe((training) => (actual = training));
+
+    const request = httpTesting.expectOne('/api/trainings/12');
+    expect(request.request.method).toBe('GET');
+    request.flush(response);
+    expect(actual).toEqual(response);
+  });
+
+  it('updates a training using the UC-503 endpoint and edit request DTO', () => {
+    const body: EditTrainingRequest = {
+      name: 'Trening zmieniony',
+      trainingDate: '2026-11-12',
+      definitions: [{
+        id: 5,
+        name: 'Główna',
+        sequenceNumber: 1,
+        segments: [{ id: 8, sequenceNumber: 1, distanceM: 400, restAfterSeconds: 90 }],
+      }],
+    };
+    const response: UpdateTrainingResponse = { id: 12 };
+    let actual: UpdateTrainingResponse | undefined;
+
+    service.update(12, body).subscribe((result) => (actual = result));
+
+    const request = httpTesting.expectOne('/api/trainings/12');
+    expect(request.request.method).toBe('PUT');
+    expect(request.request.body).toEqual(body);
+    request.flush(response);
+    expect(actual).toEqual(response);
+  });
+
+  it('submits explicit completion operations to UC-510', () => {
+    const body: CompleteTrainingRequest = {
+      add: [{ definitionId: 5, athleteId: 20, executionUpdates: [] }],
+      update: [{ id: 10, executionUpdates: [{
+        id: 15,
+        status: 'RECORDED',
+        measuredResult: 52.4,
+        usesSpikes: true,
+      }] }],
+      removeParticipationIds: [],
+    };
+    let actual: UpdateTrainingResponse | undefined;
+
+    service.complete(12, body).subscribe((result) => (actual = result));
+
+    const request = httpTesting.expectOne('/api/trainings/12/participations');
+    expect(request.request.method).toBe('PATCH');
+    expect(request.request.body).toEqual(body);
+    request.flush({ id: 12 });
+    expect(actual).toEqual({ id: 12 });
   });
 });

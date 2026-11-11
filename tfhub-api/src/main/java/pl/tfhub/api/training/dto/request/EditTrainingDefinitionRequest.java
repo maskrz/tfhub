@@ -14,8 +14,7 @@ public record EditTrainingDefinitionRequest(
         @Positive @JsonDeserialize(using = StrictLongDeserializer.class) Long id,
         @NotBlank @Size(max = 255) String name,
         @NotNull @Positive Integer sequenceNumber,
-        @NotEmpty List<@NotNull @Valid EditTrainingSegmentRequest> segments,
-        @NotNull List<@NotNull @Valid EditTrainingParticipationRequest> participations) {
+        @NotEmpty List<@NotNull @Valid EditTrainingSegmentRequest> segments) {
 
     public EditTrainingDefinitionRequest {
         name = name == null ? null : name.strip();

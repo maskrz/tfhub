@@ -1,0 +1,135 @@
+<section class="page" aria-labelledby="page-title">
+  <div class="page-heading">
+    <div>
+      <a class="back-link" routerLink="/trainings">← Wróć do treningów</a>
+      <h1 id="page-title">Uzupełnij trening</h1>
+    </div>
+  </div>
+
+  @if (loading()) {
+    <p class="field-hint" role="status">Ładowanie treningu...</p>
+  } @else if (loadError(); as message) {
+    <div class="form-error" role="alert">
+      <p>{{ message }}</p>
+      <button type="button" class="button button--secondary" (click)="retry()">Spróbuj ponownie</button>
+    </div>
+  } @else if (training(); as currentTraining) {
+    @if (errorMessage(); as message) {
+      <p class="form-error page-error" role="alert">{{ message }}</p>
+    }
+    @if (assignmentMessage(); as message) {
+      <p class="field-error" role="alert">{{ message }}</p>
+    }
+
+    <section class="form-section" aria-labelledby="training-info-heading">
+      <h2 id="training-info-heading">{{ currentTraining.name }}</h2>
+      <p>{{ currentTraining.trainingDate }} · {{ currentTraining.trainingGroup.name }}</p>
+    </section>
+
+    <form [formGroup]="form" (ngSubmit)="submit()" novalidate>
+      @for (definition of definitions.controls; track definition.controls.id.value; let definitionIndex = $index) {
+        <section class="form-section" [formGroup]="definition"
+          [attr.aria-labelledby]="'definition-heading-' + definitionIndex">
+          <div class="section-heading">
+            <div>
+              <h2 [id]="'definition-heading-' + definitionIndex">
+                {{ currentTraining.definitions[definitionIndex].name }}
+              </h2>
+              <p>Wpisz czas mm:ss,SS, X (ukończono bez wyniku) lub - (nie ukończono). Zaznacz K, jeśli zawodnik używał kolców.</p>
+            </div>
+          </div>
+          @if (athletesLoading()) {
+            <p class="field-hint" role="status">Ładowanie zawodników...</p>
+          } @else {
+            <app-multi-select-dropdown
+              [options]="optionsFor(definitionIndex)"
+              [selectedIds]="selectedIds(definitionIndex)"
+              [label]="'Zawodnicy dla definicji ' + (definitionIndex + 1)"
+              [controlId]="'definition-athletes-' + definitionIndex"
+              [emptySummary]="'Wybierz zawodników'"
+              [searchable]="true"
+              [searchLabel]="'Szukaj zawodników dla definicji ' + (definitionIndex + 1)"
+              [searchPlaceholder]="'Wyszukaj zawodnika...'"
+              (selectedIdsChange)="onAthletesChange(definitionIndex, $event)"
+            />
+          }
+
+          @if (participants(definitionIndex).length === 0) {
+            <p class="field-hint empty-participants">Nie przypisano jeszcze zawodników.</p>
+          } @else {
+            <div class="results-table-scroll" role="region" aria-label="Tabela wyników treningu" tabindex="0">
+              <table class="results-table">
+                <thead>
+                  <tr>
+                    <th class="athlete-column" scope="col">Zawodnik</th>
+                    @for (segment of currentTraining.definitions[definitionIndex].segments; track segment.id) {
+                      <th scope="col">
+                        <span>Odcinek {{ segment.sequenceNumber }}</span>
+                        <span class="segment-distance">{{ segment.distanceM }} m</span>
+                      </th>
+                    }
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (participant of participants(definitionIndex).controls; track participant.controls.athleteId.value) {
+                    <tr>
+                      <th class="athlete-name" scope="row">
+                        {{ participant.controls.firstName.value }} {{ participant.controls.lastName.value }}
+                      </th>
+                      @for (segment of currentTraining.definitions[definitionIndex].segments; track segment.id) {
+                        <td>
+                          @if (executionFor(participant, segment.id); as execution) {
+                            <div class="result-cell" [formGroup]="execution">
+                              <input class="field-control result-input" type="text" inputmode="text"
+                                placeholder="mm:ss,SS / X / -"
+                                [id]="resultInputId(definitionIndex, participant.controls.athleteId.value, segment.id)"
+                                [attr.aria-label]="resultAriaLabel(participant, segment.sequenceNumber)"
+                                [attr.aria-invalid]="resultInvalid(execution) ? 'true' : null"
+                                [formControl]="execution.controls.measuredResult"
+                                (input)="resultChanged(execution)"
+                                (blur)="formatResultOnBlur(execution)" />
+                              <label class="spikes-control">
+                                <input type="checkbox" [attr.aria-label]="spikesAriaLabel(participant, segment.sequenceNumber)"
+                                  [formControl]="execution.controls.usesSpikes" />
+                                <span>K</span>
+                              </label>
+                            </div>
+                          }
+                        </td>
+                      }
+                    </tr>
+                  }
+                </tbody>
+                <tfoot>
+                  <tr>
+                    <th class="athlete-column" scope="row">Zawodnik</th>
+                    @for (segment of currentTraining.definitions[definitionIndex].segments; track segment.id) {
+                      <th scope="col">
+                        <span>Odcinek {{ segment.sequenceNumber }}</span>
+                        <span class="segment-distance">{{ segment.distanceM }} m</span>
+                      </th>
+                    }
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          }
+        </section>
+
+        @if (successMessage(); as message) {
+          <div class="success-toast" role="status" aria-live="polite">
+            <span>{{ message }}</span>
+            <button type="button" aria-label="Zamknij powiadomienie" (click)="dismissSuccessMessage()">×</button>
+          </div>
+        }
+      }
+
+      <footer class="form-actions">
+        <a class="button button--secondary" routerLink="/trainings">Anuluj</a>
+        <button type="submit" class="button button--primary" [disabled]="submitting() || athletesLoading()">
+          {{ submitting() ? 'Zapisywanie...' : 'Zapisz uzupełnienie' }}
+        </button>
+      </footer>
+    </form>
+  }
+</section>
