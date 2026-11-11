@@ -12,6 +12,9 @@ node_modules/
 dist/
 .angular/
 
+# Local proof-of-concept artifacts
+/poc/
+
 # Environment and secrets
 .env
 .env.*
