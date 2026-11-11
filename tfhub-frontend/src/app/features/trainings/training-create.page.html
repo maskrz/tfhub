@@ -179,20 +179,17 @@
                   }
                 </div>
                 <div class="field">
-                  <label [for]="'segment-rest-' + definitionIndex + '-' + segmentIndex">Przerwa po odcinku (s)</label>
+                  <label [for]="'segment-rest-' + definitionIndex + '-' + segmentIndex">Przerwa po odcinku</label>
                   <input
                     class="field-control"
-                    type="number"
-                    min="0"
-                    max="2147483647"
-                    step="1"
-                    inputmode="numeric"
+                    type="text"
+                    inputmode="decimal"
                     [id]="'segment-rest-' + definitionIndex + '-' + segmentIndex"
                     [formControl]="segment.controls.restAfterSeconds"
-                    [attr.aria-invalid]="fieldError(segment.controls.restAfterSeconds, '', 'Przerwa musi być nieujemną liczbą całkowitą.') ? 'true' : null"
-                    [attr.aria-describedby]="'segment-rest-error-' + definitionIndex + '-' + segmentIndex"
+                    [attr.aria-invalid]="fieldError(segment.controls.restAfterSeconds, '', 'Podaj minuty lub sekundy, np. 5, 1,5 albo 45s.') ? 'true' : null"
+                    [attr.aria-describedby]="'segment-rest-hint-' + definitionIndex + '-' + segmentIndex + ' segment-rest-error-' + definitionIndex + '-' + segmentIndex"
                   />
-                  @if (fieldError(segment.controls.restAfterSeconds, '', 'Przerwa musi być nieujemną liczbą całkowitą.'); as message) {
+                  @if (fieldError(segment.controls.restAfterSeconds, '', 'Podaj minuty lub sekundy, np. 5, 1,5 albo 45s.'); as message) {
                     <span class="field-error" [id]="'segment-rest-error-' + definitionIndex + '-' + segmentIndex">{{ message }}</span>
                   }
                 </div>

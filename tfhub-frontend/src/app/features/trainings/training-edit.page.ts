@@ -11,12 +11,13 @@ import {
   TrainingDetails,
   UpdateTrainingResponse,
 } from './training.model';
+import { formatRestDuration, parseRestDuration } from './training-rest-time';
 import { TrainingsApiService } from './trainings-api.service';
 
 type SegmentForm = FormGroup<{
   id: FormControl<number | null>;
   distanceM: FormControl<number | null>;
-  restAfterSeconds: FormControl<number | null>;
+  restAfterSeconds: FormControl<string>;
 }>;
 
 type DefinitionForm = FormGroup<{
@@ -29,6 +30,11 @@ const trimmedRequired: ValidatorFn = (control) =>
   typeof control.value === 'string' && control.value.trim().length === 0
     ? { required: true }
     : null;
+
+const validRestDuration: ValidatorFn = (control) => {
+  const value = typeof control.value === 'string' ? control.value : '';
+  return value.trim() === '' || parseRestDuration(value) !== null ? null : { restDuration: true };
+};
 
 const validDate: ValidatorFn = (control) => {
   const value = control.value;
@@ -50,8 +56,9 @@ function createSegmentForm(
     distanceM: new FormControl(distanceM, {
       validators: [Validators.required, Validators.min(1), Validators.max(2147483647), Validators.pattern(/^\d+$/)],
     }),
-    restAfterSeconds: new FormControl(restAfterSeconds, {
-      validators: [Validators.min(0), Validators.max(2147483647), Validators.pattern(/^\d+$/)],
+    restAfterSeconds: new FormControl(formatRestDuration(restAfterSeconds), {
+      nonNullable: true,
+      validators: [validRestDuration],
     }),
   });
 }
@@ -151,6 +158,7 @@ export class TrainingEditPage implements OnInit {
     if (!this.attemptedSubmit() || control.valid) return null;
     if (control.hasError('required')) return required;
     if (control.hasError('min') || control.hasError('max') || control.hasError('pattern')) return invalid;
+    if (control.hasError('restDuration')) return invalid;
     if (control.hasError('date')) return invalid;
     return null;
   }
@@ -238,7 +246,7 @@ export class TrainingEditPage implements OnInit {
         id: segment.id,
         sequenceNumber: segmentIndex + 1,
         distanceM: segment.distanceM!,
-        restAfterSeconds: segment.restAfterSeconds,
+        restAfterSeconds: parseRestDuration(segment.restAfterSeconds),
       })),
     }));
     return {

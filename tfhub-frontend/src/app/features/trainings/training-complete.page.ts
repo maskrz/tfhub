@@ -264,6 +264,19 @@ export class TrainingCompletePage implements OnInit, OnDestroy {
     return `Kolce: ${participant.controls.firstName.value} ${participant.controls.lastName.value}, odcinek ${segmentSequenceNumber}`;
   }
 
+  segmentPlanLabel(distanceM: number, restAfterSeconds: number | null): string {
+    const distance = `${distanceM}m`;
+    if (restAfterSeconds === null) return distance;
+    const minutes = Math.floor(restAfterSeconds / 60);
+    const seconds = restAfterSeconds % 60;
+    const rest = seconds === 0
+      ? `${minutes}min`
+      : minutes === 0
+        ? `${seconds}s`
+        : `${minutes}min ${seconds}s`;
+    return `${distance} / ${rest}`;
+  }
+
   submit(): void {
     if (this.submitting() || !this.training()) return;
     this.attemptedSubmit.set(true);

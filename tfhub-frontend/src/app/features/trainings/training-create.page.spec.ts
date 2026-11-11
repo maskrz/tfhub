@@ -102,14 +102,14 @@ describe('TrainingCreatePage', () => {
     fixture.detectChanges();
     enterDefinition(0, 'Główna', '2147483648');
     const restInput = fixture.nativeElement.querySelector('input[id^="segment-rest-"]') as HTMLInputElement;
-    restInput.value = '-1';
+    restInput.value = '35791395';
     restInput.dispatchEvent(new Event('input'));
     fixture.detectChanges();
     (fixture.nativeElement.querySelector('button[type="submit"]') as HTMLButtonElement).click();
     fixture.detectChanges();
 
     expect(fixture.nativeElement.textContent).toContain('Dystans musi być dodatnią liczbą całkowitą.');
-    expect(fixture.nativeElement.textContent).toContain('Przerwa musi być nieujemną liczbą całkowitą.');
+    expect(fixture.nativeElement.textContent).toContain('Podaj minuty lub sekundy');
     expect(trainingsApi.create).not.toHaveBeenCalled();
   });
 
@@ -139,7 +139,7 @@ describe('TrainingCreatePage', () => {
     fixture.detectChanges();
     enterDefinition(0, 'Główna', '400');
     const restInput = fixture.nativeElement.querySelector('input[id^="segment-rest-"]') as HTMLInputElement;
-    restInput.value = '90';
+    restInput.value = '1,5';
     restInput.dispatchEvent(new Event('input'));
     fixture.detectChanges();
 
@@ -160,6 +160,25 @@ describe('TrainingCreatePage', () => {
       }],
     });
     expect(navigate).toHaveBeenCalledWith(['/trainings', 77]);
+  });
+
+  it('converts plain minute values and explicit second values to seconds', async () => {
+    await createPage();
+    vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+    fillRequiredFields();
+    await fixture.whenStable();
+    fixture.detectChanges();
+    enterDefinition(0, 'Główna', '400');
+
+    const page = fixture.componentInstance;
+    page.definitions.at(0).controls.segments.at(0).controls.restAfterSeconds.setValue('5');
+    page.addSegment(0);
+    page.definitions.at(0).controls.segments.at(1).controls.distanceM.setValue(200);
+    page.definitions.at(0).controls.segments.at(1).controls.restAfterSeconds.setValue('45s');
+    page.submit();
+
+    const request = trainingsApi.create.mock.calls[0][0] as CreateTrainingRequest;
+    expect(request.definitions[0].segments.map((segment) => segment.restAfterSeconds)).toEqual([300, 45]);
   });
 
   it('preserves entered form data and reports failed creation', async () => {

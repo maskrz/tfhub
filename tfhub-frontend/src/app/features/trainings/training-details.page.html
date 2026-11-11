@@ -1,0 +1,130 @@
+<section class="page" aria-labelledby="page-title">
+  <div class="page-heading">
+    <div>
+      <a class="back-link" routerLink="/trainings">← Wróć do treningów</a>
+      <h1 id="page-title">Szczegóły treningu</h1>
+    </div>
+  </div>
+
+  @if (loading()) {
+    <p class="feedback" role="status">Ładowanie treningu...</p>
+  } @else if (errorMessage(); as message) {
+    <div class="feedback error" role="alert">
+      <p>{{ message }}</p>
+      <button type="button" class="button button--primary retry-button" (click)="retry()">
+        Spróbuj ponownie
+      </button>
+    </div>
+  } @else if (training(); as currentTraining) {
+    <section class="details-card training-summary" aria-label="Dane treningu">
+      <div class="summary-heading">
+        <div>
+          <h2>{{ currentTraining.name }}</h2>
+          <p>{{ formatDate(currentTraining.trainingDate) }} · {{ currentTraining.trainingGroup.name }}</p>
+        </div>
+        <span class="status-badge" [class.status-badge--inactive]="!currentTraining.active">
+          {{ currentTraining.active ? 'Aktywny' : 'Nieaktywny' }}
+        </span>
+      </div>
+      @if (currentTraining.active) {
+        <div class="training-actions">
+          <a class="button button--secondary" [routerLink]="['/trainings', currentTraining.id, 'edit']">
+            Edytuj trening
+          </a>
+          <a class="button button--primary" [routerLink]="['/trainings', currentTraining.id, 'complete']">
+            Uzupełnij trening
+          </a>
+        </div>
+      }
+    </section>
+
+    @if (currentTraining.definitions.length === 0) {
+      <p class="feedback" role="status">Ten trening nie ma jeszcze podgrup.</p>
+    } @else {
+      @for (definition of currentTraining.definitions; track definition.id) {
+        <section class="details-card definition-card" [attr.aria-labelledby]="'definition-' + definition.id">
+          <div class="section-heading">
+            <h2 [id]="'definition-' + definition.id">{{ definition.sequenceNumber }}. {{ definition.name }}</h2>
+          </div>
+
+          @if (definition.segments.length === 0) {
+            <p class="empty-message" role="status">Brak zaplanowanych odcinków.</p>
+          } @else {
+            <div class="table-surface segments-surface">
+              <table class="segments-table">
+                <thead>
+                  <tr>
+                    <th scope="col">Odcinek</th>
+                    <th scope="col">Dystans</th>
+                    <th scope="col">Przerwa po odcinku</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (segment of definition.segments; track segment.id) {
+                    <tr>
+                      <th scope="row">{{ segment.sequenceNumber }}</th>
+                      <td>{{ segment.distanceM }} m</td>
+                      <td>{{ segment.restAfterSeconds === null ? '—' : segment.restAfterSeconds + ' s' }}</td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          }
+
+          <section class="participants-section" [attr.aria-labelledby]="'participants-' + definition.id">
+            <h3 [id]="'participants-' + definition.id">Zawodnicy</h3>
+            @if (definition.participations.length === 0) {
+              <p class="empty-message" role="status">Nie przypisano zawodników do tej podgrupy.</p>
+            } @else if (definition.segments.length === 0) {
+              <ul class="participant-list">
+                @for (participant of definition.participations; track participant.id) {
+                  <li>{{ participant.firstName }} {{ participant.lastName }}</li>
+                }
+              </ul>
+            } @else {
+              <div class="table-scroll" role="region" [attr.aria-label]="'Wyniki zawodników: ' + definition.name" tabindex="0">
+                <table class="executions-table">
+                  <thead>
+                    <tr>
+                      <th scope="col">Zawodnik</th>
+                      @for (segment of definition.segments; track segment.id) {
+                        <th scope="col">
+                          <span>Odcinek {{ segment.sequenceNumber }}</span>
+                          <span class="segment-distance">{{ segment.distanceM }} m</span>
+                        </th>
+                      }
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (participant of definition.participations; track participant.id) {
+                      <tr>
+                        <th scope="row">{{ participant.firstName }} {{ participant.lastName }}</th>
+                        @for (segment of definition.segments; track segment.id) {
+                          @if (executionFor(participant, segment.id); as execution) {
+                            <td>
+                              <span class="execution-result">{{ resultLabel(execution) }}</span>
+                              @if (execution.usesSpikes) {
+                                <span class="spikes-label">Kolce</span>
+                              }
+                            </td>
+                          } @else {
+                            <td><span class="execution-result"></span></td>
+                          }
+                        }
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+            }
+          </section>
+        </section>
+      }
+    }
+
+    <footer class="page-actions">
+      <a class="button button--secondary" routerLink="/trainings">Wróć do treningów</a>
+    </footer>
+  }
+</section>

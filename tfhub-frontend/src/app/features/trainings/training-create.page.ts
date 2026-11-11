@@ -11,11 +11,12 @@ import {
   CreateTrainingRequest,
   CreateTrainingResponse,
 } from './training.model';
+import { parseRestDuration } from './training-rest-time';
 import { TrainingsApiService } from './trainings-api.service';
 
 type SegmentForm = FormGroup<{
   distanceM: FormControl<number | null>;
-  restAfterSeconds: FormControl<number | null>;
+  restAfterSeconds: FormControl<string>;
 }>;
 
 type DefinitionForm = FormGroup<{
@@ -36,6 +37,11 @@ const trimmedMaxLength = (max: number): ValidatorFn => (control) =>
 const integer: ValidatorFn = (control) =>
   control.value !== null && !Number.isInteger(control.value) ? { integer: true } : null;
 
+const validRestDuration: ValidatorFn = (control) => {
+  const value = typeof control.value === 'string' ? control.value : '';
+  return value.trim() === '' || parseRestDuration(value) !== null ? null : { restDuration: true };
+};
+
 const validDate: ValidatorFn = (control) => {
   const value = control.value;
   if (typeof value !== 'string' || value === '') return null;
@@ -53,8 +59,9 @@ function createSegmentForm(): SegmentForm {
     distanceM: new FormControl<number | null>(null, {
       validators: [Validators.required, Validators.min(1), Validators.max(2147483647), integer],
     }),
-    restAfterSeconds: new FormControl<number | null>(null, {
-      validators: [Validators.min(0), Validators.max(2147483647), integer],
+    restAfterSeconds: new FormControl('', {
+      nonNullable: true,
+      validators: [validRestDuration],
     }),
   });
 }
@@ -172,6 +179,7 @@ export class TrainingCreatePage implements OnInit {
     if (control.hasError('min') || control.hasError('max') || control.hasError('integer')) {
       return invalidMessage;
     }
+    if (control.hasError('restDuration')) return invalidMessage;
     if (control.hasError('date')) return invalidMessage;
     if (control.hasError('maxlength')) return 'Nazwa może mieć maksymalnie 255 znaków.';
     return null;
@@ -228,7 +236,7 @@ export class TrainingCreatePage implements OnInit {
       segments: definition.segments.map((segment, segmentIndex) => ({
         sequenceNumber: segmentIndex + 1,
         distanceM: segment.distanceM!,
-        restAfterSeconds: segment.restAfterSeconds,
+        restAfterSeconds: parseRestDuration(segment.restAfterSeconds),
       })),
     }));
     return {

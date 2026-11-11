@@ -90,8 +90,12 @@ describe('TrainingCompletePage', () => {
     expect(page.executionFor(page.participants(0).at(0), 8)?.controls.measuredResult.value).toBe('52,40');
     expect(fixture.nativeElement.querySelector('.results-table')).not.toBeNull();
     expect(fixture.nativeElement.textContent).toContain('Odcinek 1');
+    expect(fixture.nativeElement.querySelector('.results-table thead').textContent).toContain('400m / 1min 30s');
+    expect(fixture.nativeElement.querySelector('.results-table thead').textContent).toContain('200m');
+    expect(fixture.nativeElement.querySelector('.results-table thead').textContent).not.toContain('200m /');
     expect(fixture.nativeElement.querySelectorAll('.results-table tfoot th')).toHaveLength(3);
     expect(fixture.nativeElement.querySelector('.results-table tfoot').textContent).toContain('Odcinek 2');
+    expect(fixture.nativeElement.querySelector('.results-table tfoot').textContent).toContain('400m / 1min 30s');
     expect(fixture.nativeElement.querySelector('.spikes-control span')?.textContent).toBe('K');
     expect(fixture.nativeElement.querySelector('footer a').getAttribute('href')).toBe('/trainings');
   });

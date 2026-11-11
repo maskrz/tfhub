@@ -21,9 +21,13 @@
       <p class="field-error" role="alert">{{ message }}</p>
     }
 
-    <section class="form-section" aria-labelledby="training-info-heading">
-      <h2 id="training-info-heading">{{ currentTraining.name }}</h2>
-      <p>{{ currentTraining.trainingDate }} · {{ currentTraining.trainingGroup.name }}</p>
+    <section class="form-section training-summary" aria-labelledby="training-info-heading">
+      <div class="summary-heading">
+        <div>
+          <h2 id="training-info-heading">{{ currentTraining.name }}</h2>
+          <p>{{ currentTraining.trainingDate }} · {{ currentTraining.trainingGroup.name }}</p>
+        </div>
+      </div>
     </section>
 
     <form [formGroup]="form" (ngSubmit)="submit()" novalidate>
@@ -65,7 +69,7 @@
                     @for (segment of currentTraining.definitions[definitionIndex].segments; track segment.id) {
                       <th scope="col">
                         <span>Odcinek {{ segment.sequenceNumber }}</span>
-                        <span class="segment-distance">{{ segment.distanceM }} m</span>
+                        <span class="segment-distance">{{ segmentPlanLabel(segment.distanceM, segment.restAfterSeconds) }}</span>
                       </th>
                     }
                   </tr>
@@ -81,7 +85,6 @@
                           @if (executionFor(participant, segment.id); as execution) {
                             <div class="result-cell" [formGroup]="execution">
                               <input class="field-control result-input" type="text" inputmode="text"
-                                placeholder="mm:ss,SS / X / -"
                                 [id]="resultInputId(definitionIndex, participant.controls.athleteId.value, segment.id)"
                                 [attr.aria-label]="resultAriaLabel(participant, segment.sequenceNumber)"
                                 [attr.aria-invalid]="resultInvalid(execution) ? 'true' : null"
@@ -106,7 +109,7 @@
                     @for (segment of currentTraining.definitions[definitionIndex].segments; track segment.id) {
                       <th scope="col">
                         <span>Odcinek {{ segment.sequenceNumber }}</span>
-                        <span class="segment-distance">{{ segment.distanceM }} m</span>
+                        <span class="segment-distance">{{ segmentPlanLabel(segment.distanceM, segment.restAfterSeconds) }}</span>
                       </th>
                     }
                   </tr>

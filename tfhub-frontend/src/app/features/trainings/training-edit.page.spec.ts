@@ -63,6 +63,7 @@ describe('TrainingEditPage', () => {
     expect(fixture.nativeElement.querySelector('#training-group').value).toBe('Sprint');
     expect(fixture.nativeElement.querySelector('#training-group').readOnly).toBe(true);
     expect(page.definitions.at(0).controls.segments.at(0).controls.id.value).toBe(8);
+    expect(page.definitions.at(0).controls.segments.at(0).controls.restAfterSeconds.value).toBe('90s');
   });
 
   it('reorders definitions and segments while preserving their IDs', async () => {
@@ -107,6 +108,31 @@ describe('TrainingEditPage', () => {
       }],
     });
     expect(navigate).toHaveBeenCalledWith(['/trainings']);
+  });
+
+  it('converts edited minute and second rest values while retaining existing rest values', async () => {
+    await createPage();
+    vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+    const page = fixture.componentInstance;
+    page.definitions.at(0).controls.segments.at(0).controls.restAfterSeconds.setValue('1,5');
+    page.definitions.at(0).controls.segments.at(1).controls.restAfterSeconds.setValue('45s');
+
+    page.submit();
+
+    const request = trainingsApi.update.mock.calls[0][1] as EditTrainingRequest;
+    expect(request.definitions[0].segments.map((segment) => segment.restAfterSeconds)).toEqual([90, 45]);
+  });
+
+  it('rejects invalid rest durations without submitting', async () => {
+    await createPage();
+    const page = fixture.componentInstance;
+    page.definitions.at(0).controls.segments.at(0).controls.restAfterSeconds.setValue('1,001s');
+
+    page.submit();
+    fixture.detectChanges();
+
+    expect(trainingsApi.update).not.toHaveBeenCalled();
+    expect(fixture.nativeElement.textContent).toContain('Podaj minuty lub sekundy');
   });
 
   it('routes cancel to the trainings list', async () => {
