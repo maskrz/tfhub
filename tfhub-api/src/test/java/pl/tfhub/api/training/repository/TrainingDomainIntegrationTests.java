@@ -30,6 +30,7 @@ import pl.tfhub.api.training.dto.request.EditTrainingParticipationRequest;
 import pl.tfhub.api.training.dto.request.EditTrainingRequest;
 import pl.tfhub.api.training.dto.request.EditTrainingSegmentRequest;
 import pl.tfhub.api.training.dto.response.TrainingDetailsResponse;
+import pl.tfhub.api.training.service.TrainingDeactivationService;
 import pl.tfhub.api.training.entity.AthleteTrainingParticipation;
 import pl.tfhub.api.training.entity.Training;
 import pl.tfhub.api.training.entity.TrainingDefinition;
@@ -104,6 +105,9 @@ class TrainingDomainIntegrationTests {
 
     @Autowired
     private TrainingUpdateService trainingUpdateService;
+
+    @Autowired
+    private TrainingDeactivationService trainingDeactivationService;
 
     @BeforeEach
     void resetDatabase() {
@@ -846,6 +850,74 @@ class TrainingDomainIntegrationTests {
         assertThrows(TrainingNotFoundException.class, () -> trainingDetailsService.getTraining(999));
         authenticate(1, UserRole.ATHLETE, "athlete-view");
         assertThrows(AccessDeniedException.class, () -> trainingDetailsService.getTraining(1));
+    }
+
+    @Test
+    void adminDeactivatesTrainingPreservingRelatedDataAndVisibilityRules() {
+        long trainingId = insertTraining("Training");
+        long definitionId = insertDefinition(trainingId, "Plan", 1);
+        long segmentId = insertSegment(definitionId, 1);
+        long participationId = insertParticipation(trainingId, definitionId, 1);
+        jdbcTemplate.update("""
+                INSERT INTO training_segment_executions
+                    (participation_id, training_segment_id, training_definition_id,
+                        status, measured_result, uses_spikes)
+                VALUES (?, ?, ?, 'RECORDED', 12.345, TRUE)
+                """, participationId, segmentId, definitionId);
+
+        assertEquals(trainingId, trainingDeactivationService.deactivateTraining(trainingId).id());
+        assertEquals(1, jdbcTemplate.queryForObject("""
+                SELECT COUNT(*) FROM training_sessions WHERE id = ? AND NOT active
+                """, Integer.class, trainingId));
+        assertEquals(1, jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM training_definitions WHERE training_session_id = ?",
+                Integer.class, trainingId));
+        assertEquals(1, jdbcTemplate.queryForObject("""
+                SELECT COUNT(*) FROM training_segments s
+                JOIN training_definitions d ON d.id = s.training_definition_id
+                WHERE d.training_session_id = ?
+                """, Integer.class, trainingId));
+        assertEquals(1, jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM training_athlete_participations WHERE training_session_id = ?",
+                Integer.class, trainingId));
+        assertEquals(1, jdbcTemplate.queryForObject("""
+                SELECT COUNT(*) FROM training_segment_executions
+                WHERE participation_id = ? AND status = 'RECORDED'
+                    AND measured_result = 12.345 AND uses_spikes
+                """, Integer.class, participationId));
+        assertTrue(trainingQueryService.listTrainings().stream().noneMatch(item -> item.id() == trainingId));
+        assertFalse(trainingDetailsService.getTraining(trainingId).active());
+        assertThrows(InactiveTrainingException.class, () ->
+                trainingUpdateService.updateTraining(trainingId, emptyEditRequest("Changed", null)));
+        assertThrows(InactiveTrainingException.class, () ->
+                trainingDeactivationService.deactivateTraining(trainingId));
+    }
+
+    @Test
+    void coachCanDeactivateAssignedTrainingButCannotDeactivateUnassignedTraining() {
+        long assignedTraining = insertTraining("Assigned");
+        long otherGroupId = insertGroup("Other group");
+        long unassignedTraining = insertTraining("Unassigned", otherGroupId, LocalDate.now());
+        jdbcTemplate.update("""
+                INSERT INTO users (username, password_hash, role) VALUES ('coach-deactivate', 'hash', 'COACH')
+                """);
+        jdbcTemplate.update("""
+                INSERT INTO user_training_group (user_id, training_group_id) VALUES (1, 1)
+                """);
+        authenticate(1, UserRole.COACH, "coach-deactivate");
+
+        assertEquals(assignedTraining, trainingDeactivationService.deactivateTraining(assignedTraining).id());
+        assertThrows(TrainingNotFoundException.class, () ->
+                trainingDeactivationService.deactivateTraining(unassignedTraining));
+    }
+
+    @Test
+    void rejectsDeactivationByUnauthorizedUserAndForMissingTraining() {
+        assertThrows(TrainingNotFoundException.class, () ->
+                trainingDeactivationService.deactivateTraining(999));
+        authenticate(1, UserRole.ATHLETE, "athlete-deactivate");
+        assertThrows(AccessDeniedException.class, () ->
+                trainingDeactivationService.deactivateTraining(1));
     }
 
     private TrainingRows insertTrainingRows() {

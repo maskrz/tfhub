@@ -13,9 +13,11 @@ import org.springframework.test.web.servlet.result.MockMvcResultMatchers;
 import pl.tfhub.api.training.dto.response.TrainingListItemResponse;
 import pl.tfhub.api.training.dto.response.CreateTrainingResponse;
 import pl.tfhub.api.training.dto.response.TrainingDetailsResponse;
+import pl.tfhub.api.training.dto.response.DeactivateTrainingResponse;
 import pl.tfhub.api.training.dto.response.UpdateTrainingResponse;
 import pl.tfhub.api.training.service.TrainingCreationService;
 import pl.tfhub.api.training.service.TrainingDetailsService;
+import pl.tfhub.api.training.service.TrainingDeactivationService;
 import pl.tfhub.api.training.service.TrainingQueryService;
 import pl.tfhub.api.training.service.TrainingUpdateService;
 import pl.tfhub.api.traininggroup.dto.response.TrainingGroupResponse;
@@ -43,6 +45,9 @@ class TrainingControllerTests {
 
     @MockitoBean
     private TrainingDetailsService trainingDetailsService;
+
+    @MockitoBean
+    private TrainingDeactivationService trainingDeactivationService;
 
     @Test
     void createsTrainingAndReturnsItsIdentifierAndLocation() throws Exception {
@@ -160,6 +165,18 @@ class TrainingControllerTests {
                         """, true));
 
         verify(trainingDetailsService).getTraining(42);
+    }
+
+    @Test
+    void deactivatesTrainingAndReturnsItsIdentifier() throws Exception {
+        when(trainingDeactivationService.deactivateTraining(42))
+                .thenReturn(new DeactivateTrainingResponse(42));
+
+        mockMvc.perform(MockMvcRequestBuilders.patch("/api/trainings/42/deactivate"))
+                .andExpect(status().isOk())
+                .andExpect(content().json("{\"id\":42}", true));
+
+        verify(trainingDeactivationService).deactivateTraining(42);
     }
 
     @Test
