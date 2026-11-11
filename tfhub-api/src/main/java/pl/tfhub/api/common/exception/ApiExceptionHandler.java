@@ -32,6 +32,10 @@ import pl.tfhub.api.test.exception.TestAlreadyExistsException;
 import pl.tfhub.api.test.exception.TestHasResultsException;
 import pl.tfhub.api.test.exception.TestNotFoundException;
 import pl.tfhub.api.traininggroup.exception.TrainingGroupNotFoundException;
+import pl.tfhub.api.training.exception.InvalidTrainingRequestException;
+import pl.tfhub.api.training.exception.InactiveTrainingException;
+import pl.tfhub.api.training.exception.InvalidTrainingIdException;
+import pl.tfhub.api.training.exception.TrainingNotFoundException;
 import pl.tfhub.api.user.exception.IncorrectCurrentPasswordException;
 import pl.tfhub.api.backup.BackupAlreadyRunningException;
 import pl.tfhub.api.backup.BackupExecutionException;
@@ -170,6 +174,35 @@ public class ApiExceptionHandler {
 		return problem;
 	}
 
+	@ExceptionHandler(InvalidTrainingRequestException.class)
+	public ProblemDetail handleInvalidTrainingRequest(InvalidTrainingRequestException exception) {
+		ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, exception.getMessage());
+		problem.setTitle("Invalid training");
+		return problem;
+	}
+
+	@ExceptionHandler(TrainingNotFoundException.class)
+	public ProblemDetail handleTrainingNotFound(TrainingNotFoundException exception) {
+		ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, exception.getMessage());
+		problem.setTitle("Training not found");
+		return problem;
+	}
+
+	@ExceptionHandler(InactiveTrainingException.class)
+	public ProblemDetail handleInactiveTraining(InactiveTrainingException exception) {
+		ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, exception.getMessage());
+		problem.setTitle("Training is inactive");
+		return problem;
+	}
+
+	@ExceptionHandler(InvalidTrainingIdException.class)
+	public ProblemDetail handleInvalidTrainingId() {
+		ProblemDetail problem = ProblemDetail.forStatusAndDetail(
+				HttpStatus.BAD_REQUEST, "Training ID must be a positive integer");
+		problem.setTitle("Invalid training ID");
+		return problem;
+	}
+
 	@ExceptionHandler(AccountNotFoundException.class)
 	public ProblemDetail handleAccountNotFound(AccountNotFoundException exception) {
 		ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, exception.getMessage());
@@ -208,6 +241,9 @@ public class ApiExceptionHandler {
 
 	@ExceptionHandler(MethodArgumentTypeMismatchException.class)
 	public ProblemDetail handleTypeMismatch(MethodArgumentTypeMismatchException exception) {
+		if ("trainingId".equals(exception.getName())) {
+			return handleInvalidTrainingId();
+		}
 		if ("id".equals(exception.getName())
 				&& (Long.class.equals(exception.getRequiredType())
 						|| long.class.equals(exception.getRequiredType()))) {
