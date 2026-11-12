@@ -13,8 +13,6 @@ Allow an authorized user to explicitly accept the complete reviewed draft into o
 
 ## 3. Main Flow
 
-The current review screen supports acceptance of a saved valid draft. The rejection UI remains unimplemented.
-
 1. The user reviews the current saved draft in FE-TRAINING-007.
 2. The frontend shows **Zaakceptuj trening** only when the backend reports the draft ready for acceptance; **Odrzuć import** remains available.
 3. Each action requires explicit confirmation using the existing TFHUB dialog pattern. Acceptance confirms creation of the complete training; rejection confirms that the import will be closed without creating a training.

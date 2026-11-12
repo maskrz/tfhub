@@ -9,8 +9,8 @@ Katalog opisuje planowaną funkcjonalność interfejsu. Kontrakty API i reguły 
 
 | ID | Use case | Status |
 |---|---|---|
-| FE-AUTH-001 | Logowanie do aplikacji | Planowany |
-| FE-AUTH-002 | Wylogowanie z aplikacji | Planowany |
+| FE-AUTH-001 | Logowanie do aplikacji | Implemented |
+| FE-AUTH-002 | Wylogowanie z aplikacji | Implemented |
 
 ## Testy (`FE-TEST`)
 
@@ -28,18 +28,17 @@ Katalog opisuje planowaną funkcjonalność interfejsu. Kontrakty API i reguły 
 | FE-ATHLETE-001 | Wyświetlenie listy zawodników | Implemented |
 | FE-ATHLETE-002 | Dodanie zawodnika | Implemented |
 | FE-ATHLETE-003 | Edycja zawodnika | Implemented |
-| FE-ATHLETE-004 | Aktywowanie lub dezaktywowanie zawodnika | Implemented |
+| FE-ATHLETE-004 | Profil zawodnika | Implemented |
 
 ## Wyniki (`FE-RESULT`)
 
 | ID | Use case | Status |
 |---|---|---|
 | FE-RESULT-001 | Wyświetlenie listy wyników | Implemented |
-| FE-RESULT-002 | Filtrowanie listy wyników | Planowany |
-| FE-RESULT-003 | Dodanie pojedynczego wyniku | Planowany |
-| FE-RESULT-004 | Dodanie wielu wyników | Planowany |
-| FE-RESULT-005 | Edycja wyniku | Planowany |
-| FE-RESULT-006 | Usunięcie wyniku | Planowany |
+| FE-RESULT-002 | Dodanie pojedynczego wyniku | Implemented |
+| FE-RESULT-003 | Dodanie wielu wyników | Implemented |
+| FE-RESULT-004 | Edycja wyniku | Implemented |
+| FE-RESULT-005 | Usunięcie wyniku | Implemented |
 
 ## Treningi (`FE-TRAINING`)
 
@@ -50,9 +49,9 @@ Katalog opisuje planowaną funkcjonalność interfejsu. Kontrakty API i reguły 
 | FE-TRAINING-003 | Edycja planu treningu | Implemented |
 | FE-TRAINING-004 | Podgląd treningu | Implemented |
 | FE-TRAINING-005 | Usunięcie treningu | Implemented |
-| FE-TRAINING-006 | Import treningu ze zdjęcia | Planowany |
-| FE-TRAINING-007 | Weryfikacja importu treningu | Planowany |
-| FE-TRAINING-008 | Akceptacja lub odrzucenie importu treningu | Planowany |
+| FE-TRAINING-006 | Import treningu ze zdjęcia | Implemented |
+| FE-TRAINING-007 | Weryfikacja importu treningu | Implemented |
+| FE-TRAINING-008 | Akceptacja lub odrzucenie importu treningu | Implemented |
 | FE-TRAINING-009 | Uzupełnienie treningu | Implemented |
 
 ## Przyszły zakres

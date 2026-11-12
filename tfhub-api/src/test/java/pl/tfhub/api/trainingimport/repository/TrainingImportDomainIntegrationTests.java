@@ -469,6 +469,24 @@ class TrainingImportDomainIntegrationTests {
 	}
 
 	@Test
+	void searchesCandidatesWithNullBlankAndTextQueriesInTheImportGroup() {
+		TrainingImport trainingImport = saveReviewDraft(1, "candidate-search.jpg");
+		jdbcTemplate.update("""
+				INSERT INTO athletes (first_name, last_name, birth_year, gender, training_group_id)
+				VALUES ('Zoe', 'alpha', 1992, 'FEMALE', 1),
+					('Ada', 'Outside', 1993, 'FEMALE', 2)
+				""");
+
+		for (String query : new String[] {null, "", "   "}) {
+			assertEquals(List.of("Zoe", "Ada"), draftService.findAthleteCandidates(trainingImport.getId(), query)
+					.stream().map(candidate -> candidate.firstName()).toList());
+		}
+		assertEquals(List.of("Ada"), draftService.findAthleteCandidates(trainingImport.getId(), "  ADA LOVELACE  ")
+				.stream().map(candidate -> candidate.firstName()).toList());
+		assertTrue(draftService.findAthleteCandidates(trainingImport.getId(), "outside").isEmpty());
+	}
+
+	@Test
 	void updatesDraftAtomicallyAndPreservesRecognitionDataWithoutCreatingTraining() {
 		TrainingImport trainingImport = saveReviewDraft(1, "review-update.jpg");
 		TrainingImportDraftResponse original = draftService.getDraft(trainingImport.getId());
@@ -497,6 +515,42 @@ class TrainingImportDomainIntegrationTests {
 						trainingImport.getId(), updateRequest(beforeFailure, 2, false)));
 		assertEquals(beforeFailure, draftService.getDraft(trainingImport.getId()));
 		assertEquals(0L, count("training_sessions"));
+	}
+
+	@Test
+	void savesAndAcceptsAnAthleteAddedToANewDefinition() {
+		TrainingImport trainingImport = saveReviewDraft(1, "new-athlete.jpg");
+		jdbcTemplate.update("""
+				INSERT INTO athletes (first_name, last_name, birth_year, gender, training_group_id)
+				VALUES ('Zoe', 'Runner', 1992, 'FEMALE', 1)
+				""");
+		TrainingImportDraftUpdateRequest original = updateRequest(draftService.getDraft(trainingImport.getId()), 1, false);
+		var added = new TrainingImportDraftUpdateRequest.Definition(
+				null, "New subgroup", 2,
+				List.of(
+						new TrainingImportDraftUpdateRequest.Segment(null, 1, 100, null, false),
+						new TrainingImportDraftUpdateRequest.Segment(null, 2, 200, null, false)),
+				List.of(new TrainingImportDraftUpdateRequest.AthleteRow(
+						null, "Zoe Runner", 3L, TrainingImportAthleteMatchStatus.MATCHED,
+						List.of(
+								new TrainingImportDraftUpdateRequest.Execution(
+										null, 1, TrainingExecutionStatus.RECORDED, new BigDecimal("12.340"), false, false),
+								new TrainingImportDraftUpdateRequest.Execution(
+										null, 2, TrainingExecutionStatus.PENDING, null, false, false)))));
+		var request = new TrainingImportDraftUpdateRequest(
+				original.name(), original.trainingDate(), original.recognitionReviewed(),
+				List.of(original.definitions().getFirst(), added));
+
+		var updated = draftService.updateDraft(trainingImport.getId(), request);
+		var row = updated.definitions().get(1).athleteRows().getFirst();
+		assertTrue(updated.validation().readyForAcceptance());
+		assertEquals("Zoe Runner", row.recognizedName());
+		assertEquals(3L, row.athlete().id());
+		assertEquals(2, row.executions().size());
+		assertEquals(new BigDecimal("12.340"), row.executions().getFirst().measuredResult());
+		finalizationService.accept(trainingImport.getId());
+		assertEquals(2L, count("training_athlete_participations"));
+		assertEquals(4L, count("training_segment_executions"));
 	}
 
 	@Test

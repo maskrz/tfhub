@@ -2,6 +2,7 @@
 
 .searchable-select { position: relative; }
 .searchable-select__input { padding-right: 2.5rem; }
+.searchable-select__input--unmatched { color: #a12e2e; }
 .searchable-select__options {
   background: #fff;
   border: 1px solid #cbd3df;

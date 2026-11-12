@@ -29,12 +29,10 @@ The user may:
 - Correct the name and date.
 - Add, rename, reorder and remove definitions.
 - Add, edit, reorder and remove segments, including distance and rest.
-- Match an unresolved or incorrectly matched row to an eligible athlete, or explicitly skip it.
+- Add an existing eligible athlete to a definition, match an unresolved or incorrectly matched row, or explicitly skip it.
 - Correct each execution status, measured result and spike usage independently.
 
 The group selected at upload is read-only. Athlete candidate results and assignments must be restricted to that group for both ADMIN and COACH users. The user cannot create athletes or change their group assignments.
-
-The current review screen supports correcting existing draft fields, resolving athlete rows, and confirming uncertain values. Adding, removing, and reordering definitions or segments remains unimplemented.
 
 ## 5. Validation and Saving
 
@@ -48,6 +46,8 @@ The current review screen supports correcting existing draft fields, resolving a
 ## 6. UI, Loading, and Error Handling
 
 - Follow existing TFHUB forms, tables/cards, selectors, buttons, notifications and responsive patterns.
+- Use the training-details layout: a training summary, segment table and athlete-by-segment results table with editable data. Highlight fields needing input or verification with the warning background and descriptive text.
+- Use the searchable athlete selector and the training-completion time and spike controls. Reset buttons restore values loaded when the review page was opened, including after saving while the page remains open.
 - All user-facing text must be in Polish.
 - Show loading, empty, validation and API error states.
 - Disable repeated save submissions while saving.

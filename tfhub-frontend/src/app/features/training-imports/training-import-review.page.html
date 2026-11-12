@@ -1,17 +1,31 @@
-<section class="page">
+<section class="page" aria-labelledby="page-title">
   <header class="page-heading">
-    <div>
-      <a routerLink="/trainings" class="back-link">← Lista treningów</a>
-      <h1>Weryfikacja importu</h1>
-    </div>
+    <a routerLink="/trainings" class="back-link">← Wróć do treningów</a>
+    <h1 id="page-title">Weryfikacja importu</h1>
   </header>
 
-  @if (loading()) { <p role="status">Pobieranie importu...</p> }
+  @if (loading()) { <p class="feedback" role="status">Pobieranie importu...</p> }
   @if (error(); as text) { <p class="feedback error" role="alert">{{ text }}</p> }
   @if (message(); as text) { <p class="feedback" role="status">{{ text }}</p> }
 
-  @if (draft(); as current) {
-    <details class="card">
+  @if (rejected()) {
+    <a routerLink="/trainings" class="button button--secondary">Wróć do listy treningów</a>
+  } @else if (draft(); as current) {
+    @if (current.validation.readyForAcceptance) {
+      <p class="feedback" role="status">Zapisany import jest gotowy do akceptacji.</p>
+    } @else {
+      <div class="feedback warning" role="status">
+        <p>Sprawdź dane oznaczone na żółto. Zapisany import wymaga weryfikacji przed akceptacją:</p>
+        <ul>
+          @for (issue of current.validation.issues; track $index) {
+            <li>{{ issueLocation(issue.path) }}: {{ issueText(issue.code) }}</li>
+          }
+        </ul>
+        @if (form.dirty) { <p>Lista dotyczy ostatnio zapisanych danych.</p> }
+      </div>
+    }
+
+    <details class="details-card image-card">
       <summary>Zdjęcie do porównania</summary>
       @if (imageError()) {
         <p class="feedback error" role="alert">Nie udało się pobrać zdjęcia importu.</p>
@@ -20,141 +34,214 @@
       }
     </details>
 
-    @if (!current.validation.readyForAcceptance) {
-      <p class="feedback warning" role="status">
-        Import wymaga poprawienia lub potwierdzenia danych przed akceptacją.
-      </p>
-    }
-
-    <form [formGroup]="form" (ngSubmit)="save()">
-      <fieldset [disabled]="saving() || accepting()">
-        <div class="card">
+    <form [formGroup]="form" (ngSubmit)="save()" novalidate>
+      <fieldset [disabled]="busy()">
+        <section class="details-card training-summary" aria-label="Dane treningu">
+          <div class="summary-heading">
+            <div class="summary-fields">
+              <label [class.needs-review]="form.controls.name.invalid || (needsTrainingReview() && isUncertain(fieldMetadata(current.recognitionMetadata, 'name')))">
+                Nazwa treningu
+                <span class="input-with-reset">
+                  <input class="field-control summary-name" type="text" formControlName="name" maxlength="255" required />
+                  @if (changed(form.controls.name)) { <button type="button" class="reset-button" aria-label="Przywróć nazwę treningu" title="Przywróć wartość z początku weryfikacji" (click)="reset(form.controls.name)">↶</button> }
+                </span>
+              </label>
+              <label [class.needs-review]="form.controls.trainingDate.invalid || (needsTrainingReview() && isUncertain(fieldMetadata(current.recognitionMetadata, 'trainingDate')))">
+                Data treningu
+                <span class="input-with-reset">
+                  <input class="field-control" type="date" formControlName="trainingDate" required />
+                  @if (changed(form.controls.trainingDate)) { <button type="button" class="reset-button" aria-label="Przywróć datę treningu" title="Przywróć wartość z początku weryfikacji" (click)="reset(form.controls.trainingDate)">↶</button> }
+                </span>
+              </label>
+            </div>
+            <span class="status-badge">Do weryfikacji</span>
+          </div>
           <p>Grupa treningowa: <strong>{{ current.trainingGroup.name }}</strong></p>
-          <label>Nazwa treningu
-            <input type="text" formControlName="name" maxlength="255" required />
-          </label>
-          <label>Data treningu
-            <input type="date" formControlName="trainingDate" required />
-          </label>
           @if (isUncertain(current.recognitionMetadata)) {
-            <label class="checkbox"><input type="checkbox" formControlName="recognitionReviewed" />
-              Potwierdzam nazwę, datę i nazwy wariantów
+            <label class="checkbox review-confirmation" [class.needs-review]="needsTrainingReview()">
+              <input type="checkbox" formControlName="recognitionReviewed" />
+              Potwierdzam nazwę, datę i nazwy podgrup
+              @if (needsTrainingReview()) { <span class="review-label">Wymaga weryfikacji</span> }
             </label>
           }
-        </div>
+        </section>
 
-        <div formArrayName="definitions">
-          @for (definition of current.definitions; track definition.id; let d = $index) {
-            <section class="card" [formGroupName]="d">
-              <h2>Wariant {{ definition.sequenceNumber }}</h2>
-              <label>Nazwa wariantu
-                <input type="text" formControlName="name" maxlength="255" required />
-              </label>
-              <div formArrayName="segments">
-                @for (segment of definition.segments; track segment.id; let s = $index) {
-                  <div class="item" [formGroupName]="s">
-                    <h3>Odcinek {{ segment.sequenceNumber }}</h3>
-                    <label>Dystans (m)
-                      <input type="number" formControlName="distanceM" min="1" max="2147483647" step="1"
-                        [attr.aria-describedby]="'distance-' + segment.id" />
-                    </label>
-                    <p [id]="'distance-' + segment.id" class="hint">
-                      @if (segment.distanceM === null) {
-                        Nie rozpoznano dystansu — wpisz dodatnią wartość przed akceptacją.
-                      } @else if (isUncertain(segment.recognitionMetadata)) {
-                        Rozpoznany dystans wymaga weryfikacji.
-                      }
-                      @if (originalDistance(segment); as text) { Odczyt ze zdjęcia: {{ text }} }
-                    </p>
-                    <label>Przerwa po odcinku (s)
-                      <input type="number" formControlName="restAfterSeconds" min="0" max="2147483647" step="1" />
-                    </label>
-                    @if (isUncertain(segment.recognitionMetadata)) {
-                      <label class="checkbox"><input type="checkbox" formControlName="recognitionReviewed" />
-                        Potwierdzam dane odcinka
-                      </label>
-                    }
-                  </div>
-                }
+        @for (definition of definitions.controls; track definition; let d = $index) {
+          <section class="details-card definition-card" [formGroup]="definition" [attr.aria-labelledby]="'definition-' + d">
+            <div class="section-heading">
+              <div class="definition-title">
+                <h2 [id]="'definition-' + d">{{ d + 1 }}.</h2>
+                <label [class.needs-review]="definition.controls.name.invalid || needsDefinitionReview()">
+                  <span class="visually-hidden">Nazwa podgrupy {{ d + 1 }}</span>
+                  <span class="input-with-reset">
+                    <input class="field-control definition-name" type="text" formControlName="name" maxlength="255" required placeholder="Nazwa podgrupy" />
+                    @if (changed(definition.controls.name)) { <button type="button" class="reset-button" [attr.aria-label]="'Przywróć nazwę podgrupy ' + (d + 1)" title="Przywróć wartość z początku weryfikacji" (click)="reset(definition.controls.name)">↶</button> }
+                  </span>
+                </label>
               </div>
-              <div formArrayName="athleteRows">
-                @for (row of definition.athleteRows; track row.id; let r = $index) {
-                  <div class="item" [formGroupName]="r">
-                    <h3>Zawodnik: {{ row.recognizedName }}</h3>
-                    <label>Przypisanie
-                      <select formControlName="matchStatus">
-                        <option value="UNRESOLVED">Do rozstrzygnięcia</option>
-                        <option value="MATCHED">Przypisz zawodnika</option>
-                        <option value="SKIPPED">Pomiń wiersz</option>
-                      </select>
-                    </label>
-                    @if (rows(d).at(r).controls.matchStatus.value === 'MATCHED') {
-                      <label>Zawodnik z wybranej grupy
-                        <select formControlName="athleteId">
-                          <option [ngValue]="null">Wybierz zawodnika</option>
-                          @for (candidate of candidates(); track candidate.id) {
-                            <option [ngValue]="candidate.id">
-                              {{ candidate.firstName }} {{ candidate.lastName }}{{ candidate.birthYear ? ' (' + candidate.birthYear + ')' : '' }}
-                            </option>
-                          }
-                        </select>
-                      </label>
-                    }
-                    <div formArrayName="executions">
-                      @for (execution of row.executions; track execution.id; let e = $index) {
-                        <div class="execution" [formGroupName]="e">
-                          <h4>Odcinek {{ execution.segmentSequenceNumber }}</h4>
-                          @if (execution.recognizedText) { <p class="hint">Odczyt: {{ execution.recognizedText }}</p> }
-                          <label>Status
-                            <select formControlName="status">
-                              <option value="PENDING">Brak informacji</option>
-                              <option value="RECORDED">Zapisany wynik</option>
-                              <option value="COMPLETED_WITHOUT_RESULT">Ukończono bez wyniku</option>
-                              <option value="NOT_COMPLETED">Nie ukończono</option>
-                            </select>
-                          </label>
-                          <label>Wynik
-                            <input type="number" formControlName="measuredResult" min="0" step="0.001" />
-                          </label>
-                          <p class="hint">Wynik jest wymagany tylko dla statusu „Zapisany wynik”.</p>
-                          <label>Kolce
-                            <select formControlName="usesSpikes">
-                              <option [ngValue]="null">Do rozstrzygnięcia</option>
-                              <option [ngValue]="true">Tak</option>
-                              <option [ngValue]="false">Nie</option>
-                            </select>
-                          </label>
-                          @if (isUncertain(execution.recognitionMetadata)) {
-                            <label class="checkbox"><input type="checkbox" formControlName="recognitionReviewed" />
-                              Potwierdzam wynik i oznaczenia
-                            </label>
-                          }
+              <div class="item-actions">
+                <button type="button" class="button button--secondary" [disabled]="d === 0" (click)="moveDefinition(d, -1)" [attr.aria-label]="'Przenieś podgrupę ' + (d + 1) + ' wyżej'">↑</button>
+                <button type="button" class="button button--secondary" [disabled]="d === definitions.length - 1" (click)="moveDefinition(d, 1)" [attr.aria-label]="'Przenieś podgrupę ' + (d + 1) + ' niżej'">↓</button>
+                <button type="button" class="button button--secondary" [disabled]="definitions.length <= 1" (click)="requestRemoveDefinition(d)">Usuń podgrupę</button>
+              </div>
+            </div>
+
+            <div class="table-scroll" role="region" [attr.aria-label]="'Odcinki podgrupy ' + (d + 1)" tabindex="0">
+              <table class="segments-table">
+                <thead><tr><th scope="col">Odcinek</th><th scope="col">Dystans (m)</th><th scope="col">Przerwa po odcinku (s)</th><th scope="col">Akcje</th></tr></thead>
+                <tbody>
+                  @for (segment of segments(d).controls; track segment; let s = $index) {
+                    <tr [formGroup]="segment" [class.needs-review]="needsSegmentReview(segment)">
+                      <th scope="row">{{ s + 1 }}</th>
+                      <td>
+                        <span class="input-with-reset">
+                          <input class="field-control" type="number" formControlName="distanceM" min="1" max="2147483647" step="1"
+                            [attr.aria-label]="'Dystans odcinka ' + (s + 1) + ', podgrupa ' + (d + 1)"
+                            [attr.aria-describedby]="'distance-' + d + '-' + s" />
+                          @if (changed(segment.controls.distanceM)) { <button type="button" class="reset-button" [attr.aria-label]="'Przywróć dystans odcinka ' + (s + 1)" title="Przywróć wartość z początku weryfikacji" (click)="reset(segment.controls.distanceM)">↶</button> }
+                        </span>
+                        <span [id]="'distance-' + d + '-' + s" class="hint">
+                          @if (segment.controls.distanceM.value === null) { Nie rozpoznano dystansu — wpisz dodatnią wartość. }
+                          @else if (needsSegmentReview(segment)) { Wymaga weryfikacji. }
+                        </span>
+                      </td>
+                      <td>
+                        <span class="input-with-reset">
+                          <input class="field-control" type="number" formControlName="restAfterSeconds" min="0" max="2147483647" step="1"
+                            [attr.aria-label]="'Przerwa po odcinku ' + (s + 1) + ', podgrupa ' + (d + 1)" />
+                          @if (changed(segment.controls.restAfterSeconds)) { <button type="button" class="reset-button" [attr.aria-label]="'Przywróć przerwę odcinka ' + (s + 1)" title="Przywróć wartość z początku weryfikacji" (click)="reset(segment.controls.restAfterSeconds)">↶</button> }
+                        </span>
+                        @if (isUncertain(segment.controls.metadata.value)) {
+                          <label class="checkbox"><input type="checkbox" formControlName="recognitionReviewed" /> Potwierdzam dane odcinka</label>
+                        }
+                      </td>
+                      <td>
+                        <div class="item-actions">
+                          <button type="button" class="button button--secondary" [disabled]="s === 0" (click)="moveSegment(d, s, -1)" [attr.aria-label]="'Przenieś odcinek ' + (s + 1) + ' wyżej'">↑</button>
+                          <button type="button" class="button button--secondary" [disabled]="s === segments(d).length - 1" (click)="moveSegment(d, s, 1)" [attr.aria-label]="'Przenieś odcinek ' + (s + 1) + ' niżej'">↓</button>
+                          <button type="button" class="button button--secondary" [disabled]="segments(d).length <= 1" (click)="requestRemoveSegment(d, s)" [attr.aria-label]="'Usuń odcinek ' + (s + 1)">Usuń</button>
                         </div>
+                      </td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+            <div><button type="button" class="button button--secondary" (click)="addSegment(d)">Dodaj odcinek</button></div>
+
+            <section class="participants-section" [attr.aria-labelledby]="'participants-' + d">
+              <h3 [id]="'participants-' + d">Zawodnicy</h3>
+              @if (rows(d).length === 0) {
+                <p class="hint">Brak zawodników w tej podgrupie.</p>
+              } @else {
+                <div class="table-scroll" role="region" [attr.aria-label]="'Wyniki zawodników: podgrupa ' + (d + 1)" tabindex="0">
+                  <table class="executions-table">
+                    <thead>
+                      <tr>
+                        <th scope="col">Zawodnik</th>
+                        @for (segment of segments(d).controls; track segment; let s = $index) {
+                          <th scope="col">Odcinek {{ s + 1 }}<span class="segment-distance">{{ segment.controls.distanceM.value === null ? 'Dystans do uzupełnienia' : segment.controls.distanceM.value + ' m' }}</span></th>
+                        }
+                      </tr>
+                    </thead>
+                    <tbody>
+                      @for (row of rows(d).controls; track row; let r = $index) {
+                        <tr>
+                          <th scope="row" [formGroup]="row" [class.needs-review]="needsAthleteReview(row)">
+                            <div class="athlete-select">
+                              <app-searchable-select
+                                [inputId]="'athlete-' + d + '-' + r"
+                                [ariaLabel]="row.controls.recognizedName.value ? 'Przypisz zawodnika: ' + row.controls.recognizedName.value : 'Wybierz zawodnika dla podgrupy ' + (d + 1)"
+                                [options]="candidateOptions()"
+                                [unmatchedLabel]="row.controls.matchStatus.value !== 'SKIPPED' && !candidateName(row.controls.athleteId.value) ? row.controls.recognizedName.value : ''"
+                                [placeholder]="row.controls.matchStatus.value === 'SKIPPED' ? 'Pominięto — wybierz zawodnika' : 'Wybierz zawodnika'"
+                                [showAllOnFocus]="true"
+                                [ariaInvalid]="needsAthleteReview(row) ? 'true' : null"
+                                [formControl]="row.controls.athleteSelection"
+                                (selected)="selectAthlete(row, $event)" />
+                              @if (changed(row.controls.athleteSelection) || changed(row.controls.matchStatus)) {
+                                <button type="button" class="reset-button athlete-reset" [attr.aria-label]="'Przywróć przypisanie: ' + row.controls.recognizedName.value" title="Przywróć wartość z początku weryfikacji" (click)="resetAthlete(row)">↶</button>
+                              }
+                            </div>
+                            @if (hasDuplicateAthlete(row)) {
+                              <span class="review-label">Zawodnik jest przypisany więcej niż raz</span>
+                            } @else if (row.controls.id.value === null && needsAthleteReview(row)) {
+                              <span class="review-label">Wybierz zawodnika</span>
+                            } @else if (needsAthleteReview(row)) {
+                              <span class="review-label">Wymaga przypisania lub pominięcia</span>
+                            }
+                            @if (row.controls.id.value === null) {
+                              <button type="button" class="skip-button" (click)="removeNewAthlete(d, r)">Usuń zawodnika</button>
+                            } @else if (row.controls.matchStatus.value === 'SKIPPED') { <span class="hint">Wiersz pominięty</span> }
+                            @else { <button type="button" class="skip-button" (click)="skipAthlete(row)">Pomiń wiersz</button> }
+                          </th>
+                          @for (execution of executions(d, r).controls; track execution; let e = $index) {
+                            <td [formGroup]="execution" [class.needs-review]="needsExecutionReview(execution)">
+                              <div class="result-cell">
+                                <span class="input-with-reset result-input">
+                                  <input class="field-control" type="text" inputmode="text" formControlName="timeInput"
+                                    [attr.aria-label]="'Wynik: ' + row.controls.recognizedName.value + ', odcinek ' + (e + 1)"
+                                    [attr.title]="execution.controls.recognizedText.value ? 'Odczyt ze zdjęcia: ' + execution.controls.recognizedText.value : null"
+                                    [attr.aria-invalid]="execution.controls.timeInput.invalid ? 'true' : null"
+                                    (input)="resultChanged(execution)" (blur)="formatTime(execution)" />
+                                  @if (timeChanged(execution)) {
+                                    <button type="button" class="reset-button" [attr.aria-label]="'Przywróć wynik: ' + row.controls.recognizedName.value + ', odcinek ' + (e + 1)" title="Przywróć wartość z początku weryfikacji" (click)="resetTime(execution)">↶</button>
+                                  }
+                                </span>
+                                <label class="spikes-control">
+                                  <input type="checkbox" [checked]="execution.controls.usesSpikes.value === true"
+                                    [attr.aria-label]="'Kolce: ' + row.controls.recognizedName.value + ', odcinek ' + (e + 1)"
+                                    (change)="setSpikes(execution, $event)" /> K
+                                </label>
+                                @if (changed(execution.controls.usesSpikes)) {
+                                  <button type="button" class="reset-button inline-reset" [attr.aria-label]="'Przywróć kolce: ' + row.controls.recognizedName.value + ', odcinek ' + (e + 1)" title="Przywróć wartość z początku weryfikacji" (click)="reset(execution.controls.usesSpikes)">↶</button>
+                                }
+                              </div>
+                              @if (execution.controls.usesSpikes.value === null) {
+                                <button type="button" class="skip-button" (click)="execution.controls.usesSpikes.setValue(false); form.markAsDirty()">Potwierdź brak kolców</button>
+                              }
+                                @if (isUncertain(execution.controls.metadata.value)) {
+                                  <label class="checkbox"><input type="checkbox" formControlName="recognitionReviewed" [attr.aria-label]="'Potwierdzam wynik i oznaczenia: ' + row.controls.recognizedName.value + ', odcinek ' + (e + 1)" /> Potwierdzam</label>
+                                }
+                            </td>
+                          }
+                        </tr>
                       }
-                    </div>
-                  </div>
-                }
-              </div>
+                    </tbody>
+                  </table>
+                </div>
+                <p class="hint">Wpisz czas mm:ss,SS, X (ukończono bez wyniku) lub - (nie ukończono). Zaznacz K, jeśli zawodnik używał kolców.</p>
+              }
+              <div><button type="button" class="button button--secondary" (click)="addAthlete(d)">Dodaj zawodnika</button></div>
             </section>
+          </section>
+        }
+        <div class="actions">
+          <button type="button" class="button button--secondary" (click)="addDefinition()">Dodaj podgrupę</button>
+          <button type="submit" class="button button--secondary">{{ saving() ? 'Zapisywanie...' : 'Zapisz zmiany' }}</button>
+          <button type="button" class="button button--secondary" (click)="confirmReject()">Odrzuć import</button>
+          @if (current.validation.readyForAcceptance) {
+            <button type="button" class="button button--primary" [disabled]="form.dirty" (click)="confirmAccept()">Zaakceptuj trening</button>
           }
         </div>
-        <div class="actions">
-          <button type="submit" class="button button--secondary" [disabled]="saving() || accepting()">
-            {{ saving() ? 'Zapisywanie...' : 'Zapisz zmiany' }}
-          </button>
-          <button type="button" class="button button--primary"
-            [disabled]="saving() || accepting() || form.dirty || !current.validation.readyForAcceptance"
-            (click)="confirmAccept()">Zaakceptuj trening</button>
-        </div>
+        @if (form.dirty && current.validation.readyForAcceptance) { <p class="hint">Przed akceptacją zapisz zmiany.</p> }
       </fieldset>
     </form>
 
-    <dialog #acceptDialog (cancel)="$event.preventDefault(); closeDialog()">
-      <h2>Zaakceptować import?</h2>
-      <p>Powstanie trening z zapisanych danych importu.</p>
+    <dialog #confirmDialog (cancel)="$event.preventDefault(); closeDialog()">
+      @switch (dialogAction()) {
+        @case ('accept') { <h2>Zaakceptować import?</h2><p>Powstanie trening z zapisanych danych importu.</p> }
+        @case ('reject') { <h2>Odrzucić import?</h2><p>Import zostanie zamknięty bez tworzenia treningu. Niezapisane zmiany nie zostaną zachowane.</p> }
+        @case ('remove-definition') { <h2>Usunąć podgrupę?</h2><p>Podgrupa i powiązane dane zawodników oraz wyników zostaną usunięte z wersji roboczej po zapisaniu.</p> }
+        @case ('remove-segment') { <h2>Usunąć odcinek?</h2><p>Powiązane wyniki tego odcinka zostaną usunięte z wersji roboczej po zapisaniu.</p> }
+      }
       <div class="actions">
-        <button type="button" class="button button--secondary" [disabled]="accepting()" (click)="closeDialog()">Anuluj</button>
-        <button type="button" class="button button--primary" [disabled]="accepting()" (click)="accept()">Zaakceptuj trening</button>
+        <button type="button" class="button button--secondary" [disabled]="busy()" (click)="closeDialog()">Anuluj</button>
+        <button type="button" class="button button--primary" [disabled]="busy()" (click)="confirmDialogAction()">
+          @if (dialogAction() === 'accept') { Zaakceptuj trening }
+          @else if (dialogAction() === 'reject') { Odrzuć import }
+          @else { Usuń }
+        </button>
       </div>
     </dialog>
   }

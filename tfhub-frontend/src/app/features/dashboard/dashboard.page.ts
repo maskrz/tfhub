@@ -10,7 +10,7 @@ import { AthletesApiService } from '../athletes/athletes-api.service';
 import { MultipleResultsFormModalComponent } from '../results/multiple-results-form-modal.component';
 import { CreateMultipleResultsResponse, ResultResponse } from '../results/result.model';
 import { ResultFormModalComponent } from '../results/result-form-modal.component';
-import { SearchableSelectComponent, SearchableSelectOption } from '../results/searchable-select.component';
+import { SearchableSelectComponent, SearchableSelectOption } from '../../shared/searchable-select.component';
 import { TestResponse } from '../tests/test.model';
 import { TestsApiService } from '../tests/tests-api.service';
 import { ClubRecords, DashboardOverview } from './statistics.model';

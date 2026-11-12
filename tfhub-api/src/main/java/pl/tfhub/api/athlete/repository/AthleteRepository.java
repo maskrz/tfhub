@@ -21,8 +21,15 @@ public interface AthleteRepository extends JpaRepository<Athlete, Long>, JpaSpec
 			SELECT athlete
 			FROM Athlete athlete
 			WHERE athlete.trainingGroup.id = :trainingGroupId
-				AND (:query IS NULL
-					OR LOWER(athlete.firstName) LIKE CONCAT('%', :query, '%')
+			ORDER BY LOWER(athlete.lastName), LOWER(athlete.firstName), athlete.id
+			""")
+	List<Athlete> findAllCandidatesInTrainingGroup(@Param("trainingGroupId") long trainingGroupId);
+
+	@Query("""
+			SELECT athlete
+			FROM Athlete athlete
+			WHERE athlete.trainingGroup.id = :trainingGroupId
+				AND (LOWER(athlete.firstName) LIKE CONCAT('%', :query, '%')
 					OR LOWER(athlete.lastName) LIKE CONCAT('%', :query, '%')
 					OR LOWER(CONCAT(athlete.firstName, ' ', athlete.lastName))
 						LIKE CONCAT('%', :query, '%'))

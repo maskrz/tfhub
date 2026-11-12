@@ -14,6 +14,7 @@ import {
   TrainingParticipationDetails,
 } from './training.model';
 import { TrainingsApiService } from './trainings-api.service';
+import { formatResult, normalizeTimeInput, parseTimeSeconds } from './training-time';
 
 type ExecutionForm = FormGroup<{
   id: FormControl<number | null>;
@@ -69,54 +70,6 @@ function createExecution(execution: {
     measuredResult: new FormControl(displayValue, { nonNullable: true }),
     usesSpikes: new FormControl(execution.usesSpikes, { nonNullable: true }),
   }, { validators: [executionValidator] });
-}
-
-function formatResult(seconds: number): string {
-  const hundredths = Math.round(seconds * 100);
-  const minutes = Math.floor(hundredths / 6000);
-  const secondsWithinMinute = Math.floor((hundredths % 6000) / 100);
-  const fraction = hundredths % 100;
-  const secondsText = `${String(secondsWithinMinute).padStart(2, '0')},${String(fraction).padStart(2, '0')}`;
-  return minutes > 0 ? `${minutes}:${secondsText}` : secondsText;
-}
-
-function normalizeTimeInput(input: string): string | null {
-  let value = input.trim();
-  if (!value) return '';
-  if (value.toUpperCase() === 'X') return 'X';
-  if (value === '-') return '-';
-
-  value = value.replace(/;/g, ':');
-  const separators = [...value.matchAll(/[,.]/g)];
-  let singleDotFraction = false;
-  if (separators.length >= 2) {
-    const first = separators[0].index!;
-    const second = separators[1].index!;
-    value = `${value.slice(0, first)}:${value.slice(first + 1, second)},${value.slice(second + 1)}`;
-  } else if (separators.length === 1) {
-    const index = separators[0].index!;
-    singleDotFraction = value[index] === '.';
-    value = `${value.slice(0, index)},${value.slice(index + 1)}`;
-  }
-
-  const match = /^(?:(\d+):)?(\d+)(?:,(\d{1,2}))?$/.exec(value);
-  if (!match) return null;
-  const [, minutes, seconds, fraction] = match;
-  if (minutes !== undefined && Number(seconds) > 59) return null;
-  const secondsText = minutes !== undefined ? seconds.padStart(2, '0') : seconds;
-  const fractionText = fraction && fraction.length === 1 && !singleDotFraction
-    ? `${fraction}0`
-    : fraction;
-  return `${minutes === undefined ? '' : `${minutes}:`}${secondsText}${fractionText ? `,${fractionText}` : ''}`;
-}
-
-function parseTimeSeconds(input: string): number | null {
-  const normalized = normalizeTimeInput(input);
-  if (!normalized || normalized === 'X' || normalized === '-') return null;
-  const match = /^(?:(\d+):)?(\d+)(?:,(\d{1,2}))?$/.exec(normalized);
-  if (!match) return null;
-  const [, minutes, seconds, fraction] = match;
-  return Number(minutes ?? 0) * 60 + Number(seconds) + Number(`0.${fraction ?? '0'}`);
 }
 
 @Component({

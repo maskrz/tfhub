@@ -221,8 +221,11 @@ public class TrainingImportDraftService {
 		if (normalizedQuery != null && normalizedQuery.length() > MAX_CANDIDATE_QUERY_LENGTH) {
 			throw new InvalidTrainingImportDraftException("Athlete candidate query is too long");
 		}
-		return athleteRepository.findCandidatesInTrainingGroup(
-						trainingImport.getTrainingGroup().getId(), normalizedQuery)
+		long groupId = trainingImport.getTrainingGroup().getId();
+		List<Athlete> candidates = normalizedQuery == null
+				? athleteRepository.findAllCandidatesInTrainingGroup(groupId)
+				: athleteRepository.findCandidatesInTrainingGroup(groupId, normalizedQuery);
+		return candidates
 				.stream()
 				.map(TrainingImportAthleteCandidateResponse::from)
 				.toList();

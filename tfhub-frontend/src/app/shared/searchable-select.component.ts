@@ -25,6 +25,8 @@ export class SearchableSelectComponent implements ControlValueAccessor {
   @Input() options: SearchableSelectOption[] = [];
   @Input() ariaInvalid: string | null = null;
   @Input() describedBy = '';
+  @Input() unmatchedLabel = '';
+  @Input() showAllOnFocus = false;
   @Output() selected = new EventEmitter<string>();
 
   readonly query = signal('');
@@ -38,9 +40,15 @@ export class SearchableSelectComponent implements ControlValueAccessor {
 
   get inputValue(): string {
     if (this.selectedValue()) {
-      return this.options.find((option) => option.value === this.selectedValue())?.label ?? this.query();
+      return this.options.find((option) => option.value === this.selectedValue())?.label
+        ?? (this.query() || (this.isOpen() ? '' : this.unmatchedLabel));
     }
-    return this.query();
+    return this.query() || (this.isOpen() ? '' : this.unmatchedLabel);
+  }
+
+  get showUnmatched(): boolean {
+    return !!this.unmatchedLabel && !this.isOpen()
+      && !this.options.some((option) => option.value === this.selectedValue());
   }
 
   get filteredOptions(): SearchableSelectOption[] {
@@ -53,7 +61,9 @@ export class SearchableSelectComponent implements ControlValueAccessor {
     const previousValue = this.selectedValue();
     this.selectedValue.set(value ?? '');
     if (!value && previousValue) {
-      this.query.set('');
+      this.query.set(this.showAllOnFocus ? '' : this.selectedValue()
+        ? this.options.find((option) => option.value === this.selectedValue())?.label ?? ''
+        : this.query());
     }
   }
 
@@ -71,9 +81,7 @@ export class SearchableSelectComponent implements ControlValueAccessor {
 
   onFocus(event: FocusEvent): void {
     if (this.isDisabled()) return;
-    this.query.set(this.selectedValue()
-      ? this.options.find((option) => option.value === this.selectedValue())?.label ?? ''
-      : this.query());
+    this.query.set('');
     this.isOpen.set(true);
     this.activeIndex.set(-1);
     (event.target as HTMLInputElement).select();

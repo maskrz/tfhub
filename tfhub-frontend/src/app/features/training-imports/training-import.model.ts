@@ -112,17 +112,17 @@ export interface TrainingImportDraftUpdate {
   trainingDate: string;
   recognitionReviewed: boolean;
   definitions: {
-    id: number;
+    id: number | null;
     name: string;
     sequenceNumber: number;
-    segments: { id: number; sequenceNumber: number; distanceM: number | null;
+    segments: { id: number | null; sequenceNumber: number; distanceM: number | null;
       restAfterSeconds: number | null; recognitionReviewed: boolean }[];
     athleteRows: {
-      id: number;
+      id: number | null;
       recognizedName: string;
       athleteId: number | null;
       matchStatus: ImportMatchStatus;
-      executions: { id: number; segmentSequenceNumber: number; status: ImportExecutionStatus;
+      executions: { id: number | null; segmentSequenceNumber: number; status: ImportExecutionStatus;
         measuredResult: number | null; usesSpikes: boolean | null; recognitionReviewed: boolean }[];
     }[];
   }[];

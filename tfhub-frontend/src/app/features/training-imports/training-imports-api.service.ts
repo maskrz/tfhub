@@ -57,4 +57,10 @@ export class TrainingImportsApiService {
       `/api/training-imports/${importId}/accept`, null,
     );
   }
+
+  reject(importId: number): Observable<{ importId: number; status: 'REJECTED' }> {
+    return this.http.post<{ importId: number; status: 'REJECTED' }>(
+      `/api/training-imports/${importId}/reject`, null,
+    );
+  }
 }

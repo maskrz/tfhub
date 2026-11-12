@@ -4,7 +4,7 @@ import { FormControl, FormGroup, ReactiveFormsModule, ValidatorFn, Validators } 
 import { EMPTY, catchError, finalize, take } from 'rxjs';
 import { AthleteResponse } from '../athletes/athlete.model';
 import { TestResponse } from '../tests/test.model';
-import { SearchableSelectComponent, SearchableSelectOption } from './searchable-select.component';
+import { SearchableSelectComponent, SearchableSelectOption } from '../../shared/searchable-select.component';
 import {
   CreateResultRequest,
   ResultFormMode,

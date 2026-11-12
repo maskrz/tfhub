@@ -66,5 +66,14 @@ describe('TrainingImportsApiService', () => {
       possibleDuplicate: false,
       latestAttempt: null,
     });
+
+  });
+
+  it('rejects the specified import using POST', () => {
+    service.reject(21).subscribe();
+    const request = httpTesting.expectOne('/api/training-imports/21/reject');
+    expect(request.request.method).toBe('POST');
+    expect(request.request.body).toBeNull();
+    request.flush({ importId: 21, status: 'REJECTED' });
   });
 });
