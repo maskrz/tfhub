@@ -65,6 +65,20 @@
         />
       </label>
     </div>
+
+    <label class="filter-field status-filter">
+      <span>Status</span>
+      <select
+        class="field-control select-with-arrow"
+        aria-label="Filtruj według statusu"
+        [value]="statusFilter()"
+        (change)="onStatusChange($event)"
+      >
+        <option value="">Wszystkie statusy</option>
+        <option value="PLANNED">Planowane</option>
+        <option value="COMPLETED">Zakończone</option>
+      </select>
+    </label>
   </div>
 
   @if (loading()) {
@@ -117,7 +131,8 @@
                 </span>
               </button>
             </th>
-            <th scope="col">Akcje</th>
+            <th scope="col">Status</th>
+            <th scope="col" aria-label="Akcje"></th>
           </tr>
         </thead>
         <tbody>
@@ -131,6 +146,11 @@
               <td data-label="Data">{{ formatDate(training.trainingDate) }}</td>
               <td data-label="Grupa treningowa">{{ training.trainingGroup.name }}</td>
               <td data-label="Liczba uczestników">{{ training.participantCount }}</td>
+              <td data-label="Status">
+                <span class="status-badge" [class.status-badge--completed]="training.status === 'COMPLETED'">
+                  {{ training.status === 'COMPLETED' ? 'Zakończony' : 'Planowany' }}
+                </span>
+              </td>
               <td data-label="Akcje" class="training-actions">
                 <a
                   class="button button--secondary edit-training-link"
@@ -138,16 +158,16 @@
                   [attr.aria-label]="'Edytuj trening: ' + training.name"
                 >Edytuj</a>
                 <a
-                  class="button button--secondary complete-training-link"
+                  class="button button--primary complete-training-link"
                   [routerLink]="['/trainings', training.id, 'complete']"
                   [attr.aria-label]="'Uzupełnij trening: ' + training.name"
                 >Uzupełnij trening</a>
                 <button
                   type="button"
-                  class="button button--secondary deactivate-training-button"
-                  [attr.aria-label]="'Dezaktywuj trening: ' + training.name"
-                  (click)="openDeactivationConfirmation(training)"
-                >Dezaktywuj trening</button>
+                  class="button button--danger delete-training-button"
+                  [attr.aria-label]="'Usuń trening: ' + training.name"
+                  (click)="openDeletionConfirmation(training)"
+                >Usuń</button>
               </td>
             </tr>
           }
@@ -157,11 +177,11 @@
   }
 </section>
 
-@if (trainingPendingDeactivation(); as training) {
-  <app-training-deactivate-confirmation
+@if (trainingPendingDeletion(); as training) {
+  <app-training-delete-confirmation
     [trainingId]="training.id"
     [trainingName]="training.name"
-    (deactivated)="onTrainingDeactivated($event)"
-    (cancelled)="closeDeactivationConfirmation()"
+    (deleted)="onTrainingDeleted($event)"
+    (cancelled)="closeDeletionConfirmation()"
   />
 }

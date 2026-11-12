@@ -3,6 +3,8 @@ export interface TrainingGroupSummary {
   name: string;
 }
 
+export type TrainingStatus = 'PLANNED' | 'COMPLETED';
+
 export interface TrainingListItem {
   id: number;
   name: string;
@@ -10,6 +12,7 @@ export interface TrainingListItem {
   trainingGroup: TrainingGroupSummary;
   definitionCount: number;
   participantCount: number;
+  status: TrainingStatus;
 }
 
 export interface CreateTrainingSegmentRequest {
@@ -77,7 +80,7 @@ export interface TrainingDetails {
   id: number;
   name: string;
   trainingDate: string;
-  active: boolean;
+  status: TrainingStatus;
   trainingGroup: TrainingGroupSummary;
   definitions: TrainingDefinitionDetails[];
 }
@@ -110,10 +113,6 @@ export interface EditTrainingRequest {
 }
 
 export interface UpdateTrainingResponse {
-  id: number;
-}
-
-export interface DeactivateTrainingResponse {
   id: number;
 }
 

@@ -2,22 +2,22 @@
 
 ## 1. Purpose
 
-Allow an authorized user to manage athlete participation in an existing active training and record or correct each participant's execution status, measured result and spike usage.
+Allow an authorized user to manage athlete participation in an existing training and record or correct each participant's execution status, measured result and spike usage.
 
 The training plan is managed separately through UC-503 – Edit Training.
 
 ## 2. Actors and Preconditions
 
-- **ADMIN** – can complete any active training.
-- **COACH** – can complete an active training only while currently assigned to its group.
+- **ADMIN** – can complete any training.
+- **COACH** – can complete a training only while currently assigned to its group.
 - The requester is authenticated and has the ADMIN or COACH role.
-- The training exists and is active.
+- The training exists.
 
 ## 3. Business Rules
 
 ### 3.1 Authorization and Group
 
-- ADMIN can manage participation and execution data for any active training.
+- ADMIN can manage participation and execution data for any training.
 - COACH can do so only while assigned to the training's group.
 - All assigned coaches have identical permissions; creator ownership is not used.
 - The training group is immutable and is never accepted as a request field.
@@ -44,6 +44,13 @@ The training plan is managed separately through UC-503 – Edit Training.
 - Existing execution IDs must be preserved when records remain. Values may be corrected by an authorized user.
 - Execution records must continue to refer to the correct participant and segment, even if definitions or segments have been reordered.
 
+### 3.4 Training Status
+
+- A newly created training has status `PLANNED`.
+- The first successful UC-510 save changes its status to `COMPLETED`, regardless of whether some executions remain `PENDING`.
+- A failed save does not change the status.
+- A completed training remains editable through UC-503 and UC-510 so authorized users can correct its plan and execution data.
+
 ## 4. API Contract
 
 - **Method and path:** `PATCH /api/trainings/{trainingId}/participations`
@@ -61,7 +68,6 @@ The backend validates the complete combined result of all requested operations b
 
 - Reject unauthenticated users and users without ADMIN or COACH role.
 - Reject a missing training; do not reveal an inaccessible training to an unassigned coach.
-- Reject updates to inactive trainings.
 - Reject nonexistent athletes, new athletes not currently assigned to the training's group, duplicate athletes, invalid definition or segment references, duplicate IDs, and IDs belonging to another training.
 - Reject removal or reassignment of a participant with any `RECORDED` execution.
 - Reject invalid execution statuses, negative or out-of-range results, missing results for `RECORDED`, and results supplied for another status.
@@ -76,11 +82,11 @@ All additions, removals, reassignments and execution updates for one request are
 ## 7. Out of Scope
 
 - Editing training name, date, definitions or segments (UC-503).
-- Modifying the group, editing inactive trainings, deactivation/reactivation, athlete/group management, imports, templates and statistics.
+- Modifying the group, deleting trainings (UC-505), athlete/group management, imports, templates and statistics.
 
 ## 8. Acceptance Criteria
 
-1. ADMIN can complete any active training; COACH can complete only a training in a currently assigned group.
+1. ADMIN can complete any training; COACH can complete only a training in a currently assigned group.
 2. Authorized users can add, remove and reassign athletes and edit their execution data.
 3. New athletes must currently belong to the training's group; existing historical participants remain editable after group changes.
 4. An athlete cannot be assigned to more than one definition in the training.
@@ -89,4 +95,4 @@ All additions, removals, reassignments and execution updates for one request are
 7. All four statuses are supported; result/status consistency and independent spike usage are enforced.
 8. Every requested participant has exactly one execution per current segment.
 9. The operation validates the complete state and persists atomically.
-10. Inactive trainings and unauthorized requests cannot be updated.
+10. Failed requests do not change the training status, and unauthorized requests cannot be updated.

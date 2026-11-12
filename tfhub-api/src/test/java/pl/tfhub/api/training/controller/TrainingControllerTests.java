@@ -13,12 +13,12 @@ import org.springframework.test.web.servlet.result.MockMvcResultMatchers;
 import pl.tfhub.api.training.dto.response.TrainingListItemResponse;
 import pl.tfhub.api.training.dto.response.CreateTrainingResponse;
 import pl.tfhub.api.training.dto.response.TrainingDetailsResponse;
-import pl.tfhub.api.training.dto.response.DeactivateTrainingResponse;
 import pl.tfhub.api.training.dto.response.UpdateTrainingResponse;
+import pl.tfhub.api.training.enums.TrainingStatus;
 import pl.tfhub.api.training.service.TrainingCreationService;
 import pl.tfhub.api.training.service.TrainingCompletionService;
 import pl.tfhub.api.training.service.TrainingDetailsService;
-import pl.tfhub.api.training.service.TrainingDeactivationService;
+import pl.tfhub.api.training.service.TrainingDeletionService;
 import pl.tfhub.api.training.service.TrainingQueryService;
 import pl.tfhub.api.training.service.TrainingUpdateService;
 import pl.tfhub.api.traininggroup.dto.response.TrainingGroupResponse;
@@ -48,7 +48,7 @@ class TrainingControllerTests {
     private TrainingDetailsService trainingDetailsService;
 
     @MockitoBean
-    private TrainingDeactivationService trainingDeactivationService;
+    private TrainingDeletionService trainingDeletionService;
 
     @MockitoBean
     private TrainingCompletionService trainingCompletionService;
@@ -171,7 +171,7 @@ class TrainingControllerTests {
                         42,
                         "Intervals",
                         LocalDate.parse("2026-11-10"),
-                        true,
+                        TrainingStatus.PLANNED,
                         new TrainingGroupResponse(3, "Group A"),
                         List.of()));
 
@@ -182,7 +182,7 @@ class TrainingControllerTests {
                           "id": 42,
                           "name": "Intervals",
                           "trainingDate": "2026-11-10",
-                          "active": true,
+                          "status": "PLANNED",
                           "trainingGroup": {"id": 3, "name": "Group A"},
                           "definitions": []
                         }
@@ -192,22 +192,19 @@ class TrainingControllerTests {
     }
 
     @Test
-    void deactivatesTrainingAndReturnsItsIdentifier() throws Exception {
-        when(trainingDeactivationService.deactivateTraining(42))
-                .thenReturn(new DeactivateTrainingResponse(42));
+    void deletesTrainingAndReturnsNoContent() throws Exception {
+        mockMvc.perform(MockMvcRequestBuilders.delete("/api/trainings/42"))
+                .andExpect(status().isNoContent())
+                .andExpect(content().string(""));
 
-        mockMvc.perform(MockMvcRequestBuilders.patch("/api/trainings/42/deactivate"))
-                .andExpect(status().isOk())
-                .andExpect(content().json("{\"id\":42}", true));
-
-        verify(trainingDeactivationService).deactivateTraining(42);
+        verify(trainingDeletionService).deleteTraining(42);
     }
 
     @Test
     void returnsTrainingSummariesFromTheService() throws Exception {
-        when(trainingQueryService.listTrainings()).thenReturn(List.of(
+        when(trainingQueryService.listTrainings(false)).thenReturn(List.of(
                 new TrainingListItemResponse(7, "Intervals", LocalDate.parse("2026-11-10"),
-                        new TrainingGroupResponse(3, "Group A"), 2, 12)));
+                        new TrainingGroupResponse(3, "Group A"), 2, 12, TrainingStatus.PLANNED)));
 
         mockMvc.perform(get("/api/trainings"))
                 .andExpect(status().isOk())
@@ -218,16 +215,40 @@ class TrainingControllerTests {
                           "trainingDate": "2026-11-10",
                           "trainingGroup": {"id": 3, "name": "Group A"},
                           "definitionCount": 2,
-                          "participantCount": 12
+                          "participantCount": 12,
+                          "status": "PLANNED"
                         }]
                         """, true));
 
-        verify(trainingQueryService).listTrainings();
+        verify(trainingQueryService).listTrainings(false);
+    }
+
+    @Test
+    void includesCompletedTrainingsWhenRequested() throws Exception {
+        when(trainingQueryService.listTrainings(true)).thenReturn(List.of(
+                new TrainingListItemResponse(8, "Archived", LocalDate.parse("2026-11-09"),
+                        new TrainingGroupResponse(3, "Group A"), 1, 4, TrainingStatus.COMPLETED)));
+
+        mockMvc.perform(get("/api/trainings").param("includeCompleted", "true"))
+                .andExpect(status().isOk())
+                .andExpect(content().json("""
+                        [{
+                          "id": 8,
+                          "name": "Archived",
+                          "trainingDate": "2026-11-09",
+                          "trainingGroup": {"id": 3, "name": "Group A"},
+                          "definitionCount": 1,
+                          "participantCount": 4,
+                          "status": "COMPLETED"
+                        }]
+                        """, true));
+
+        verify(trainingQueryService).listTrainings(true);
     }
 
     @Test
     void returnsAnEmptyCollectionWhenNoTrainingsAreVisible() throws Exception {
-        when(trainingQueryService.listTrainings()).thenReturn(List.of());
+        when(trainingQueryService.listTrainings(false)).thenReturn(List.of());
 
         mockMvc.perform(get("/api/trainings"))
                 .andExpect(status().isOk())

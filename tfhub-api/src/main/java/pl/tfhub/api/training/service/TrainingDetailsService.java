@@ -154,7 +154,7 @@ public class TrainingDetailsService {
                 training.getId(),
                 training.getName(),
                 training.getTrainingDate(),
-                training.isActive(),
+                training.getStatus(),
                 new TrainingGroupResponse(
                         training.getTrainingGroup().getId(),
                         training.getTrainingGroup().getName()),

@@ -22,7 +22,6 @@ import pl.tfhub.api.training.entity.TrainingDefinition;
 import pl.tfhub.api.training.entity.TrainingSegment;
 import pl.tfhub.api.training.entity.TrainingSegmentExecution;
 import pl.tfhub.api.training.enums.TrainingExecutionStatus;
-import pl.tfhub.api.training.exception.InactiveTrainingException;
 import pl.tfhub.api.training.exception.InvalidTrainingIdException;
 import pl.tfhub.api.training.exception.InvalidTrainingRequestException;
 import pl.tfhub.api.training.exception.TrainingNotFoundException;
@@ -74,9 +73,6 @@ public class TrainingCompletionService {
         Training training = trainingRepository.findByIdForUpdate(trainingId)
                 .orElseThrow(() -> new TrainingNotFoundException(trainingId));
         accessScopeService.requireGroupAssignment(training.getTrainingGroup().getId());
-        if (!training.isActive()) {
-            throw new InactiveTrainingException(trainingId);
-        }
         if (request == null || request.add() == null || request.update() == null
                 || request.removeParticipationIds() == null) {
             throw new InvalidTrainingRequestException("Add, update, and removal collections are required");
@@ -109,6 +105,7 @@ public class TrainingCompletionService {
                 request, definitionsById, segments, segmentsById, participationsById, executionsById, executions,
                 training.getTrainingGroup().getId());
         applyPlan(training, plan, participationsById);
+        training.markCompleted();
         return new UpdateTrainingResponse(trainingId);
     }
 

@@ -202,10 +202,6 @@ export class TrainingEditPage implements OnInit {
       finalize(() => this.loading.set(false)),
       takeUntilDestroyed(this.destroyRef),
     ).subscribe((training) => {
-      if (!training.active) {
-        this.loadError.set('Nie można edytować nieaktywnego treningu.');
-        return;
-      }
       this.training.set(training);
       this.populateForm(training);
     });

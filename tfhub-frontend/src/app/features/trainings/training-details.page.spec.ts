@@ -10,7 +10,7 @@ const training: TrainingDetails = {
   id: 12,
   name: 'Trening szybkościowy',
   trainingDate: '2026-11-11',
-  active: true,
+  status: 'PLANNED',
   trainingGroup: { id: 3, name: 'Sprint' },
   definitions: [{
     id: 5,
@@ -52,7 +52,7 @@ describe('TrainingDetailsPage', () => {
   let fixture: ComponentFixture<TrainingDetailsPage>;
   let api: {
     getById: ReturnType<typeof vi.fn>;
-    deactivate: ReturnType<typeof vi.fn>;
+    deleteTraining: ReturnType<typeof vi.fn>;
   };
 
   async function createPage(
@@ -61,7 +61,7 @@ describe('TrainingDetailsPage', () => {
   ): Promise<void> {
     api = {
       getById: vi.fn(loader),
-      deactivate: vi.fn((id: number) => of({ id })),
+      deleteTraining: vi.fn(() => of(void 0)),
     };
     await TestBed.configureTestingModule({
       imports: [TrainingDetailsPage],
@@ -77,7 +77,7 @@ describe('TrainingDetailsPage', () => {
     fixture.detectChanges();
   }
 
-  it('displays training data, ordered plan, historical participants, executions and actions', async () => {
+  it('displays training data, ordered plan, historical participants, executions, workflow links and delete action', async () => {
     await createPage();
     const text = fixture.nativeElement.textContent as string;
     const definitionHeadings = [...fixture.nativeElement.querySelectorAll('.definition-card h2')]
@@ -92,7 +92,7 @@ describe('TrainingDetailsPage', () => {
     expect(text).toContain('Trening szybkościowy');
     expect(text).toContain('11.11.2026');
     expect(text).toContain('Sprint');
-    expect(text).toContain('Aktywny');
+    expect(text).toContain('Planowany');
     expect(definitionHeadings).toEqual(['1. Główna', '2. Rozgrzewka']);
     expect(segmentHeadings).toEqual(['1', '2', '1']);
     expect(text).toContain('Jan Kowalski');
@@ -103,32 +103,32 @@ describe('TrainingDetailsPage', () => {
     expect(fixture.nativeElement.querySelectorAll('.spikes-label')).toHaveLength(1);
     expect(fixture.nativeElement.querySelector('a[href="/trainings/12/edit"]')?.textContent.trim()).toBe('Edytuj trening');
     expect(fixture.nativeElement.querySelector('a[href="/trainings/12/complete"]')?.textContent.trim()).toBe('Uzupełnij trening');
-    expect(fixture.nativeElement.querySelector('.deactivate-training-button')?.textContent).toContain('Dezaktywuj trening');
+    expect(fixture.nativeElement.querySelector('.delete-training-button')).toBeTruthy();
   });
 
-  it('shows inactive training as view-only', async () => {
-    await createPage(() => of({ ...training, active: false }));
+  it('shows completed trainings with edit and completion actions', async () => {
+    await createPage(() => of({ ...training, status: 'COMPLETED' }));
     const text = fixture.nativeElement.textContent as string;
 
-    expect(text).toContain('Nieaktywny');
-    expect(fixture.nativeElement.querySelector('a[href="/trainings/12/edit"]')).toBeNull();
-    expect(fixture.nativeElement.querySelector('a[href="/trainings/12/complete"]')).toBeNull();
-    expect(fixture.nativeElement.querySelector('.deactivate-training-button')).toBeNull();
-    expect(fixture.nativeElement.querySelector('app-training-deactivate-confirmation')).toBeNull();
+    expect(text).toContain('Zakończony');
+    expect(fixture.nativeElement.querySelector('a[href="/trainings/12/edit"]')).toBeTruthy();
+    expect(fixture.nativeElement.querySelector('a[href="/trainings/12/complete"]')).toBeTruthy();
+    expect(fixture.nativeElement.querySelector('.delete-training-button')).toBeTruthy();
     expect(text).toContain('Jan Kowalski');
   });
 
-  it('deactivates an active training after confirmation and returns to the list', async () => {
+  it('requires confirmation before deleting from details and returns to the list on success', async () => {
     await createPage();
     const navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
-    (fixture.nativeElement.querySelector('.deactivate-training-button') as HTMLButtonElement).click();
+    (fixture.nativeElement.querySelector('.delete-training-button') as HTMLButtonElement).click();
     fixture.detectChanges();
 
-    expect(fixture.nativeElement.textContent).toContain('wszystkie jego dane');
-    (fixture.nativeElement.querySelector('app-training-deactivate-confirmation .button--danger') as HTMLButtonElement).click();
+    expect(fixture.nativeElement.textContent).toContain('trwale usunąć');
+    expect(api.deleteTraining).not.toHaveBeenCalled();
+    (fixture.nativeElement.querySelector('app-training-delete-confirmation .button--danger') as HTMLButtonElement).click();
     fixture.detectChanges();
 
-    expect(api.deactivate).toHaveBeenCalledWith(12);
+    expect(api.deleteTraining).toHaveBeenCalledWith(12);
     expect(navigate).toHaveBeenCalledWith(['/trainings']);
   });
 
@@ -172,7 +172,7 @@ describe('TrainingDetailsPage', () => {
     const pending = new Subject<TrainingDetails>();
     api = {
       getById: vi.fn(() => pending.asObservable()),
-      deactivate: vi.fn((id: number) => of({ id })),
+      deleteTraining: vi.fn(() => of(void 0)),
     };
     await TestBed.configureTestingModule({
       imports: [TrainingDetailsPage],

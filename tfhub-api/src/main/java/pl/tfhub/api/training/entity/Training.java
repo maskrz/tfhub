@@ -2,6 +2,8 @@ package pl.tfhub.api.training.entity;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.ForeignKey;
 import jakarta.persistence.GeneratedValue;
@@ -14,6 +16,7 @@ import jakarta.persistence.Table;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
+import pl.tfhub.api.training.enums.TrainingStatus;
 import pl.tfhub.api.traininggroup.entity.TrainingGroup;
 
 import java.time.LocalDate;
@@ -21,8 +24,8 @@ import java.util.Objects;
 
 @Entity
 @Table(name = "training_sessions", indexes = {
-        @Index(name = "idx_training_sessions_group_active_date",
-                columnList = "training_group_id, active, training_date, id")
+        @Index(name = "idx_training_sessions_group_status_date",
+                columnList = "training_group_id, status, training_date, id")
 })
 public class Training {
 
@@ -45,8 +48,10 @@ public class Training {
             foreignKey = @ForeignKey(name = "fk_training_sessions_group"))
     private TrainingGroup trainingGroup;
 
-    @Column(nullable = false)
-    private boolean active = true;
+    @NotNull
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    private TrainingStatus status = TrainingStatus.PLANNED;
 
     protected Training() {
     }
@@ -62,8 +67,8 @@ public class Training {
         this.trainingDate = Objects.requireNonNull(trainingDate);
     }
 
-    public void setActive(boolean active) {
-        this.active = active;
+    public void markCompleted() {
+        this.status = TrainingStatus.COMPLETED;
     }
 
     private void setName(String name) {
@@ -89,7 +94,7 @@ public class Training {
         return trainingGroup;
     }
 
-    public boolean isActive() {
-        return active;
+    public TrainingStatus getStatus() {
+        return status;
     }
 }

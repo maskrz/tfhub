@@ -12,7 +12,7 @@ const training: TrainingDetails = {
   id: 12,
   name: 'Trening szybkościowy',
   trainingDate: '2026-11-11',
-  active: true,
+  status: 'PLANNED',
   trainingGroup: { id: 3, name: 'Sprint' },
   definitions: [{
     id: 5,
@@ -330,10 +330,10 @@ describe('TrainingCompletePage', () => {
     expect(page.errorMessage()).toContain('Nie udało się zapisać');
   });
 
-  it('does not allow completion of inactive trainings', async () => {
-    await createPage(() => of({ id: 12 }), { ...training, active: false });
+  it('allows correcting a completed training', async () => {
+    await createPage(() => of({ id: 12 }), { ...training, status: 'COMPLETED' });
 
-    expect(fixture.componentInstance.loadError()).toContain('Nie można uzupełnić nieaktywnego treningu');
-    expect(fixture.componentInstance.definitions.length).toBe(0);
+    expect(fixture.componentInstance.loadError()).toBeNull();
+    expect(fixture.componentInstance.definitions.length).toBe(2);
   });
 });

@@ -105,7 +105,6 @@ Detailed specification:
 
 The following functionality is intentionally outside the scope of the initial implementation:
 
-- Training sessions and attendance.
 - Groups and team management.
 - Competition management.
 

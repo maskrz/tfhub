@@ -23,7 +23,7 @@ The operation must enforce role-based access and training group visibility rules
 
 - ADMIN can retrieve any existing training session.
 - Visibility does not depend on the training group's coach assignments.
-- ADMIN can retrieve both active and inactive training sessions.
+- ADMIN can retrieve both planned and completed training sessions.
 
 ### 4.2 Training Visibility – COACH
 
@@ -31,7 +31,7 @@ The operation must enforce role-based access and training group visibility rules
 - A training session belongs to exactly one training group.
 - All coaches assigned to the training's group have identical visibility.
 - Visibility does not depend on which coach created the training session.
-- COACH can retrieve both active and inactive training sessions belonging to their assigned groups.
+- COACH can retrieve both planned and completed training sessions belonging to their assigned groups.
 - A coach who is no longer assigned to the training's group cannot retrieve its details.
 
 ### 4.3 Training Information
@@ -123,15 +123,15 @@ The exact response structure and field types will be defined during API design.
 ## 9. Consistency Requirements
 
 - Training visibility rules must be consistent with UC-501 – List Trainings, UC-503 – Edit Training Plan, and UC-510 – Complete Training.
-- An active training session visible in the standard list must also be accessible through this operation to the same authorized user.
-- Inactive training sessions are excluded from the standard list but remain accessible through this operation.
+- A planned training session visible in the standard list must also be accessible through this operation to the same authorized user.
+- Completed training sessions are excluded from the default list but remain accessible through this operation.
 - Historical participation and execution data must remain visible after an athlete changes their current group.
 - The returned training group must represent the immutable group assigned to the training session.
 - The operation must not modify any persisted training data.
 
 ## 10. Out of Scope
 
-- Creating, editing or deactivating training sessions.
+- Creating, editing or deleting training sessions (UC-505).
 - Reviewing or accepting OCR imports.
 - Training statistics and athlete training history.
 - Searching or filtering within a training session.
@@ -143,7 +143,7 @@ The exact response structure and field types will be defined during API design.
 1. ADMIN can retrieve details of any existing training session.
 2. COACH can retrieve details only of training sessions belonging to groups currently assigned to that coach.
 3. All coaches assigned to the same group have identical visibility.
-4. Both active and inactive training sessions can be retrieved by authorized users.
+4. Both planned and completed training sessions can be retrieved by authorized users.
 5. An inaccessible training session returns the same not-found response as a nonexistent training session.
 6. The response includes the complete training structure, including definitions and segments.
 7. All assigned participants are included, even if they have no recorded execution results.

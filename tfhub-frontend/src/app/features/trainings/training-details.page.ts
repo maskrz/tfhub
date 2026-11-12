@@ -9,10 +9,10 @@ import {
   TrainingParticipationDetails,
 } from './training.model';
 import { TrainingsApiService } from './trainings-api.service';
-import { TrainingDeactivateConfirmationComponent } from './training-deactivate-confirmation.component';
+import { TrainingDeleteConfirmationComponent } from './training-delete-confirmation.component';
 
 @Component({
-  imports: [RouterLink, TrainingDeactivateConfirmationComponent],
+  imports: [RouterLink, TrainingDeleteConfirmationComponent],
   selector: 'app-training-details-page',
   styleUrl: './training-details.page.scss',
   templateUrl: './training-details.page.html',
@@ -21,7 +21,7 @@ export class TrainingDetailsPage implements OnInit {
   readonly training = signal<TrainingDetails | null>(null);
   readonly loading = signal(true);
   readonly errorMessage = signal<string | null>(null);
-  readonly deactivationDialogOpen = signal(false);
+  readonly deletionDialogOpen = signal(false);
 
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
@@ -44,17 +44,17 @@ export class TrainingDetailsPage implements OnInit {
     this.loadTraining();
   }
 
-  openDeactivationConfirmation(): void {
-    if (this.training()?.active) this.deactivationDialogOpen.set(true);
+  openDeletionConfirmation(): void {
+    if (this.training()) this.deletionDialogOpen.set(true);
   }
 
-  closeDeactivationConfirmation(): void {
-    this.deactivationDialogOpen.set(false);
+  closeDeletionConfirmation(): void {
+    this.deletionDialogOpen.set(false);
   }
 
-  onTrainingDeactivated(trainingId: number): void {
+  onTrainingDeleted(trainingId: number): void {
     if (trainingId !== this.training()?.id) return;
-    this.deactivationDialogOpen.set(false);
+    this.deletionDialogOpen.set(false);
     void this.router.navigate(['/trainings']);
   }
 

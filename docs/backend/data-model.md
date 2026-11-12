@@ -1,20 +1,21 @@
 # TFHub – Data Model
 
 **Status:** Initial version  
-**Version:** 1.0  
+**Version:** 1.1
 **Project:** Track & Field Hub
 
 ## 1. Overview
 
 This document describes the data model used by TFHub.
 
-The application data model consists of athlete, test, result, user, and training-group entities:
+The application data model consists of athlete, test, result, user, training-group, and training-session entities:
 
 - `Athlete` – an athlete managed by the coach.
 - `Test` – a definition of an athletic performance test.
 - `TestResult` – a recorded result of an athlete performing a test.
 - `User` – login account, role, and active status.
 - `TrainingGroup` – current athlete group and coach access scope.
+- `Training` – a persisted session belonging to exactly one training group, with definitions, segments, athlete participations, and segment executions.
 
 There is no public registration or account-management UI. Administrators manage accounts through the authenticated backend API; training-group and athlete CRUD remain separate use cases.
 
@@ -38,6 +39,12 @@ erDiagram
         varchar coach_name
     }
 
+    TRAINING_SESSIONS {
+        bigint id PK
+        bigint training_group_id FK
+        varchar status
+    }
+
     USER_TRAINING_GROUP {
         bigint user_id FK
         bigint training_group_id FK
@@ -49,6 +56,7 @@ erDiagram
     }
 
     TRAINING_GROUPS ||--o{ ATHLETES : contains
+    TRAINING_GROUPS ||--o{ TRAINING_SESSIONS : owns
     USERS }o--o{ TRAINING_GROUPS : coaches
     USERS }o--o{ ATHLETES : athlete_access
     ATHLETES ||--o{ TEST_RESULTS : has
@@ -276,9 +284,19 @@ No separate Competition entity is required initially.
 - Multiple results for the same athlete, test and date are technically allowed.
 - The application does not enforce uniqueness of `(athlete_id, test_id, result_date)`.
 
-## 7. Relationships
+## 7 Training Session Status
 
-### 7.1 Athlete – TestResult
+Each persisted training session has a required `status` column stored as `VARCHAR(20)`, defaulting to `PLANNED` and constrained to `PLANNED` or `COMPLETED`. The Java enum values match. New sessions created directly or from an accepted import start as `PLANNED`. The first successful UC-510 save changes the status to `COMPLETED`, even when some segment executions remain `PENDING`; failed saves do not change it.
+
+The status describes workflow progress, not availability or authorization. Both planned and completed sessions remain accessible to authorized users and may be edited or corrected. There is no inactive training status; sessions are removed through the hard-delete operation.
+
+Migration V5 replaces the legacy training-session `active` flag with `status`. The old flag cannot reliably identify whether UC-510 was previously saved, so existing sessions migrate to `PLANNED`.
+
+The training list index is `(training_group_id, status, training_date DESC, id)`.
+
+## 8. Relationships
+
+### 8.1 Athlete – TestResult
 
 One athlete can have multiple test results.
 
@@ -286,7 +304,7 @@ Each test result belongs to exactly one athlete.
 
 Deleting an athlete with existing results must be prevented.
 
-### 7.2 Test – TestResult
+### 8.2 Test – TestResult
 
 One test can have multiple results.
 
@@ -294,7 +312,7 @@ Each test result belongs to exactly one test.
 
 Deleting a test with existing results must be prevented.
 
-### 7.3 Referential integrity
+### 8.3 Referential integrity
 
 Foreign key constraints are enforced by PostgreSQL.
 
@@ -302,9 +320,9 @@ The database uses `ON DELETE RESTRICT` for both relationships.
 
 An athlete has zero or one current training group. A coach may belong to multiple groups and a group may have multiple coaches. Reassignment changes current coach access only; it does not update, delete, or re-parent historical results.
 
-## 8. Data Types and Precision
+## 9. Data Types and Precision
 
-### 8.1 Numeric values
+### 9.1 Numeric values
 
 Test results use `NUMERIC(12,3)`.
 
@@ -319,7 +337,7 @@ Examples:
 
 The application must not store formatted values such as `2:15.00`.
 
-### 8.2 Dates
+### 9.2 Dates
 
 Results use PostgreSQL `DATE`.
 
@@ -327,7 +345,7 @@ The corresponding Java type should be `LocalDate`.
 
 No time or timezone information is stored.
 
-### 8.3 Enumerations
+### 9.3 Enumerations
 
 Enum-like values are stored as VARCHAR columns.
 
@@ -335,7 +353,7 @@ Java enums provide application-level type safety.
 
 Database columns are not PostgreSQL native enum types.
 
-## 9. Database Schema Management
+## 10. Database Schema Management
 
 The current athlete, test, and result schema is created by Flyway migration:
 
@@ -347,25 +365,24 @@ The migration creates:
 - `tests`
 - `test_results`
 
-The authentication and training-group tables were introduced through `V3__add_users_and_training_groups.sql`; the migration adds a nullable athlete group reference and preserves existing athlete and result rows. UC-402 reuses these tables and adds no schema migration. Do not alter an already-applied migration. All future database modifications must be introduced through new Flyway migrations.
+The authentication and training-group tables were introduced through `V3__add_users_and_training_groups.sql`; the migration adds a nullable athlete group reference and preserves existing athlete and result rows. The training-session hierarchy was introduced through `V4__create_training_domain_schema.sql`; `V5__replace_training_active_flag_with_status.sql` introduced the training workflow status. Training deletion (UC-505) permanently removes the session-owned definitions, segments, participations, and executions in one transaction; its foreign keys remain restrictive, so the service deletes children in dependency order. Do not alter an already-applied migration. All future database modifications must be introduced through new Flyway migrations.
 
 Existing applied migrations must not be modified.
 
 Hibernate uses schema validation and must not modify the schema automatically.
 
-## 10. Explicitly Excluded Entities and Capabilities
+## 11. Explicitly Excluded Entities and Capabilities
 
 The following entities and capabilities are not part of the current model:
 
 - Public registration or account-management UI
 - Training-group management UI and athlete group-reassignment UI
-- TrainingSession
 - Competition
 - TrainingPlan
 
 They may be introduced later when supported by actual application requirements.
 
-## 11. Future Extensions
+## 12. Future Extensions
 
 Potential future improvements include:
 
@@ -373,7 +390,6 @@ Potential future improvements include:
 - Parent accounts and multiple athlete profiles per account.
 - Detailed competition metadata.
 - Import of external competition results.
-- Training sessions.
 - Performance history and analytics.
 - Additional measurement units and test categories.
 

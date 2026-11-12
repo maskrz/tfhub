@@ -8,8 +8,8 @@ The view must follow the existing TFHUB visual design and interaction patterns.
 
 ## 2. Actors
 
-- **ADMIN** – can view all active trainings.
-- **COACH** – can view active trainings belonging to groups assigned to that coach.
+- **ADMIN** – can view all planned trainings and may include completed trainings.
+- **COACH** – can view trainings belonging to groups assigned to that coach and may include completed trainings.
 
 ## 3. Preconditions
 
@@ -23,8 +23,9 @@ The view must follow the existing TFHUB visual design and interaction patterns.
 3. The view displays the available trainings.
 4. The user can browse the list and use the available search and filtering controls.
 5. The user selects a training to open its details (FE-TRAINING-004).
-6. For each training, the user can navigate directly to **Edytuj trening** (FE-TRAINING-003) or **Uzupełnij trening** (FE-TRAINING-009).
-7. The user can initiate training creation (FE-TRAINING-002), subject to the existing role permissions.
+6. For any training, the user can navigate directly to **Edytuj trening** (FE-TRAINING-003) or **Uzupełnij trening** (FE-TRAINING-009).
+7. The user can initiate permanent deletion of a training from its row (FE-TRAINING-005).
+8. The user can initiate training creation (FE-TRAINING-002), subject to the existing role permissions.
 
 ## 5. Displayed Information
 
@@ -37,7 +38,7 @@ Each training list item must display:
 
 Use the actual response DTO returned by the implemented UC-501 endpoint. Do not invent or duplicate data that is not provided by the backend.
 
-Only active trainings are displayed. Filtering by active/inactive status is not required.
+Each item includes its status. The default filter displays all trainings; users can select planned or completed trainings.
 
 ## 6. Search, Filtering, and Sorting
 
@@ -46,13 +47,17 @@ Only active trainings are displayed. Filtering by active/inactive status is not 
 - Do not introduce a new filtering UX or custom control style.
 - Do not implement filtering that requires unsupported backend functionality. If filtering is performed locally, it must operate on the data actually loaded by the endpoint.
 - Follow existing list sorting conventions where applicable.
+- Provide a status filter with **Planowane**, **Zakończone**, and **Wszystkie statusy** options, following existing TFHUB status-filter patterns.
+- Load completed trainings through UC-501's `includeCompleted` option; apply the selected status filter to the returned data.
 
 ## 7. Navigation and Actions
 
 - Selecting a training opens its details view (FE-TRAINING-004).
 - Provide an action to create a new training (FE-TRAINING-002) for authorized users.
-- Provide separate **Edytuj trening** and **Uzupełnij trening** links for each active list item. These links only navigate to FE-TRAINING-003 and FE-TRAINING-009; authorization and active-state checks remain backend-enforced.
-- Do not provide a deactivation action in this use case.
+- Provide separate **Edytuj trening** and **Uzupełnij trening** links for all list items. These links only navigate to FE-TRAINING-003 and FE-TRAINING-009; authorization remains backend-enforced.
+- Display the planned/completed state as a read-only status label.
+- Provide **Usuń** for all items (FE-TRAINING-005), requiring explicit confirmation before permanent deletion.
+- Use a blank, accessible actions-column header rather than displaying the text **Akcje**.
 
 ## 8. UI and UX Requirements
 
@@ -93,7 +98,7 @@ The view must be mobile-first and consistent with the existing TFHUB application
 
 ## 11. Out of Scope
 
-- Creating or editing training data, completing a training, or deactivating a training. This use case provides navigation links only.
+- Creating, editing, or completing training data; deletion behavior is specified in FE-TRAINING-005.
 - Training details implementation.
 - OCR and training imports.
 - Any backend changes.
@@ -106,6 +111,8 @@ The view must be mobile-first and consistent with the existing TFHUB application
 - Search and filters follow existing TFHUB patterns and work correctly.
 - Selecting a training navigates to its details.
 - Each listed training provides distinct links to edit its plan and complete its athlete participation/results.
+- Users can filter planned, completed, or all returned trainings; the default is all statuses.
+- Planned and completed list items display their status and offer edit/completion actions; both statuses can be deleted after confirmation.
 - Authorized users can initiate training creation.
 - Loading, empty, and error states are handled.
 - The view is responsive and usable on mobile devices.

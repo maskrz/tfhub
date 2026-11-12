@@ -22,36 +22,36 @@
           <h2>{{ currentTraining.name }}</h2>
           <p>{{ formatDate(currentTraining.trainingDate) }} · {{ currentTraining.trainingGroup.name }}</p>
         </div>
-        <span class="status-badge" [class.status-badge--inactive]="!currentTraining.active">
-          {{ currentTraining.active ? 'Aktywny' : 'Nieaktywny' }}
+        <span class="status-badge" [class.status-badge--completed]="currentTraining.status === 'COMPLETED'">
+          {{ currentTraining.status === 'COMPLETED' ? 'Zakończony' : 'Planowany' }}
         </span>
       </div>
-      @if (currentTraining.active) {
-        <div class="training-actions">
-          <a class="button button--secondary" [routerLink]="['/trainings', currentTraining.id, 'edit']">
-            Edytuj trening
-          </a>
-          <a class="button button--primary" [routerLink]="['/trainings', currentTraining.id, 'complete']">
-            Uzupełnij trening
-          </a>
-          <button
-            type="button"
-            class="button button--secondary deactivate-training-button"
-            (click)="openDeactivationConfirmation()"
-          >
-            Dezaktywuj trening
-          </button>
-        </div>
-      }
+      <div class="training-actions">
+        <a class="button button--secondary" [routerLink]="['/trainings', currentTraining.id, 'edit']">
+          Edytuj trening
+        </a>
+        <a class="button button--primary" [routerLink]="['/trainings', currentTraining.id, 'complete']">
+          Uzupełnij trening
+        </a>
+      </div>
+      <div class="training-actions">
+        <button
+          type="button"
+          class="button button--danger delete-training-button"
+          (click)="openDeletionConfirmation()"
+        >
+          Usuń trening
+        </button>
+      </div>
     </section>
 
-    @if (deactivationDialogOpen()) {
-      @if (training(); as currentTraining) {
-        <app-training-deactivate-confirmation
-          [trainingId]="currentTraining.id"
-          [trainingName]="currentTraining.name"
-          (deactivated)="onTrainingDeactivated($event)"
-          (cancelled)="closeDeactivationConfirmation()"
+    @if (deletionDialogOpen()) {
+      @if (training(); as pendingTraining) {
+        <app-training-delete-confirmation
+          [trainingId]="pendingTraining.id"
+          [trainingName]="pendingTraining.name"
+          (deleted)="onTrainingDeleted($event)"
+          (cancelled)="closeDeletionConfirmation()"
         />
       }
     }

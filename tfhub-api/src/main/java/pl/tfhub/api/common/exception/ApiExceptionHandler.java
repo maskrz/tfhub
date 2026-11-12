@@ -33,7 +33,6 @@ import pl.tfhub.api.test.exception.TestHasResultsException;
 import pl.tfhub.api.test.exception.TestNotFoundException;
 import pl.tfhub.api.traininggroup.exception.TrainingGroupNotFoundException;
 import pl.tfhub.api.training.exception.InvalidTrainingRequestException;
-import pl.tfhub.api.training.exception.InactiveTrainingException;
 import pl.tfhub.api.training.exception.InvalidTrainingIdException;
 import pl.tfhub.api.training.exception.TrainingNotFoundException;
 import pl.tfhub.api.user.exception.IncorrectCurrentPasswordException;
@@ -185,13 +184,6 @@ public class ApiExceptionHandler {
 	public ProblemDetail handleTrainingNotFound(TrainingNotFoundException exception) {
 		ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, exception.getMessage());
 		problem.setTitle("Training not found");
-		return problem;
-	}
-
-	@ExceptionHandler(InactiveTrainingException.class)
-	public ProblemDetail handleInactiveTraining(InactiveTrainingException exception) {
-		ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, exception.getMessage());
-		problem.setTitle("Training is inactive");
 		return problem;
 	}
 

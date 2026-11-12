@@ -26,7 +26,7 @@ The operation must enforce role-based access and training group assignment rules
 - Every training session must belong to exactly one training group.
 - The training group is required during creation.
 - The assigned training group cannot be changed after the training session has been created.
-- A training session is created as active.
+- A training session is created with status `PLANNED`.
 - Training sessions for different groups are separate records, even if they have the same name, date and training plan.
 
 ### 4.2 Training Group Assignment
@@ -57,7 +57,7 @@ The operation must enforce role-based access and training group assignment rules
 
 ### 4.5 Initial Training State
 
-- A newly created training session is active.
+- A newly created training session has status `PLANNED`.
 - Creation does not assign athletes or accept execution data. The newly created training has no athlete participations until UC-510 or an accepted import creates them.
 - All supplied definitions and segments belong to the newly created training session.
 - The training session must not be partially created if any part of the submitted data is invalid.
@@ -124,7 +124,7 @@ The exact response structure and field types will be defined during API design.
 6. Every training definition contains at least one ordered training segment.
 7. Every segment has a positive distance and a valid execution order.
 8. Training creation does not assign athletes or accept execution data.
-9. A newly created training session is active and initially has no athlete participations.
+9. A newly created training session has status `PLANNED` and initially has no athlete participations.
 10. The plan is persisted atomically.
 11. Validation or persistence failure leaves no partially created training data.
 12. The operation returns the identifier of the newly created training session.

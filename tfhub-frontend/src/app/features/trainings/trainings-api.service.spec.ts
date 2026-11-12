@@ -5,7 +5,6 @@ import {
   CreateTrainingRequest,
   CreateTrainingResponse,
   CompleteTrainingRequest,
-  DeactivateTrainingResponse,
   EditTrainingRequest,
   TrainingDetails,
   UpdateTrainingResponse,
@@ -26,7 +25,7 @@ describe('TrainingsApiService', () => {
 
   afterEach(() => httpTesting.verify());
 
-  it('retrieves the active training list from the UC-501 endpoint', () => {
+  it('retrieves planned trainings from the UC-501 endpoint by default', () => {
     const response = [{
       id: 8,
       name: 'Trening szybkościowy',
@@ -34,6 +33,7 @@ describe('TrainingsApiService', () => {
       trainingGroup: { id: 3, name: 'Sprint' },
       definitionCount: 1,
       participantCount: 4,
+      status: 'PLANNED',
     }];
     let actual: typeof response | undefined;
 
@@ -43,6 +43,14 @@ describe('TrainingsApiService', () => {
     expect(request.request.method).toBe('GET');
     request.flush(response);
     expect(actual).toEqual(response);
+  });
+
+  it('includes completed trainings when requested', () => {
+    service.getAll(true).subscribe();
+
+    const request = httpTesting.expectOne('/api/trainings?includeCompleted=true');
+    expect(request.request.method).toBe('GET');
+    request.flush([]);
   });
 
   it('creates a training using the UC-502 endpoint and request DTO', () => {
@@ -73,7 +81,7 @@ describe('TrainingsApiService', () => {
       id: 12,
       name: 'Trening szybkościowy',
       trainingDate: '2026-11-11',
-      active: true,
+      status: 'PLANNED',
       trainingGroup: { id: 3, name: 'Sprint' },
       definitions: [],
     };
@@ -132,16 +140,14 @@ describe('TrainingsApiService', () => {
     expect(actual).toEqual({ id: 12 });
   });
 
-  it('deactivates a training through the UC-505 endpoint', () => {
-    const response: DeactivateTrainingResponse = { id: 12 };
-    let actual: DeactivateTrainingResponse | undefined;
+  it('deletes a training through the UC-505 endpoint with no response body', () => {
+    let completed = false;
 
-    service.deactivate(12).subscribe((result) => (actual = result));
+    service.deleteTraining(12).subscribe(() => (completed = true));
 
-    const request = httpTesting.expectOne('/api/trainings/12/deactivate');
-    expect(request.request.method).toBe('PATCH');
-    expect(request.request.body).toBeNull();
-    request.flush(response);
-    expect(actual).toEqual(response);
+    const request = httpTesting.expectOne('/api/trainings/12');
+    expect(request.request.method).toBe('DELETE');
+    request.flush(null, { status: 204, statusText: 'No Content' });
+    expect(completed).toBe(true);
   });
 });

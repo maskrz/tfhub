@@ -5,7 +5,6 @@ import {
   CreateTrainingRequest,
   CreateTrainingResponse,
   CompleteTrainingRequest,
-  DeactivateTrainingResponse,
   EditTrainingRequest,
   TrainingDetails,
   TrainingListItem,
@@ -16,8 +15,10 @@ import {
 export class TrainingsApiService {
   private readonly http = inject(HttpClient);
 
-  getAll(): Observable<TrainingListItem[]> {
-    return this.http.get<TrainingListItem[]>('/api/trainings');
+  getAll(includeCompleted = false): Observable<TrainingListItem[]> {
+    return this.http.get<TrainingListItem[]>('/api/trainings', {
+      params: includeCompleted ? { includeCompleted: 'true' } : {},
+    });
   }
 
   create(request: CreateTrainingRequest): Observable<CreateTrainingResponse> {
@@ -36,7 +37,7 @@ export class TrainingsApiService {
     return this.http.patch<UpdateTrainingResponse>(`/api/trainings/${id}/participations`, request);
   }
 
-  deactivate(id: number): Observable<DeactivateTrainingResponse> {
-    return this.http.patch<DeactivateTrainingResponse>(`/api/trainings/${id}/deactivate`, null);
+  deleteTraining(id: number): Observable<void> {
+    return this.http.delete<void>(`/api/trainings/${id}`);
   }
 }

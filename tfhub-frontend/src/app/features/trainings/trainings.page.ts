@@ -5,12 +5,12 @@ import { RouterLink } from '@angular/router';
 import { EMPTY, catchError, finalize } from 'rxjs';
 import { AuthService } from '../../core/auth/auth.service';
 import { MultiSelectDropdownComponent, MultiSelectOption } from '../../shared/multi-select-dropdown.component';
-import { TrainingListItem } from './training.model';
+import { TrainingListItem, TrainingStatus } from './training.model';
 import { TrainingsApiService } from './trainings-api.service';
-import { TrainingDeactivateConfirmationComponent } from './training-deactivate-confirmation.component';
+import { TrainingDeleteConfirmationComponent } from './training-delete-confirmation.component';
 
 @Component({
-  imports: [MultiSelectDropdownComponent, RouterLink, TrainingDeactivateConfirmationComponent],
+  imports: [MultiSelectDropdownComponent, RouterLink, TrainingDeleteConfirmationComponent],
   selector: 'app-trainings-page',
   styleUrl: './trainings.page.scss',
   templateUrl: './trainings.page.html',
@@ -20,9 +20,10 @@ export class TrainingsPage implements OnInit {
   readonly loading = signal(false);
   readonly errorMessage = signal<string | null>(null);
   readonly successMessage = signal<string | null>(null);
-  readonly trainingPendingDeactivation = signal<TrainingListItem | null>(null);
+  readonly trainingPendingDeletion = signal<TrainingListItem | null>(null);
   readonly query = signal('');
   readonly selectedGroupIds = signal<number[]>([]);
+  readonly statusFilter = signal<'' | TrainingStatus>('');
   readonly trainingDateFrom = signal('');
   readonly trainingDateTo = signal('');
   readonly sortColumn = signal<'name' | 'date' | 'group' | 'participants'>('date');
@@ -42,11 +43,13 @@ export class TrainingsPage implements OnInit {
   readonly visibleTrainings = computed(() => {
     const terms = this.query().trim().toLocaleLowerCase('pl').split(/\s+/).filter(Boolean);
     const groupIds = this.selectedGroupIds();
+    const status = this.statusFilter();
     const dateFrom = this.trainingDateFrom();
     const dateTo = this.trainingDateTo();
     const direction = this.sortDirection() === 'asc' ? 1 : -1;
     return this.allTrainings()
       .filter((training) => {
+        if (status && training.status !== status) return false;
         if (groupIds.length > 0 && !groupIds.includes(training.trainingGroup.id)) return false;
         if (dateFrom && training.trainingDate < dateFrom) return false;
         if (dateTo && training.trainingDate > dateTo) return false;
@@ -88,6 +91,15 @@ export class TrainingsPage implements OnInit {
     this.selectedGroupIds.set(groupIds);
   }
 
+  onStatusChange(event: Event): void {
+    const select = event.target;
+    if (!(select instanceof HTMLSelectElement)) return;
+    const value = select.value;
+    if (value === '' || value === 'PLANNED' || value === 'COMPLETED') {
+      this.statusFilter.set(value);
+    }
+  }
+
   onTrainingDateChange(event: Event, bound: 'from' | 'to'): void {
     const input = event.target;
     if (input instanceof HTMLInputElement) {
@@ -112,26 +124,27 @@ export class TrainingsPage implements OnInit {
     return this.query().trim().length > 0 ||
       this.selectedGroupIds().length > 0 ||
       this.trainingDateFrom().length > 0 ||
-      this.trainingDateTo().length > 0;
+      this.trainingDateTo().length > 0 ||
+      this.statusFilter() !== '';
   }
 
   retry(): void {
     this.loadTrainings();
   }
 
-  openDeactivationConfirmation(training: TrainingListItem): void {
+  openDeletionConfirmation(training: TrainingListItem): void {
     this.successMessage.set(null);
-    this.trainingPendingDeactivation.set(training);
+    this.trainingPendingDeletion.set(training);
   }
 
-  closeDeactivationConfirmation(): void {
-    this.trainingPendingDeactivation.set(null);
+  closeDeletionConfirmation(): void {
+    this.trainingPendingDeletion.set(null);
   }
 
-  onTrainingDeactivated(trainingId: number): void {
+  onTrainingDeleted(trainingId: number): void {
     this.allTrainings.update((current) => current.filter((training) => training.id !== trainingId));
-    this.trainingPendingDeactivation.set(null);
-    this.successMessage.set('Trening został dezaktywowany.');
+    this.trainingPendingDeletion.set(null);
+    this.successMessage.set('Trening został trwale usunięty.');
   }
 
   formatDate(date: string): string {
@@ -143,7 +156,7 @@ export class TrainingsPage implements OnInit {
     this.loading.set(true);
     this.errorMessage.set(null);
     this.api
-      .getAll()
+      .getAll(true)
       .pipe(
         catchError((error: unknown) => {
           this.allTrainings.set([]);
@@ -165,4 +178,5 @@ export class TrainingsPage implements OnInit {
     }
     return 'Nie udało się pobrać listy treningów. Spróbuj ponownie.';
   }
+
 }

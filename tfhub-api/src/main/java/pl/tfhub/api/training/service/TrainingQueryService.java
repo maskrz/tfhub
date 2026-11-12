@@ -22,12 +22,12 @@ public class TrainingQueryService {
     }
 
     @Transactional(readOnly = true)
-    public List<TrainingListItemResponse> listTrainings() {
+    public List<TrainingListItemResponse> listTrainings(boolean includeCompleted) {
         accessScopeService.requireCoachOrAdmin();
         var user = accessScopeService.currentUser();
         if (user.role() == UserRole.ADMIN) {
-            return trainingListRepository.findAllActive();
+            return trainingListRepository.findAll(includeCompleted);
         }
-        return trainingListRepository.findActiveForCoach(user.id());
+        return trainingListRepository.findForCoach(user.id(), includeCompleted);
     }
 }

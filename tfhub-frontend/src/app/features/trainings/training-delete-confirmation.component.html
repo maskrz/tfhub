@@ -1,0 +1,25 @@
+<dialog #dialog class="confirmation-modal" aria-labelledby="delete-training-title" (cancel)="onDialogCancel($event)">
+  <header class="modal-header">
+    <h2 id="delete-training-title">Usuń trening</h2>
+  </header>
+
+  <div class="modal-content">
+    <p class="training-name">{{ trainingName }}</p>
+    <p class="confirmation-message">
+      Czy na pewno chcesz trwale usunąć ten trening? Jego plan, uczestnicy i wszystkie zapisane wyniki zostaną usunięte. Tej operacji nie można cofnąć.
+    </p>
+
+    @if (errorMessage(); as message) {
+      <p class="form-error" role="alert">{{ message }}</p>
+    }
+  </div>
+
+  <footer class="modal-footer">
+    <button type="button" class="button button--secondary" [disabled]="deleting()" (click)="cancel()">
+      Anuluj
+    </button>
+    <button type="button" class="button button--danger" [disabled]="deleting()" (click)="confirm()">
+      {{ deleting() ? 'Usuwanie...' : 'Usuń trening' }}
+    </button>
+  </footer>
+</dialog>

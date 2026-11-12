@@ -15,8 +15,8 @@ Display complete training details, including the immutable training group, plan,
 1. The user opens a training from the list.
 2. The frontend retrieves complete details using UC-504.
 3. The view displays training name, date, status, group, ordered definitions/segments, participants and each participant's executions.
-4. For an active training, the user may select **Edytuj trening** (FE-TRAINING-003) or **Uzupełnij trening** (FE-TRAINING-009).
-5. Inactive trainings remain viewable by authorized users but do not offer edit or completion actions.
+4. For a planned or completed training, the user may select **Edytuj trening** (FE-TRAINING-003) or **Uzupełnij trening** (FE-TRAINING-009).
+5. Planned and completed trainings remain editable by authorized users. They can permanently delete the training from this view (FE-TRAINING-005).
 
 ## 4. Display and Navigation Requirements
 
@@ -25,7 +25,8 @@ Display complete training details, including the immutable training group, plan,
 - Empty collections must render normally.
 - The group is read-only.
 - Provide separate actions for plan editing and assigning/recording athlete participation. Do not combine them into one edit action.
-- Backend authorization and active-state checks remain authoritative.
+- Offer **Usuń trening** for planned and completed sessions with explicit confirmation (FE-TRAINING-005).
+- Backend authorization remains authoritative.
 
 ## 5. UI and Error Handling
 
@@ -35,12 +36,12 @@ Follow existing TFHub view, loading, empty, error, and responsive patterns. All 
 
 - Editing the plan (FE-TRAINING-003).
 - Assigning athletes or recording results (FE-TRAINING-009).
-- Deactivation and imports.
+- Deletion (FE-TRAINING-005) and imports.
 
 ## 7. Acceptance Criteria
 
 1. Authorized users see complete details, including historical participants and executions.
 2. Definition and segment order is preserved.
-3. Active trainings expose distinct **Edytuj trening** and **Uzupełnij trening** actions.
-4. Inactive trainings are view-only.
+3. Planned and completed trainings expose distinct **Edytuj trening** and **Uzupełnij trening** actions.
+4. Planned and completed trainings can be deleted after confirmation.
 5. The view handles empty, loading and error states and remains usable on mobile.

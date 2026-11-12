@@ -4,18 +4,18 @@ import { EMPTY, catchError, finalize, take } from 'rxjs';
 import { TrainingsApiService } from './trainings-api.service';
 
 @Component({
-  selector: 'app-training-deactivate-confirmation',
-  templateUrl: './training-deactivate-confirmation.component.html',
-  styleUrl: './training-deactivate-confirmation.component.scss',
+  selector: 'app-training-delete-confirmation',
+  templateUrl: './training-delete-confirmation.component.html',
+  styleUrl: './training-delete-confirmation.component.scss',
 })
-export class TrainingDeactivateConfirmationComponent implements AfterViewInit {
+export class TrainingDeleteConfirmationComponent implements AfterViewInit {
   @Input({ required: true }) trainingId!: number;
   @Input({ required: true }) trainingName!: string;
-  @Output() deactivated = new EventEmitter<number>();
+  @Output() deleted = new EventEmitter<number>();
   @Output() cancelled = new EventEmitter<void>();
   @ViewChild('dialog') private dialog!: ElementRef<HTMLDialogElement>;
 
-  readonly deactivating = signal(false);
+  readonly deleting = signal(false);
   readonly errorMessage = signal<string | null>(null);
 
   private readonly api = inject(TrainingsApiService);
@@ -30,25 +30,28 @@ export class TrainingDeactivateConfirmationComponent implements AfterViewInit {
   }
 
   confirm(): void {
-    if (this.deactivating()) return;
+    if (this.deleting()) return;
 
     this.errorMessage.set(null);
-    this.deactivating.set(true);
-    this.api.deactivate(this.trainingId).pipe(
-      take(1),
-      catchError((error: unknown) => {
-        this.errorMessage.set(this.getErrorMessage(error));
-        return EMPTY;
-      }),
-      finalize(() => this.deactivating.set(false)),
-    ).subscribe((response) => {
-      this.closeDialog();
-      this.deactivated.emit(response.id);
-    });
+    this.deleting.set(true);
+    this.api
+      .deleteTraining(this.trainingId)
+      .pipe(
+        take(1),
+        catchError((error: unknown) => {
+          this.errorMessage.set(this.getErrorMessage(error));
+          return EMPTY;
+        }),
+        finalize(() => this.deleting.set(false)),
+      )
+      .subscribe(() => {
+        this.closeDialog();
+        this.deleted.emit(this.trainingId);
+      });
   }
 
   cancel(): void {
-    if (this.deactivating()) return;
+    if (this.deleting()) return;
     this.closeDialog();
     this.cancelled.emit();
   }
@@ -72,14 +75,11 @@ export class TrainingDeactivateConfirmationComponent implements AfterViewInit {
       return 'Sesja wygasła lub użytkownik nie jest zalogowany.';
     }
     if (error instanceof HttpErrorResponse && error.status === 403) {
-      return 'Brak dostępu do dezaktywacji tego treningu.';
+      return 'Brak dostępu do usunięcia tego treningu.';
     }
     if (error instanceof HttpErrorResponse && error.status === 404) {
-      return 'Nie znaleziono treningu lub brak dostępu. Trening nie został zmieniony.';
+      return 'Nie znaleziono treningu lub brak dostępu. Lista nie została zmieniona.';
     }
-    if (error instanceof HttpErrorResponse && error.status === 409) {
-      return 'Trening jest już nieaktywny. Lista nie została zmieniona.';
-    }
-    return 'Nie udało się dezaktywować treningu. Spróbuj ponownie.';
+    return 'Nie udało się usunąć treningu. Spróbuj ponownie.';
   }
 }

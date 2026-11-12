@@ -6,9 +6,9 @@ Allow an authorized user to assign athletes to a training's definitions and reco
 
 ## 2. Actors and Preconditions
 
-- **ADMIN** – can complete any active training.
-- **COACH** – can complete active trainings in groups assigned to that coach.
-- The user is authenticated, the training is active, and backend UC-510 is available.
+- **ADMIN** – can complete any training.
+- **COACH** – can complete trainings in groups assigned to that coach.
+- The user is authenticated, the training exists, and backend UC-510 is available.
 
 ## 3. Main Flow
 
@@ -17,6 +17,8 @@ Allow an authorized user to assign athletes to a training's definitions and reco
 3. The user assigns athletes to definitions, removes or reassigns eligible athletes, and updates execution data.
 4. The frontend submits explicit additions, execution updates, and removals to UC-510. Omitted participants and executions remain unchanged.
 5. On success, the frontend stays on the completion view and displays a dismissible success notice that closes automatically after five seconds. The frontend refreshes the saved training data so later edits use persisted participation and execution IDs.
+
+The first successful save changes the training status from `PLANNED` to `COMPLETED`, even if some executions remain `PENDING`. Failed saves do not change the status. Completed trainings remain editable for later corrections.
 
 ## 4. Athlete Assignments
 
@@ -62,11 +64,11 @@ Follow existing TFHub form, athlete-selector, validation, loading/error and resp
 ## 8. Out of Scope
 
 - Editing training name, date, definitions or segments (FE-TRAINING-003).
-- Viewing implementation, deactivation, imports, athlete records or group assignments.
+- Viewing implementation, deletion (FE-TRAINING-005), imports, athlete records or group assignments.
 
 ## 9. Acceptance Criteria
 
-1. Authorized users can open the completion view for an active training.
+1. Authorized users can open the completion view for a planned or completed training.
 2. Historical participants remain available after their current group changes.
 3. New assignments are limited to athletes currently in the training group.
 4. The same athlete cannot appear in multiple definitions.
@@ -76,3 +78,4 @@ Follow existing TFHub form, athlete-selector, validation, loading/error and resp
 8. Backend errors preserve form changes.
 9. After success, the user remains on the completion view and can dismiss the success notice or allow it to close after five seconds.
 10. The UI is consistent with TFHub and usable on mobile devices.
+11. A successful save marks a planned training as completed; failed saves leave its status unchanged.

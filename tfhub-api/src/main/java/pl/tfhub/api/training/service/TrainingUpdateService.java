@@ -19,7 +19,6 @@ import pl.tfhub.api.training.entity.TrainingDefinition;
 import pl.tfhub.api.training.entity.TrainingSegment;
 import pl.tfhub.api.training.entity.TrainingSegmentExecution;
 import pl.tfhub.api.training.enums.TrainingExecutionStatus;
-import pl.tfhub.api.training.exception.InactiveTrainingException;
 import pl.tfhub.api.training.exception.InvalidTrainingIdException;
 import pl.tfhub.api.training.exception.InvalidTrainingRequestException;
 import pl.tfhub.api.training.exception.TrainingNotFoundException;
@@ -64,10 +63,6 @@ public class TrainingUpdateService {
         Training training = trainingRepository.findByIdForUpdate(trainingId)
                 .orElseThrow(() -> new TrainingNotFoundException(trainingId));
         accessScopeService.requireGroupAssignment(training.getTrainingGroup().getId());
-        if (!training.isActive()) {
-            throw new InactiveTrainingException(trainingId);
-        }
-
         List<TrainingDefinition> currentDefinitions =
                 definitionRepository.findAllByTraining_IdOrderBySequenceNumberAsc(trainingId);
         List<Long> definitionIds = currentDefinitions.stream().map(TrainingDefinition::getId).toList();

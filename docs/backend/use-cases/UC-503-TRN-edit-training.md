@@ -2,16 +2,16 @@
 
 ## 1. Purpose
 
-Allow an authorized user to edit the plan of an existing active training session: its name, date, definitions and segments. Athlete assignments and execution data are managed separately through UC-510 – Complete Training.
+Allow an authorized user to edit the plan of an existing training session, regardless of whether its status is `PLANNED` or `COMPLETED`: its name, date, definitions and segments. Athlete assignments and execution data are managed separately through UC-510 – Complete Training.
 
 The operation preserves the training session's identity, group and historical execution associations.
 
 ## 2. Actors and Preconditions
 
-- **ADMIN** – can edit any active training session.
-- **COACH** – can edit an active training session only while currently assigned to its group.
+- **ADMIN** – can edit any training session.
+- **COACH** – can edit a training session only while currently assigned to its group.
 - The requester is authenticated and has the ADMIN or COACH role.
-- The training exists and is active.
+- The training exists.
 
 ## 3. Business Rules
 
@@ -20,12 +20,12 @@ The operation preserves the training session's identity, group and historical ex
 - The training name and date may be changed.
 - The training must retain a non-empty name and valid date.
 - The training group is immutable and is not accepted as an editable request field.
-- Inactive trainings cannot be edited.
+- Training status does not restrict editing; completed training plans can still be corrected.
 - The operation does not edit athlete assignments or execution status, results, or spike usage.
 
 ### 3.2 Authorization
 
-- ADMIN can edit any active training.
+- ADMIN can edit any training.
 - COACH can edit only trainings belonging to groups currently assigned to that coach.
 - All coaches assigned to a group have identical permissions.
 - Permissions do not depend on who created the training.
@@ -71,7 +71,7 @@ The exact JSON DTO and error representation follow the backend API conventions.
 
 - Reject unauthenticated users and users without ADMIN or COACH role.
 - Reject a missing training; do not reveal an inaccessible training to an unassigned coach.
-- Reject edits to inactive trainings and edits that attempt to change the training group.
+- Reject edits to missing or inaccessible trainings and edits that attempt to change the training group.
 - Reject blank names, invalid dates, an empty definitions collection, blank definition names, empty segment collections, invalid distances/rests, duplicate order numbers, or IDs outside the training.
 - Reject removal of a definition with any `RECORDED` execution.
 - Reject removal of a segment with any `RECORDED` execution or a change to its distance while such an execution exists.
@@ -85,11 +85,11 @@ The full plan update, including any required creation/removal of derived `PENDIN
 
 - Adding, removing or moving athlete assignments except as the unavoidable consequence of deleting an eligible definition.
 - Editing athlete execution status, result or spike usage.
-- Editing inactive trainings, changing the training group, deactivation/reactivation, imports, templates and statistics.
+- Changing the training group, deleting trainings (UC-505), imports, templates and statistics.
 
 ## 8. Acceptance Criteria
 
-1. ADMIN can edit any active training; COACH can edit only while assigned to its group.
+1. ADMIN can edit any training; COACH can edit only while assigned to its group.
 2. Name, date, definition names/order, segment distances/rest/order can be edited.
 3. The training group cannot be changed and is not part of this request.
 4. Existing definition and segment IDs remain stable when items are retained or reordered.
@@ -97,4 +97,4 @@ The full plan update, including any required creation/removal of derived `PENDIN
 6. Removing a definition with no `RECORDED` execution removes its assignments and associated executions; removing an eligible segment removes its executions.
 7. Adding a segment initializes a `PENDING` execution for each existing participant in that definition.
 8. Existing execution values are unchanged by plan edits.
-9. All changes are atomic, and inaccessible/inactive trainings cannot be edited.
+9. All changes are atomic, and inaccessible trainings cannot be edited.

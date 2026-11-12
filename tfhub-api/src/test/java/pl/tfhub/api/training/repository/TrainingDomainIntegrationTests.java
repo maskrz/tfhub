@@ -34,14 +34,14 @@ import pl.tfhub.api.training.dto.request.CompleteTrainingRequest;
 import pl.tfhub.api.training.dto.request.NewTrainingExecutionRequest;
 import pl.tfhub.api.training.dto.request.UpdateTrainingParticipationRequest;
 import pl.tfhub.api.training.dto.response.TrainingDetailsResponse;
-import pl.tfhub.api.training.service.TrainingDeactivationService;
+import pl.tfhub.api.training.service.TrainingDeletionService;
 import pl.tfhub.api.training.entity.AthleteTrainingParticipation;
 import pl.tfhub.api.training.entity.Training;
 import pl.tfhub.api.training.entity.TrainingDefinition;
 import pl.tfhub.api.training.entity.TrainingSegment;
 import pl.tfhub.api.training.entity.TrainingSegmentExecution;
 import pl.tfhub.api.training.enums.TrainingExecutionStatus;
-import pl.tfhub.api.training.exception.InactiveTrainingException;
+import pl.tfhub.api.training.enums.TrainingStatus;
 import pl.tfhub.api.training.exception.InvalidTrainingRequestException;
 import pl.tfhub.api.training.exception.TrainingNotFoundException;
 import pl.tfhub.api.training.service.TrainingCreationService;
@@ -115,7 +115,7 @@ class TrainingDomainIntegrationTests {
     private TrainingUpdateService trainingUpdateService;
 
     @Autowired
-    private TrainingDeactivationService trainingDeactivationService;
+    private TrainingDeletionService trainingDeletionService;
 
     @BeforeEach
     void resetDatabase() {
@@ -158,7 +158,7 @@ class TrainingDomainIntegrationTests {
         assertEquals(TrainingExecutionStatus.RECORDED, persisted.getStatus());
         assertEquals(BigDecimal.ZERO.setScale(3), persisted.getMeasuredResult());
         assertFalse(persisted.isUsesSpikes());
-        assertTrue(trainingRepository.findById(training.getId()).orElseThrow().isActive());
+        assertEquals(TrainingStatus.PLANNED, trainingRepository.findById(training.getId()).orElseThrow().getStatus());
         var storedRelations = jdbcTemplate.queryForMap("""
                 SELECT p.training_session_id, p.training_definition_id, e.training_segment_id
                 FROM training_segment_executions e
@@ -257,12 +257,12 @@ class TrainingDomainIntegrationTests {
     }
 
     @Test
-    void adminGetsAllActiveTrainingsWithDefinitionsAndParticipantCountsInDateOrder() {
+    void adminGetsPlannedTrainingsByDefaultAndCanIncludeCompletedTrainings() {
         long older = insertTraining("Older", 1, LocalDate.parse("2026-01-01"));
         long newerFirst = insertTraining("Newer first", 1, LocalDate.parse("2026-03-01"));
         long newerSecond = insertTraining("Newer second", 1, LocalDate.parse("2026-03-01"));
-        long inactive = insertTraining("Inactive", 1, LocalDate.parse("2026-04-01"));
-        jdbcTemplate.update("UPDATE training_sessions SET active = FALSE WHERE id = ?", inactive);
+        long completed = insertTraining("Completed", 1, LocalDate.parse("2026-04-01"));
+        jdbcTemplate.update("UPDATE training_sessions SET status = 'COMPLETED' WHERE id = ?", completed);
 
         long firstDefinition = insertDefinition(newerFirst, "Main", 1);
         insertDefinition(newerFirst, "Alternative", 2);
@@ -271,7 +271,7 @@ class TrainingDomainIntegrationTests {
         insertParticipation(newerFirst, firstDefinition, 2);
         insertExecution(participationId, segmentId, firstDefinition, "PENDING");
 
-        var trainings = trainingQueryService.listTrainings();
+        var trainings = trainingQueryService.listTrainings(false);
         assertEquals(java.util.List.of(newerSecond, newerFirst, older),
                 trainings.stream().map(item -> item.id()).toList());
         var newer = trainings.get(1);
@@ -281,19 +281,24 @@ class TrainingDomainIntegrationTests {
         assertEquals("Group A", newer.trainingGroup().name());
         assertEquals(2L, newer.definitionCount());
         assertEquals(2L, newer.participantCount());
+        assertEquals(TrainingStatus.PLANNED, newer.status());
         assertEquals(0L, trainings.get(0).definitionCount());
         assertEquals(0L, trainings.get(0).participantCount());
+        var allTrainings = trainingQueryService.listTrainings(true);
+        assertEquals(java.util.List.of(completed, newerSecond, newerFirst, older),
+                allTrainings.stream().map(item -> item.id()).toList());
+        assertEquals(TrainingStatus.COMPLETED, allTrainings.get(0).status());
     }
 
     @Test
-    void coachOnlyGetsActiveTrainingsInAssignedGroupsAndCountsHistoricalParticipants() {
+    void coachOnlyGetsPlannedTrainingsInAssignedGroupsAndCanIncludeCompletedTrainings() {
         long assignedGroup = insertGroup("Assigned group");
         long unassignedGroup = insertGroup("Unassigned group");
         long firstTraining = insertTraining("Assigned recent", assignedGroup, LocalDate.parse("2026-05-01"));
         long secondTraining = insertTraining("Assigned older", 1, LocalDate.parse("2026-02-01"));
         long hiddenTraining = insertTraining("Unassigned", unassignedGroup, LocalDate.parse("2026-06-01"));
-        long inactiveTraining = insertTraining("Inactive", assignedGroup, LocalDate.parse("2026-07-01"));
-        jdbcTemplate.update("UPDATE training_sessions SET active = FALSE WHERE id = ?", inactiveTraining);
+        long completedTraining = insertTraining("Completed", assignedGroup, LocalDate.parse("2026-07-01"));
+        jdbcTemplate.update("UPDATE training_sessions SET status = 'COMPLETED' WHERE id = ?", completedTraining);
 
         jdbcTemplate.update("""
                 INSERT INTO users (username, password_hash, role) VALUES ('coach-one', 'hash', 'COACH')
@@ -310,20 +315,23 @@ class TrainingDomainIntegrationTests {
         jdbcTemplate.update("UPDATE athletes SET training_group_id = ? WHERE id = 1", unassignedGroup);
 
         authenticate(1, UserRole.COACH, "coach-one");
-        var trainings = trainingQueryService.listTrainings();
+        var trainings = trainingQueryService.listTrainings(false);
 
         assertEquals(java.util.List.of(firstTraining, secondTraining),
                 trainings.stream().map(item -> item.id()).toList());
         assertEquals(2L, trainings.get(0).participantCount());
         assertEquals(1L, trainings.get(0).definitionCount());
         assertEquals(assignedGroup, trainings.get(0).trainingGroup().id());
+        var allTrainings = trainingQueryService.listTrainings(true);
+        assertEquals(java.util.List.of(completedTraining, firstTraining, secondTraining),
+                allTrainings.stream().map(item -> item.id()).toList());
     }
 
     @Test
     void rejectsAuthenticatedUsersWithoutCoachOrAdminRole() {
         authenticate(1, UserRole.ATHLETE, "athlete-one");
 
-        assertThrows(AccessDeniedException.class, () -> trainingQueryService.listTrainings());
+        assertThrows(AccessDeniedException.class, () -> trainingQueryService.listTrainings(false));
         assertThrows(AccessDeniedException.class, () ->
                 trainingCreationService.createTraining(basicTrainingRequest(1, List.of())));
         assertThrows(AccessDeniedException.class, () ->
@@ -351,7 +359,7 @@ class TrainingDomainIntegrationTests {
         var response = trainingCreationService.createTraining(request);
 
         assertEquals(1, jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM training_sessions WHERE id = ? AND training_group_id = ? AND active",
+                "SELECT COUNT(*) FROM training_sessions WHERE id = ? AND training_group_id = ? AND status = 'PLANNED'",
                 Integer.class, response.id(), otherGroupId));
         assertEquals(2, jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM training_definitions WHERE training_session_id = ?",
@@ -517,12 +525,12 @@ class TrainingDomainIntegrationTests {
     }
 
     @Test
-    void coachCanEditAssignedTrainingButNotUnassignedOrInactiveTraining() {
+    void coachCanEditAssignedPlannedOrCompletedTrainingButNotUnassignedTraining() {
         long assignedTraining = insertTraining("Assigned", 1, LocalDate.now());
         long unassignedGroupId = insertGroup("Other");
         long unassignedTraining = insertTraining("Unassigned", unassignedGroupId, LocalDate.now());
-        long inactiveTraining = insertTraining("Inactive", 1, LocalDate.now());
-        jdbcTemplate.update("UPDATE training_sessions SET active = FALSE WHERE id = ?", inactiveTraining);
+        long completedTraining = insertTraining("Completed", 1, LocalDate.now());
+        jdbcTemplate.update("UPDATE training_sessions SET status = 'COMPLETED' WHERE id = ?", completedTraining);
         jdbcTemplate.update("""
                 INSERT INTO users (username, password_hash, role) VALUES ('coach-edit', 'hash', 'COACH')
                 """);
@@ -535,8 +543,10 @@ class TrainingDomainIntegrationTests {
                 assignedTraining, emptyEditRequest("Changed", null)).id());
         assertThrows(AccessDeniedException.class, () -> trainingUpdateService.updateTraining(
                 unassignedTraining, emptyEditRequest("Changed", null)));
-        assertThrows(InactiveTrainingException.class, () -> trainingUpdateService.updateTraining(
-                inactiveTraining, emptyEditRequest("Changed", null)));
+        assertEquals(completedTraining, trainingUpdateService.updateTraining(
+                completedTraining, emptyEditRequest("Changed", null)).id());
+        assertEquals("COMPLETED", jdbcTemplate.queryForObject(
+                "SELECT status FROM training_sessions WHERE id = ?", String.class, completedTraining));
     }
 
     @Test
@@ -793,6 +803,8 @@ class TrainingDomainIntegrationTests {
                 WHERE p.training_session_id = ? AND p.athlete_id = 2 AND e.training_segment_id = ?
                     AND e.status = 'PENDING' AND e.measured_result IS NULL AND NOT e.uses_spikes
                 """, Integer.class, trainingId, secondSegmentId));
+        assertEquals(TrainingStatus.COMPLETED,
+                trainingRepository.findById(trainingId).orElseThrow().getStatus());
     }
 
     @Test
@@ -818,6 +830,8 @@ class TrainingDomainIntegrationTests {
                                         executionId, TrainingExecutionStatus.RECORDED,
                                         new BigDecimal("11.000"), false)))),
                         List.of())));
+        assertEquals(TrainingStatus.PLANNED,
+                trainingRepository.findById(trainingId).orElseThrow().getStatus());
         assertEquals(1, jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM training_segment_executions WHERE id = ? AND status = 'PENDING'",
                 Integer.class, executionId));
@@ -866,12 +880,12 @@ class TrainingDomainIntegrationTests {
     }
 
     @Test
-    void adminViewsActiveAndInactiveTrainingWithOrderedCompleteHistory() {
-        long activeId = insertTraining("Active", 1, LocalDate.parse("2026-03-01"));
-        long inactiveId = insertTraining("Inactive", 1, LocalDate.parse("2026-04-01"));
-        jdbcTemplate.update("UPDATE training_sessions SET active = FALSE WHERE id = ?", inactiveId);
-        long secondDefinitionId = insertDefinition(activeId, "Second", 2);
-        long firstDefinitionId = insertDefinition(activeId, "First", 1);
+    void adminViewsPlannedAndCompletedTrainingWithOrderedCompleteHistory() {
+        long plannedId = insertTraining("Planned", 1, LocalDate.parse("2026-03-01"));
+        long completedId = insertTraining("Completed", 1, LocalDate.parse("2026-04-01"));
+        jdbcTemplate.update("UPDATE training_sessions SET status = 'COMPLETED' WHERE id = ?", completedId);
+        long secondDefinitionId = insertDefinition(plannedId, "Second", 2);
+        long firstDefinitionId = insertDefinition(plannedId, "First", 1);
         long firstSegmentId = insertSegment(firstDefinitionId, 1);
         long secondSegmentId = insertSegment(firstDefinitionId, 2);
         long anotherDefinitionSegmentId = insertSegment(secondDefinitionId, 1);
@@ -883,8 +897,8 @@ class TrainingDomainIntegrationTests {
                 INSERT INTO athletes (first_name, last_name, birth_year, gender, training_group_id)
                 VALUES ('Bob', 'Alpha', 2000, 'MALE', 1) RETURNING id
                 """, Long.class);
-        long aliceParticipationId = insertParticipation(activeId, firstDefinitionId, aliceId);
-        long bobParticipationId = insertParticipation(activeId, firstDefinitionId, bobId);
+        long aliceParticipationId = insertParticipation(plannedId, firstDefinitionId, aliceId);
+        long bobParticipationId = insertParticipation(plannedId, firstDefinitionId, bobId);
         insertExecution(aliceParticipationId, firstSegmentId, firstDefinitionId, "PENDING");
         long recordedExecutionId = jdbcTemplate.queryForObject("""
                 INSERT INTO training_segment_executions
@@ -894,13 +908,13 @@ class TrainingDomainIntegrationTests {
                 """, Long.class, aliceParticipationId, secondSegmentId, firstDefinitionId);
         insertExecution(bobParticipationId, firstSegmentId, firstDefinitionId, "COMPLETED_WITHOUT_RESULT");
         insertExecution(bobParticipationId, secondSegmentId, firstDefinitionId, "NOT_COMPLETED");
-        long secondDefinitionParticipation = insertParticipation(activeId, secondDefinitionId, 3);
+        long secondDefinitionParticipation = insertParticipation(plannedId, secondDefinitionId, 3);
         insertExecution(secondDefinitionParticipation, anotherDefinitionSegmentId, secondDefinitionId, "PENDING");
         jdbcTemplate.update("UPDATE athletes SET training_group_id = NULL WHERE id = ?", aliceId);
 
-        TrainingDetailsResponse details = trainingDetailsService.getTraining(activeId);
-        assertEquals(activeId, details.id());
-        assertTrue(details.active());
+        TrainingDetailsResponse details = trainingDetailsService.getTraining(plannedId);
+        assertEquals(plannedId, details.id());
+        assertEquals(TrainingStatus.PLANNED, details.status());
         assertEquals("Group A", details.trainingGroup().name());
         assertEquals(List.of(1, 2), details.definitions().stream()
                 .map(definition -> definition.sequenceNumber()).toList());
@@ -920,9 +934,9 @@ class TrainingDomainIntegrationTests {
         assertEquals(new BigDecimal("12.340"), alice.executions().get(1).measuredResult());
         assertTrue(alice.executions().get(1).usesSpikes());
 
-        TrainingDetailsResponse inactiveDetails = trainingDetailsService.getTraining(inactiveId);
-        assertFalse(inactiveDetails.active());
-        assertTrue(inactiveDetails.definitions().isEmpty());
+        TrainingDetailsResponse completedDetails = trainingDetailsService.getTraining(completedId);
+        assertEquals(TrainingStatus.COMPLETED, completedDetails.status());
+        assertTrue(completedDetails.definitions().isEmpty());
     }
 
     @Test
@@ -955,7 +969,7 @@ class TrainingDomainIntegrationTests {
     }
 
     @Test
-    void adminDeactivatesTrainingPreservingRelatedDataAndVisibilityRules() {
+    void adminDeletesCompletedTrainingAndAllRelatedDataIncludingRecordedResults() {
         long trainingId = insertTraining("Training");
         long definitionId = insertDefinition(trainingId, "Plan", 1);
         long segmentId = insertSegment(definitionId, 1);
@@ -966,37 +980,34 @@ class TrainingDomainIntegrationTests {
                         status, measured_result, uses_spikes)
                 VALUES (?, ?, ?, 'RECORDED', 12.345, TRUE)
                 """, participationId, segmentId, definitionId);
+        jdbcTemplate.update("UPDATE training_sessions SET status = 'COMPLETED' WHERE id = ?", trainingId);
 
-        assertEquals(trainingId, trainingDeactivationService.deactivateTraining(trainingId).id());
-        assertEquals(1, jdbcTemplate.queryForObject("""
-                SELECT COUNT(*) FROM training_sessions WHERE id = ? AND NOT active
-                """, Integer.class, trainingId));
+        trainingDeletionService.deleteTraining(trainingId);
+
+        assertEquals(0, jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM training_sessions WHERE id = ?", Integer.class, trainingId));
+        assertEquals(0, jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM training_definitions WHERE id = ?", Integer.class, definitionId));
+        assertEquals(0, jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM training_segments WHERE id = ?", Integer.class, segmentId));
+        assertEquals(0, jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM training_athlete_participations WHERE id = ?",
+                Integer.class, participationId));
+        assertEquals(0, jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM training_segment_executions WHERE participation_id = ?",
+                Integer.class, participationId));
         assertEquals(1, jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM training_definitions WHERE training_session_id = ?",
-                Integer.class, trainingId));
-        assertEquals(1, jdbcTemplate.queryForObject("""
-                SELECT COUNT(*) FROM training_segments s
-                JOIN training_definitions d ON d.id = s.training_definition_id
-                WHERE d.training_session_id = ?
-                """, Integer.class, trainingId));
+                "SELECT COUNT(*) FROM training_groups WHERE id = 1", Integer.class));
         assertEquals(1, jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM training_athlete_participations WHERE training_session_id = ?",
-                Integer.class, trainingId));
-        assertEquals(1, jdbcTemplate.queryForObject("""
-                SELECT COUNT(*) FROM training_segment_executions
-                WHERE participation_id = ? AND status = 'RECORDED'
-                    AND measured_result = 12.345 AND uses_spikes
-                """, Integer.class, participationId));
-        assertTrue(trainingQueryService.listTrainings().stream().noneMatch(item -> item.id() == trainingId));
-        assertFalse(trainingDetailsService.getTraining(trainingId).active());
-        assertThrows(InactiveTrainingException.class, () ->
-                trainingUpdateService.updateTraining(trainingId, emptyEditRequest("Changed", null)));
-        assertThrows(InactiveTrainingException.class, () ->
-                trainingDeactivationService.deactivateTraining(trainingId));
+                "SELECT COUNT(*) FROM athletes WHERE id = 1", Integer.class));
+        assertEquals(0, trainingQueryService.listTrainings(true).stream()
+                .filter(item -> item.id() == trainingId).count());
+        assertThrows(TrainingNotFoundException.class, () ->
+                trainingDetailsService.getTraining(trainingId));
     }
 
     @Test
-    void coachCanDeactivateAssignedTrainingButCannotDeactivateUnassignedTraining() {
+    void coachCanDeleteAssignedTrainingButCannotDeleteUnassignedTraining() {
         long assignedTraining = insertTraining("Assigned");
         long otherGroupId = insertGroup("Other group");
         long unassignedTraining = insertTraining("Unassigned", otherGroupId, LocalDate.now());
@@ -1008,18 +1019,20 @@ class TrainingDomainIntegrationTests {
                 """);
         authenticate(1, UserRole.COACH, "coach-deactivate");
 
-        assertEquals(assignedTraining, trainingDeactivationService.deactivateTraining(assignedTraining).id());
+        trainingDeletionService.deleteTraining(assignedTraining);
+        assertEquals(0, jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM training_sessions WHERE id = ?", Integer.class, assignedTraining));
         assertThrows(TrainingNotFoundException.class, () ->
-                trainingDeactivationService.deactivateTraining(unassignedTraining));
+                trainingDeletionService.deleteTraining(unassignedTraining));
     }
 
     @Test
-    void rejectsDeactivationByUnauthorizedUserAndForMissingTraining() {
+    void rejectsDeletionByUnauthorizedUserAndForMissingTraining() {
         assertThrows(TrainingNotFoundException.class, () ->
-                trainingDeactivationService.deactivateTraining(999));
+                trainingDeletionService.deleteTraining(999));
         authenticate(1, UserRole.ATHLETE, "athlete-deactivate");
         assertThrows(AccessDeniedException.class, () ->
-                trainingDeactivationService.deactivateTraining(1));
+                trainingDeletionService.deleteTraining(1));
     }
 
     private TrainingRows insertTrainingRows() {

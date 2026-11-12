@@ -58,14 +58,14 @@ h1 {
 }
 .summary-heading p { color: #59667e; margin: .35rem 0 0; }
 .status-badge {
-  background: #e6f6ec;
+  background: #eef0f3;
   border-radius: 2rem;
-  color: #16834e;
+  color: #626d7f;
   font-size: .85rem;
   font-weight: 650;
   padding: .3rem .65rem;
 }
-.status-badge--inactive { background: #eef0f3; color: #626d7f; }
+.status-badge--completed { background: #e6f6ec; color: #16834e; }
 .training-actions { display: flex; flex-wrap: wrap; gap: .6rem; margin-top: 1rem; }
 .training-actions .button { min-height: var(--field-height); }
 

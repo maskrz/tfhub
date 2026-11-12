@@ -2,13 +2,13 @@
 
 ## 1. Purpose
 
-Allow an authorized user to edit the plan of an existing active training: its name, date, definitions and segments. Athlete assignments and execution data are managed separately through FE-TRAINING-009 – Complete Training.
+Allow an authorized user to edit the plan of an existing planned or completed training: its name, date, definitions and segments. Athlete assignments and execution data are managed separately through FE-TRAINING-009 – Complete Training.
 
 ## 2. Actors and Preconditions
 
-- **ADMIN** – can edit any active training.
-- **COACH** – can edit active trainings in groups assigned to that coach.
-- The user is authenticated, the training is active, and backend UC-503 is available.
+- **ADMIN** – can edit any training.
+- **COACH** – can edit trainings in groups assigned to that coach.
+- The user is authenticated, the training exists, and backend UC-503 is available.
 
 ## 3. Main Flow
 
@@ -52,12 +52,12 @@ Follow FE-TRAINING-002 form patterns and existing TFHub controls, validation and
 
 - Adding/removing/reassigning athletes as a separate task.
 - Editing execution statuses, results or spike usage.
-- Viewing, deactivating or reactivating trainings.
+- Viewing or deleting trainings (FE-TRAINING-005).
 - OCR and imports.
 
 ## 9. Acceptance Criteria
 
-1. Authorized users can edit an active training plan; unauthorized users and inactive trainings are rejected.
+1. Authorized users can edit a planned or completed training plan; unauthorized users are rejected.
 2. Existing values load correctly and the group is read-only.
 3. Definitions and segments can be edited and reordered while retained IDs remain stable.
 4. Plan edits do not change retained participant assignments or execution values.

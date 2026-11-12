@@ -326,10 +326,6 @@ export class TrainingCompletePage implements OnInit, OnDestroy {
       finalize(() => this.loading.set(false)),
       takeUntilDestroyed(this.destroyRef),
     ).subscribe((training) => {
-      if (!training.active) {
-        this.loadError.set('Nie można uzupełnić nieaktywnego treningu.');
-        return;
-      }
       this.training.set(training);
       this.populate(training);
       this.loadAthletes(training.trainingGroup.id);

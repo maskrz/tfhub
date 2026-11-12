@@ -42,6 +42,7 @@ h1 {
   grid-column: span 2;
   min-width: 0;
 }
+.status-filter { grid-column: span 2; }
 .date-range .filter-field { flex: 1; min-width: 0; }
 .date-range input { width: 100%; }
 
@@ -104,7 +105,18 @@ td strong { display: block; font-size: 1.08rem; font-weight: 650; }
 .training-link { color: inherit; text-decoration: none; }
 .training-link:hover { color: #16834e; text-decoration: underline; }
 .training-link:focus-visible { border-radius: .2rem; outline: 3px solid var(--button-focus); outline-offset: 2px; }
-.training-actions { white-space: nowrap; }
+.status-badge {
+  background: #eef0f3;
+  border-radius: 2rem;
+  color: #626d7f;
+  display: inline-block;
+  font-size: .85rem;
+  font-weight: 650;
+  padding: .3rem .65rem;
+  white-space: nowrap;
+}
+.status-badge--completed { background: #e6f6ec; color: #16834e; }
+.training-actions { align-items: center; display: flex; gap: .5rem; white-space: nowrap; }
 .training-actions .button { display: inline-flex; min-height: var(--field-height); }
 .edit-training-link { display: inline-flex; min-height: var(--field-height); }
 
@@ -118,19 +130,25 @@ td strong { display: block; font-size: 1.08rem; font-weight: 650; }
 }
 
 .feedback.error { color: #8d2929; }
+.feedback.success {
+  background: #edf8f0;
+  border-color: #b8dfc3;
+  color: #236b3a;
+  margin-bottom: 1rem;
+}
 .feedback p { margin: 0; }
 .retry-button { margin-top: 1rem; }
 
 @media (max-width: 1000px) {
   .filters { grid-template-columns: repeat(4, minmax(0, 1fr)); }
   .search-filter, .date-range { grid-column: 1 / -1; }
-  .group-filter { grid-column: span 2; }
+  .group-filter, .status-filter { grid-column: span 2; }
 }
 
 @media (max-width: 760px) {
   .page-heading { margin-bottom: 1.5rem; }
   .filters { gap: .75rem; grid-template-columns: minmax(0, 1fr); }
-  .search-filter, .group-filter, .date-range { grid-column: 1; }
+  .search-filter, .group-filter, .date-range, .status-filter { grid-column: 1; }
   .group-filter app-multi-select-dropdown { min-width: 0; }
   .table-surface { background: transparent; border: 0; border-radius: 0; overflow: visible; }
   table, tbody { display: block; }
@@ -149,5 +167,6 @@ td strong { display: block; font-size: 1.08rem; font-weight: 650; }
   td::before { color: #59667e; content: attr(data-label); font-size: .78rem; font-weight: 650; }
   td:first-child { grid-column: 1 / -1; }
   .training-actions { grid-column: 1 / -1; }
+  .training-actions { align-items: stretch; flex-direction: column; }
   .training-actions .button { justify-content: center; width: 100%; }
 }

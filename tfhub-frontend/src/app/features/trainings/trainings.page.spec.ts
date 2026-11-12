@@ -16,6 +16,7 @@ const trainings: TrainingListItem[] = [
     trainingGroup: { id: 2, name: 'Średni dystans' },
     definitionCount: 2,
     participantCount: 5,
+    status: 'PLANNED',
   },
   {
     id: 2,
@@ -24,14 +25,25 @@ const trainings: TrainingListItem[] = [
     trainingGroup: { id: 1, name: 'Sprint' },
     definitionCount: 1,
     participantCount: 0,
+    status: 'PLANNED',
   },
 ];
+
+const completedTraining: TrainingListItem = {
+  id: 3,
+  name: 'Trening techniczny',
+  trainingDate: '2026-11-09',
+  trainingGroup: { id: 1, name: 'Sprint' },
+  definitionCount: 1,
+  participantCount: 2,
+  status: 'COMPLETED',
+};
 
 describe('TrainingsPage', () => {
   let fixture: ComponentFixture<TrainingsPage>;
   let api: {
     getAll: ReturnType<typeof vi.fn>;
-    deactivate: ReturnType<typeof vi.fn>;
+    deleteTraining: ReturnType<typeof vi.fn>;
   };
 
   async function createPage(
@@ -40,7 +52,7 @@ describe('TrainingsPage', () => {
   ): Promise<void> {
     api = {
       getAll: vi.fn(getAll),
-      deactivate: vi.fn((id: number) => of({ id })),
+      deleteTraining: vi.fn(() => of(void 0)),
     };
     await TestBed.configureTestingModule({
       imports: [TrainingsPage],
@@ -139,114 +151,125 @@ describe('TrainingsPage', () => {
     );
   });
 
-  it('requires confirmation and leaves the training unchanged when cancelled', async () => {
-    await createPage();
-    const trainingRow = fixture.nativeElement.querySelector('tbody tr') as HTMLElement;
-    (trainingRow.querySelector('.deactivate-training-button') as HTMLButtonElement).click();
+  it('shows all statuses by default and filters planned and completed trainings', async () => {
+    await createPage(() => of([...trainings, completedTraining]));
+
+    expect(visibleNames()).toHaveLength(3);
+    const badges = [...fixture.nativeElement.querySelectorAll('.status-badge')] as HTMLElement[];
+    expect(badges.some((badge) => badge.textContent.trim() === 'Planowany' &&
+      !badge.classList.contains('status-badge--completed'))).toBe(true);
+    expect(badges.some((badge) => badge.textContent.trim() === 'Zakończony' &&
+      badge.classList.contains('status-badge--completed'))).toBe(true);
+
+    const statusFilter = fixture.nativeElement.querySelector('[aria-label="Filtruj według statusu"]') as HTMLSelectElement;
+    statusFilter.value = 'COMPLETED';
+    statusFilter.dispatchEvent(new Event('change'));
     fixture.detectChanges();
 
-    const dialog = fixture.nativeElement.querySelector('app-training-deactivate-confirmation');
-    expect(dialog.textContent).toContain('Dezaktywuj trening');
-    expect(dialog.textContent).toContain('wszystkie jego dane');
-    expect(dialog.textContent).toContain('nie można cofnąć w aplikacji');
+    expect(visibleNames()).toEqual(['Trening techniczny']);
+    expect(fixture.nativeElement.querySelector('.status-badge')?.textContent.trim()).toBe('Zakończony');
+    expect(fixture.nativeElement.querySelector('.edit-training-link')).toBeTruthy();
+    expect(fixture.nativeElement.querySelector('.complete-training-link')).toBeTruthy();
+    expect(fixture.nativeElement.querySelector('.delete-training-button')).toBeTruthy();
 
+    statusFilter.value = 'PLANNED';
+    statusFilter.dispatchEvent(new Event('change'));
+    fixture.detectChanges();
+    expect(visibleNames()).toHaveLength(2);
+
+    statusFilter.value = '';
+    statusFilter.dispatchEvent(new Event('change'));
+    fixture.detectChanges();
+    expect(visibleNames()).toHaveLength(3);
+  });
+
+  it('requires explicit confirmation and leaves a training unchanged when cancelled', async () => {
+    await createPage(() => of([...trainings, completedTraining]));
+    const statusFilter = fixture.nativeElement.querySelector('[aria-label="Filtruj według statusu"]') as HTMLSelectElement;
+    statusFilter.value = 'COMPLETED';
+    statusFilter.dispatchEvent(new Event('change'));
+    fixture.detectChanges();
+    const deleteButton = fixture.nativeElement.querySelector('[aria-label="Usuń trening: Trening techniczny"]') as HTMLButtonElement;
+    deleteButton.click();
+    fixture.detectChanges();
+
+    const dialog = fixture.nativeElement.querySelector('app-training-delete-confirmation');
+    expect(dialog.textContent).toContain('trwale usunąć');
+    expect(dialog.textContent).toContain('wszystkie zapisane wyniki');
+    expect(dialog.textContent).toContain('nie można cofnąć');
     (dialog.querySelector('.button--secondary') as HTMLButtonElement).click();
     fixture.detectChanges();
-    expect(fixture.nativeElement.querySelector('app-training-deactivate-confirmation')).toBeNull();
-    expect(api.deactivate).not.toHaveBeenCalled();
-    expect(visibleNames()).toHaveLength(2);
+
+    expect(fixture.nativeElement.querySelector('app-training-delete-confirmation')).toBeNull();
+    expect(api.deleteTraining).not.toHaveBeenCalled();
+    expect(visibleNames()).toEqual(['Trening techniczny']);
   });
 
-  it('removes a training from the active list only after successful deactivation', async () => {
-    await createPage();
-    const trainingId = 2;
-    const row = fixture.nativeElement.querySelector('tbody tr') as HTMLElement;
-    (row.querySelector('.deactivate-training-button') as HTMLButtonElement).click();
-    fixture.detectChanges();
-    (fixture.nativeElement.querySelector('app-training-deactivate-confirmation .button--danger') as HTMLButtonElement).click();
+  it('deletes only after explicit confirmation and removes the training from the list', async () => {
+    await createPage(() => of([...trainings, completedTraining]));
+    const statusFilter = fixture.nativeElement.querySelector('[aria-label="Filtruj według statusu"]') as HTMLSelectElement;
+    statusFilter.value = 'COMPLETED';
+    statusFilter.dispatchEvent(new Event('change'));
     fixture.detectChanges();
 
-    expect(api.deactivate).toHaveBeenCalledTimes(1);
-    expect(api.deactivate).toHaveBeenCalledWith(trainingId);
-    expect(fixture.nativeElement.querySelector('app-training-deactivate-confirmation')).toBeNull();
-    expect(visibleNames()).toEqual(['Trening wytrzymałościowy']);
-    expect(fixture.nativeElement.textContent).toContain('Trening został dezaktywowany.');
-  });
-
-  it('prevents duplicate deactivation submissions while the request is pending', async () => {
-    const response = new Subject<{ id: number }>();
-    api = {
-      getAll: vi.fn(() => of(trainings)),
-      deactivate: vi.fn(() => response.asObservable()),
-    };
-    await TestBed.configureTestingModule({
-      imports: [TrainingsPage],
-      providers: [
-        provideRouter([]),
-        { provide: TrainingsApiService, useValue: api },
-        {
-          provide: AuthService,
-          useValue: {
-            currentUser: signal({ authenticated: true, userId: 1, username: 'coach', role: 'COACH', athleteId: null }),
-          },
-        },
-      ],
-    }).compileComponents();
-    fixture = TestBed.createComponent(TrainingsPage);
+    (fixture.nativeElement.querySelector('.delete-training-button') as HTMLButtonElement).click();
     fixture.detectChanges();
+    (fixture.nativeElement.querySelector('app-training-delete-confirmation .button--danger') as HTMLButtonElement).click();
     await fixture.whenStable();
     fixture.detectChanges();
 
-    (fixture.nativeElement.querySelector('.deactivate-training-button') as HTMLButtonElement).click();
+    expect(api.deleteTraining).toHaveBeenCalledWith(completedTraining.id);
+    expect(fixture.componentInstance.allTrainings().some((training) => training.id === completedTraining.id)).toBe(false);
+    expect(visibleNames()).toEqual([]);
+    expect(fixture.nativeElement.textContent).toContain('Trening został trwale usunięty.');
+  });
+
+  it('keeps the training visible and allows retry after a delete API failure', async () => {
+    const deleteTraining = vi.fn()
+      .mockReturnValueOnce(throwError(() => new HttpErrorResponse({ status: 404 })))
+      .mockReturnValueOnce(of(void 0));
+    await createPage(() => of(trainings), true);
+    api.deleteTraining = deleteTraining;
+    (fixture.nativeElement.querySelector('[aria-label="Usuń trening: Sprint"]') as HTMLButtonElement).click();
     fixture.detectChanges();
     const confirmButton = fixture.nativeElement.querySelector(
-      'app-training-deactivate-confirmation .button--danger',
+      'app-training-delete-confirmation .button--danger',
+    ) as HTMLButtonElement;
+    confirmButton.click();
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelector('app-training-delete-confirmation')).toBeTruthy();
+    expect(fixture.nativeElement.textContent).toContain('Nie znaleziono treningu lub brak dostępu.');
+    expect(visibleNames()).toHaveLength(2);
+
+    confirmButton.click();
+    fixture.detectChanges();
+    expect(deleteTraining).toHaveBeenCalledTimes(2);
+    expect(fixture.nativeElement.querySelector('app-training-delete-confirmation')).toBeNull();
+    expect(visibleNames()).toEqual(['Trening wytrzymałościowy']);
+  });
+
+  it('prevents duplicate deletion submissions while the request is pending', async () => {
+    const response = new Subject<void>();
+    await createPage();
+    api.deleteTraining.mockReturnValue(response.asObservable());
+    (fixture.nativeElement.querySelector('[aria-label="Usuń trening: Sprint"]') as HTMLButtonElement).click();
+    fixture.detectChanges();
+    const confirmButton = fixture.nativeElement.querySelector(
+      'app-training-delete-confirmation .button--danger',
     ) as HTMLButtonElement;
     confirmButton.click();
     confirmButton.click();
     fixture.detectChanges();
 
-    expect(api.deactivate).toHaveBeenCalledTimes(1);
+    expect(api.deleteTraining).toHaveBeenCalledTimes(1);
     expect(confirmButton.disabled).toBe(true);
-    expect(visibleNames()).toHaveLength(2);
+    expect(fixture.componentInstance.allTrainings()).toHaveLength(2);
 
-    response.next({ id: 2 });
+    response.next();
     response.complete();
     fixture.detectChanges();
-    expect(visibleNames()).toHaveLength(1);
-  });
-
-  it('keeps the active training in the list and reports backend errors', async () => {
-    api = {
-      getAll: vi.fn(() => of(trainings)),
-      deactivate: vi.fn(() => throwError(() => new HttpErrorResponse({ status: 403 }))),
-    };
-    await TestBed.configureTestingModule({
-      imports: [TrainingsPage],
-      providers: [
-        provideRouter([]),
-        { provide: TrainingsApiService, useValue: api },
-        {
-          provide: AuthService,
-          useValue: {
-            currentUser: signal({ authenticated: true, userId: 1, username: 'coach', role: 'COACH', athleteId: null }),
-          },
-        },
-      ],
-    }).compileComponents();
-    fixture = TestBed.createComponent(TrainingsPage);
-    fixture.detectChanges();
-    await fixture.whenStable();
-    fixture.detectChanges();
-    (fixture.nativeElement.querySelector('.deactivate-training-button') as HTMLButtonElement).click();
-    fixture.detectChanges();
-    (fixture.nativeElement.querySelector('app-training-deactivate-confirmation .button--danger') as HTMLButtonElement).click();
-    fixture.detectChanges();
-
-    expect(fixture.nativeElement.textContent).toContain('Brak dostępu do dezaktywacji tego treningu.');
-    expect(fixture.nativeElement.querySelector('app-training-deactivate-confirmation')).toBeTruthy();
-    expect(visibleNames()).toHaveLength(2);
-    expect(fixture.nativeElement.textContent).not.toContain('Trening został dezaktywowany.');
+    expect(fixture.componentInstance.allTrainings()).toHaveLength(1);
   });
 
   it('searches by training name or group and filters by date range locally', async () => {
