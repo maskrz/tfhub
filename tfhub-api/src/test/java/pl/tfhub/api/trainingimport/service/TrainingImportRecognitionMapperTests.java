@@ -76,6 +76,93 @@ class TrainingImportRecognitionMapperTests {
 		}
 	}
 
+	@Test
+	void matchesApproximateSurnamesAndUsesFirstNameInitialWhenSurnameIsShared() {
+		Athlete ada = athlete(41L, "Ada", "Lovelace");
+		Athlete ann = athlete(42L, "Ben", "Lovelace");
+		AthleteRepository athleteRepository = mock(AthleteRepository.class);
+		when(athleteRepository.findByTrainingGroup_IdOrderByLastNameAscFirstNameAscIdAsc(7L))
+				.thenReturn(List.of(ada, ann));
+		TrainingImportRecognitionMapper mapper =
+				new TrainingImportRecognitionMapper(new ObjectMapper(), athleteRepository);
+
+		var draft = mapper.validateAndMap(recognition("""
+				[{"recognizedName":"Ada Lovelece","firstName":"Ada","lastName":"Lovelece",
+				  "uncertain":false,"uncertaintyReason":null,"executions":%s}]
+				""".formatted(executions())), 7L);
+
+		var row = draft.definitions().getFirst().athleteRows().getFirst();
+		assertEquals(TrainingImportAthleteMatchStatus.MATCHED, row.matchStatus());
+		assertEquals(41L, row.athleteId());
+		assertEquals(Boolean.TRUE, row.recognitionMetadata().get("uncertain"));
+		assertEquals(
+				"Surname matched approximately and first-name initial was used; confirm athlete",
+				row.recognitionMetadata().get("matchingReason"));
+	}
+
+	@Test
+	void leavesApproximateSurnameMatchesUnresolvedWhenFirstInitialIsAmbiguous() {
+		Athlete ada = athlete(41L, "Ada", "Lovelace");
+		Athlete alice = athlete(42L, "Alice", "Lovelace");
+		AthleteRepository athleteRepository = mock(AthleteRepository.class);
+		when(athleteRepository.findByTrainingGroup_IdOrderByLastNameAscFirstNameAscIdAsc(7L))
+				.thenReturn(List.of(ada, alice));
+		TrainingImportRecognitionMapper mapper =
+				new TrainingImportRecognitionMapper(new ObjectMapper(), athleteRepository);
+
+		var draft = mapper.validateAndMap(recognition("""
+				[{"recognizedName":"A. Lovelece","firstName":"A","lastName":"Lovelece",
+				  "uncertain":false,"uncertaintyReason":null,"executions":%s}]
+				""".formatted(executions())), 7L);
+
+		assertEquals(TrainingImportAthleteMatchStatus.UNRESOLVED,
+				draft.definitions().getFirst().athleteRows().getFirst().matchStatus());
+	}
+
+	@Test
+	void leavesApproximateSurnameMatchesUnresolvedWhenDifferentSurnamesAreClose() {
+		Athlete lovelace = athlete(41L, "Ada", "Lovelace");
+		Athlete lovelece = athlete(42L, "Ben", "Lovelece");
+		AthleteRepository athleteRepository = mock(AthleteRepository.class);
+		when(athleteRepository.findByTrainingGroup_IdOrderByLastNameAscFirstNameAscIdAsc(7L))
+				.thenReturn(List.of(lovelace, lovelece));
+		TrainingImportRecognitionMapper mapper =
+				new TrainingImportRecognitionMapper(new ObjectMapper(), athleteRepository);
+
+		var draft = mapper.validateAndMap(recognition("""
+				[{"recognizedName":"Alex Lovelece","firstName":"Alex","lastName":"Lovelece",
+				  "uncertain":false,"uncertaintyReason":null,"executions":%s}]
+				""".formatted(executions())), 7L);
+
+		assertEquals(TrainingImportAthleteMatchStatus.UNRESOLVED,
+				draft.definitions().getFirst().athleteRows().getFirst().matchStatus());
+	}
+
+	@Test
+	void normalizesSupportedHandwrittenTimeSeparators() {
+		TrainingImportRecognitionMapper mapper =
+				new TrainingImportRecognitionMapper(new ObjectMapper(), mock(AthleteRepository.class));
+		for (var sample : List.of(
+				new TimeSample("59", "59.00"),
+				new TimeSample("1:14", "74.00"),
+				new TimeSample("55,1", "55.10"),
+				new TimeSample("1,11,11", "71.11"),
+				new TimeSample("1:11:11", "71.11"),
+				new TimeSample("1 22,33", "82.33"),
+				new TimeSample("1;11,11", "71.11"))) {
+			String input = recognition("""
+					[{"recognizedName":"Runner Name","firstName":"Runner","lastName":"Name",
+					  "uncertain":false,"uncertaintyReason":null,"executions":%s}]
+					""".formatted(executions().replace("1:02.3", sample.input())));
+
+			var draft = mapper.validateAndMap(input, 7L);
+			assertEquals(new java.math.BigDecimal(sample.expected()),
+					draft.definitions().getFirst().athleteRows().getFirst()
+							.executions().getFirst().measuredResult(),
+					sample.input());
+		}
+	}
+
 	private String recognition(String athleteRows) {
 		return """
 				{
@@ -127,5 +214,16 @@ class TrainingImportRecognitionMapperTests {
 				{"segmentSequenceNumber":1,"recognizedText":"12.3","status":"%s",
 				 "measuredResult":%s,"usesSpikes":false,"uncertain":false,"uncertaintyReason":null}
 				""".formatted(status, measuredResult);
+	}
+
+	private Athlete athlete(long id, String firstName, String lastName) {
+		Athlete athlete = mock(Athlete.class);
+		when(athlete.getId()).thenReturn(id);
+		when(athlete.getFirstName()).thenReturn(firstName);
+		when(athlete.getLastName()).thenReturn(lastName);
+		return athlete;
+	}
+
+	private record TimeSample(String input, String expected) {
 	}
 }

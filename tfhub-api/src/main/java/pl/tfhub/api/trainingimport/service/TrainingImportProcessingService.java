@@ -51,6 +51,14 @@ public class TrainingImportProcessingService {
 		if (!properties.isProcessingEnabled() || !hasQueueCapacity()) {
 			return;
 		}
+		Long retryImportId = stateService.findNextDueAutomaticRetryImportId();
+		if (retryImportId != null) {
+			Long retryAttemptId = stateService.claimScheduledRetry(retryImportId);
+			if (retryAttemptId != null) {
+				dispatch(retryAttemptId, false);
+			}
+			return;
+		}
 		Long importId = stateService.findNextPendingImportId();
 		if (importId == null) {
 			return;
@@ -84,13 +92,15 @@ public class TrainingImportProcessingService {
 					attemptId,
 					rawModelResponse,
 					exception.getFailureCode(),
-					exception.getSafeMessage());
+					exception.getSafeMessage(),
+					exception.isRetryable());
 		} catch (RuntimeException exception) {
 			stateService.fail(
 					attemptId,
 					rawModelResponse,
 					"PROCESSING_FAILED",
-					"Training import processing failed");
+					"Training import processing failed",
+					false);
 			LOGGER.error("Training import attempt {} failed with {}", attemptId,
 					exception.getClass().getSimpleName());
 		}
@@ -104,7 +114,8 @@ public class TrainingImportProcessingService {
 					attemptId,
 					null,
 					"WORKER_QUEUE_FULL",
-					"Training import processing could not be scheduled");
+					"Training import processing could not be scheduled",
+					true);
 			if (explicitRetry) {
 				throw new TrainingImportWorkerUnavailableException();
 			}

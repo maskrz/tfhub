@@ -1,6 +1,7 @@
 package pl.tfhub.api.trainingimport.service;
 
 import java.time.OffsetDateTime;
+import java.time.Duration;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -45,6 +46,11 @@ import pl.tfhub.api.common.authorization.AccessScopeService;
 
 @Service
 public class TrainingImportProcessingStateService {
+
+	private static final List<Duration> AUTOMATIC_RETRY_DELAYS = List.of(
+			Duration.ofSeconds(30),
+			Duration.ofMinutes(2),
+			Duration.ofMinutes(5));
 
 	private final TrainingImportAccessService accessService;
 	private final TrainingImportRepository importRepository;
@@ -118,13 +124,33 @@ public class TrainingImportProcessingStateService {
 		}
 		AuthenticatedUser currentUser = accessScopeService.currentUser();
 		User requester = accountManagementService.getAccountEntity(currentUser.id());
+		trainingImport.resetAutomaticRetries();
 		return startAttempt(trainingImport, requester).getId();
+	}
+
+	@Transactional
+	public Long claimScheduledRetry(long importId) {
+		TrainingImport trainingImport = importRepository.findByIdForUpdate(importId).orElse(null);
+		if (trainingImport == null
+				|| trainingImport.getStatus() != TrainingImportStatus.FAILED
+				|| trainingImport.getNextRetryAt() == null
+				|| trainingImport.getNextRetryAt().isAfter(now())) {
+			return null;
+		}
+		return startAttempt(trainingImport, null).getId();
 	}
 
 	@Transactional(readOnly = true)
 	public Long findNextPendingImportId() {
 		List<Long> ids = importRepository.findIdsByStatusOrderByCreatedAt(
 				TrainingImportStatus.PENDING, PageRequest.of(0, 1));
+		return ids.isEmpty() ? null : ids.getFirst();
+	}
+
+	@Transactional(readOnly = true)
+	public Long findNextDueAutomaticRetryImportId() {
+		List<Long> ids = importRepository.findDueAutomaticRetryIds(
+				TrainingImportStatus.FAILED, now(), PageRequest.of(0, 1));
 		return ids.isEmpty() ? null : ids.getFirst();
 	}
 
@@ -191,12 +217,18 @@ public class TrainingImportProcessingStateService {
 		persistDraftChildren(draft, trainingImport, recognizedDraft);
 		attempt.markSucceeded(now(), rawModelResponse);
 		trainingImport.changeStatus(TrainingImportStatus.REVIEW_REQUIRED);
+		trainingImport.resetAutomaticRetries();
 		attemptRepository.saveAndFlush(attempt);
 		importRepository.saveAndFlush(trainingImport);
 	}
 
 	@Transactional
-	public void fail(long attemptId, String rawModelResponse, String failureCode, String safeMessage) {
+	public void fail(
+			long attemptId,
+			String rawModelResponse,
+			String failureCode,
+			String safeMessage,
+			boolean retryable) {
 		LockedAttempt locked = lockAttempt(attemptId);
 		if (locked == null) {
 			return;
@@ -206,10 +238,7 @@ public class TrainingImportProcessingStateService {
 		if (!isCurrentProcessingAttempt(trainingImport, attempt)) {
 			return;
 		}
-		attempt.markFailed(now(), rawModelResponse, failureCode, safeMessage);
-		trainingImport.changeStatus(TrainingImportStatus.FAILED);
-		attemptRepository.saveAndFlush(attempt);
-		importRepository.saveAndFlush(trainingImport);
+		markFailed(trainingImport, attempt, rawModelResponse, failureCode, safeMessage, retryable);
 	}
 
 	@Transactional
@@ -227,16 +256,35 @@ public class TrainingImportProcessingStateService {
 			TrainingImportAttempt attempt = locked.attempt();
 			if (isCurrentProcessingAttempt(trainingImport, attempt)
 					&& attempt.getStartedAt().isBefore(cutoff)) {
-				attempt.markFailed(
-						now(),
+				markFailed(
+						trainingImport,
+						attempt,
 						attempt.getRawModelResponse(),
 						"PROCESSING_TIMEOUT",
-						"Training import processing did not finish in time");
-				trainingImport.changeStatus(TrainingImportStatus.FAILED);
-				attemptRepository.saveAndFlush(attempt);
-				importRepository.saveAndFlush(trainingImport);
+						"Training import processing did not finish in time",
+						true);
 			}
 		}
+	}
+
+	private void markFailed(
+			TrainingImport trainingImport,
+			TrainingImportAttempt attempt,
+			String rawModelResponse,
+			String failureCode,
+			String safeMessage,
+			boolean retryable) {
+		OffsetDateTime failedAt = now();
+		attempt.markFailed(failedAt, rawModelResponse, failureCode, safeMessage);
+		trainingImport.changeStatus(TrainingImportStatus.FAILED);
+		int retryIndex = trainingImport.getAutomaticRetryCount();
+		if (retryable && retryIndex < AUTOMATIC_RETRY_DELAYS.size()) {
+			trainingImport.scheduleAutomaticRetry(failedAt.plus(AUTOMATIC_RETRY_DELAYS.get(retryIndex)));
+		} else {
+			trainingImport.clearScheduledRetry();
+		}
+		attemptRepository.saveAndFlush(attempt);
+		importRepository.saveAndFlush(trainingImport);
 	}
 
 	private LockedAttempt lockAttempt(long attemptId) {
@@ -271,6 +319,7 @@ public class TrainingImportProcessingStateService {
 				null,
 				null);
 		trainingImport.changeStatus(TrainingImportStatus.PROCESSING);
+		trainingImport.clearScheduledRetry();
 		importRepository.saveAndFlush(trainingImport);
 		return attemptRepository.saveAndFlush(attempt);
 	}
@@ -290,6 +339,7 @@ public class TrainingImportProcessingStateService {
 				trainingImport.getId(),
 				trainingImport.getTrainingGroup().getId(),
 				trainingImport.getStatus(),
+				trainingImport.getNextRetryAt(),
 				trainingImport.getCreatedAt(),
 				trainingImport.isPossibleDuplicate(),
 				latestAttempt);

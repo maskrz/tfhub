@@ -8,6 +8,7 @@ public record TrainingImportStatusResponse(
 		long id,
 		long trainingGroupId,
 		TrainingImportStatus status,
+		OffsetDateTime nextRetryAt,
 		OffsetDateTime createdAt,
 		boolean possibleDuplicate,
 		Attempt latestAttempt) {

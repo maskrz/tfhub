@@ -101,6 +101,14 @@ Additional recognition rules:
 - Matching must use available identifying information, including first name and last name.
 - The system must not assume that a name match is unambiguous if multiple candidates exist.
 - A confidently matched athlete may be associated with the corresponding draft participant.
+- If an exact first-name and last-name match is unavailable, the system may use a conservative
+  Levenshtein-distance comparison of the recognized surname against surnames in the selected group.
+- The maximum surname distance is one for surnames of up to seven letters and two for longer
+  surnames. If different surnames are within the threshold, the athlete remains unresolved.
+- A unique approximate surname match may be associated with the athlete, but must be marked
+  uncertain for manual confirmation. If the matching surname is shared by multiple athletes, the
+  recognized first-name initial may disambiguate only when exactly one athlete has that initial;
+  otherwise the row remains unresolved.
 - An ambiguous or unmatched athlete must remain unresolved.
 - An athlete who cannot be matched must not be assigned to another group automatically.
 - Unresolved athletes must be explicitly identified in the draft.
@@ -121,6 +129,14 @@ Additional recognition rules:
 ### 4.8 Processing Retry
 
 - An import in FAILED state may be retried using the same optimized JPEG.
+- Temporary service failures, including timeouts, rate limits and server errors, are retried
+  automatically after 30 seconds, 2 minutes and 5 minutes, for at most three automatic retries
+  after the initial attempt.
+- The import remains FAILED while waiting for an automatic retry. Its status response includes
+  `nextRetryAt` when another automatic retry is scheduled.
+- Permanent failures, including invalid model output and non-retryable client errors, are not
+  retried automatically.
+- An explicit retry starts a new automatic-retry allowance.
 - Retry must replace the current draft only after the new attempt succeeds and passes basic output validation.
 - A failed retry must leave any existing valid draft unchanged.
 - Retry must not create a second import record.
@@ -132,7 +148,8 @@ Additional recognition rules:
 
 ### 4.9 AI Service Failure
 
-- Temporary AI service errors must result in a failed processing attempt.
+- Temporary AI service errors must result in a failed processing attempt and be scheduled for
+  automatic retry while retry attempts remain.
 - Invalid, incomplete or unusable model responses must not produce an accepted draft.
 - The system must validate the model response before creating or replacing the draft.
 - Failure must leave the optimized JPEG intact.
@@ -168,7 +185,9 @@ A failed processing attempt must not create or modify persisted training session
 
 ## 7. Output
 
-The asynchronous process produces an updated training import containing its current processing state. Clients retrieve the current state from `GET /api/training-imports/{importId}`. An authorized user retries a failed import using `POST /api/training-imports/{importId}/retry`, which returns `202 Accepted`.
+The asynchronous process produces an updated training import containing its current processing state. Clients retrieve the current state, including `nextRetryAt` when scheduled, from
+`GET /api/training-imports/{importId}`. An authorized user retries a failed import using
+`POST /api/training-imports/{importId}/retry`, which returns `202 Accepted`.
 
 When processing succeeds, the import must expose sufficient information to retrieve and review the generated draft through UC-508.
 
@@ -223,3 +242,7 @@ When processing succeeds, the import must expose sufficient information to retri
 23. Processing status and failure information are persisted.
 24. The raw model response is retained per attempt when returned and is not exposed to clients or logs.
 25. Unauthorized users cannot retry processing.
+26. Temporary failures are retried automatically after 30 seconds, 2 minutes and 5 minutes, with no more than three automatic retries per processing cycle.
+27. The import remains FAILED while waiting for an automatic retry, and its status response includes the scheduled `nextRetryAt`.
+28. Explicit retry starts a fresh automatic-retry allowance.
+29. Approximate surname matches are restricted to the selected group and are marked uncertain for manual confirmation.

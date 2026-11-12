@@ -215,23 +215,69 @@ public class TrainingImportRecognitionMapper {
 			TrainingImportRecognitionData.AthleteRow row,
 			List<Athlete> candidates,
 			Set<Long> alreadyMatched) {
-		if (Boolean.TRUE.equals(row.uncertain()) || row.firstName() == null || row.lastName() == null
+		if (row.firstName() == null || row.lastName() == null
 				|| row.firstName().isBlank() || row.lastName().isBlank()) {
-			return MatchedAthlete.unresolved("Athlete name is incomplete or uncertain");
+			return MatchedAthlete.unresolved("Athlete name is incomplete");
 		}
 		List<Athlete> matches = candidates.stream()
 				.filter(candidate -> normalize(candidate.getFirstName()).equals(normalize(row.firstName()))
 						&& normalize(candidate.getLastName()).equals(normalize(row.lastName())))
 				.toList();
-		if (matches.size() != 1) {
-			return MatchedAthlete.unresolved(
-					matches.isEmpty() ? "No athlete matched the recognized name" : "The recognized name is ambiguous");
+		if (matches.size() == 1) {
+			return useMatchedAthlete(
+					matches.getFirst(),
+					alreadyMatched,
+					Boolean.TRUE.equals(row.uncertain()) ? "The recognized athlete name is uncertain" : null);
 		}
-		Athlete match = matches.getFirst();
-		if (!alreadyMatched.add(match.getId())) {
+		if (!matches.isEmpty()) {
+			return MatchedAthlete.unresolved("The recognized name is ambiguous");
+		}
+
+		String recognizedSurname = normalizeNameForDistance(row.lastName());
+		int maximumDistance = recognizedSurname.length() <= 7 ? 1 : 2;
+		List<AthleteSurnameMatch> surnameMatches = candidates.stream()
+				.map(candidate -> new AthleteSurnameMatch(
+						candidate, normalizeNameForDistance(candidate.getLastName())))
+				.filter(candidate -> levenshteinDistance(recognizedSurname, candidate.normalizedSurname())
+						<= maximumDistance)
+				.toList();
+		Set<String> matchingSurnames = surnameMatches.stream()
+				.map(AthleteSurnameMatch::normalizedSurname)
+				.collect(java.util.stream.Collectors.toSet());
+		if (matchingSurnames.size() != 1) {
+			return MatchedAthlete.unresolved(
+					matchingSurnames.isEmpty()
+							? "No athlete matched the recognized name"
+							: "The recognized surname matches multiple athletes");
+		}
+
+		List<Athlete> sameSurname = surnameMatches.stream()
+				.map(AthleteSurnameMatch::athlete)
+				.toList();
+		if (sameSurname.size() == 1) {
+			return useMatchedAthlete(
+					sameSurname.getFirst(), alreadyMatched, "Surname matched approximately; confirm athlete");
+		}
+		String recognizedInitial = firstLetter(row.firstName());
+		List<Athlete> initialMatches = sameSurname.stream()
+				.filter(candidate -> firstLetter(candidate.getFirstName()).equals(recognizedInitial))
+				.toList();
+		if (initialMatches.size() == 1) {
+			return useMatchedAthlete(
+					initialMatches.getFirst(), alreadyMatched,
+					"Surname matched approximately and first-name initial was used; confirm athlete");
+		}
+		return MatchedAthlete.unresolved("The recognized surname is shared and the first-name initial is ambiguous");
+	}
+
+	private MatchedAthlete useMatchedAthlete(
+			Athlete athlete,
+			Set<Long> alreadyMatched,
+			String uncertaintyReason) {
+		if (!alreadyMatched.add(athlete.getId())) {
 			return MatchedAthlete.unresolved("The athlete was recognized in more than one row");
 		}
-		return new MatchedAthlete(match.getId(), TrainingImportAthleteMatchStatus.MATCHED, null);
+		return new MatchedAthlete(athlete.getId(), TrainingImportAthleteMatchStatus.MATCHED, uncertaintyReason);
 	}
 
 	private String normalize(String value) {
@@ -239,6 +285,34 @@ public class TrainingImportRecognitionMapper {
 				.strip()
 				.replaceAll("\\s+", " ")
 				.toLowerCase(Locale.ROOT);
+	}
+
+	private String normalizeNameForDistance(String value) {
+		return normalize(value).replaceAll("[^\\p{L}]", "");
+	}
+
+	private String firstLetter(String value) {
+		String normalized = normalizeNameForDistance(value);
+		return normalized.isEmpty() ? "" : normalized.substring(0, 1);
+	}
+
+	private int levenshteinDistance(String left, String right) {
+		int[] previous = new int[right.length() + 1];
+		for (int column = 0; column <= right.length(); column++) {
+			previous[column] = column;
+		}
+		for (int row = 1; row <= left.length(); row++) {
+			int[] current = new int[right.length() + 1];
+			current[0] = row;
+			for (int column = 1; column <= right.length(); column++) {
+				int substitutionCost = left.charAt(row - 1) == right.charAt(column - 1) ? 0 : 1;
+				current[column] = Math.min(
+						Math.min(current[column - 1] + 1, previous[column] + 1),
+						previous[column - 1] + substitutionCost);
+			}
+			previous = current;
+		}
+		return previous[right.length()];
 	}
 
 	private TrainingExecutionStatus parseStatus(String value) {
@@ -259,27 +333,10 @@ public class TrainingImportRecognitionMapper {
 		if (value == null || value.isBlank()) {
 			throw invalid("A RECORDED execution must contain a measured result");
 		}
-		String normalizedText = value.strip().replace(',', '.')
-				.replaceFirst("(?i)\\s*K\\s*$", "");
-		BigDecimal result;
-		try {
-			int separator = normalizedText.indexOf(':');
-			if (separator >= 0) {
-				if (separator != normalizedText.lastIndexOf(':')) {
-					throw invalid("The recognized running time is invalid");
-				}
-				long minutes = Long.parseLong(normalizedText.substring(0, separator).strip());
-				BigDecimal seconds = new BigDecimal(normalizedText.substring(separator + 1).strip());
-				if (minutes < 0 || seconds.signum() < 0 || seconds.compareTo(BigDecimal.valueOf(60)) >= 0) {
-					throw invalid("The recognized running time is outside the valid range");
-				}
-				result = BigDecimal.valueOf(minutes).multiply(BigDecimal.valueOf(60)).add(seconds);
-			} else {
-				result = new BigDecimal(normalizedText);
-			}
-		} catch (NumberFormatException exception) {
-			throw invalid("The recognized running time is invalid");
-		}
+		String normalizedText = value.strip()
+				.replaceFirst("(?i)\\s*K\\s*$", "")
+				.strip();
+		BigDecimal result = parseRunningTime(normalizedText);
 		if (result.signum() < 0 || result.precision() - result.scale() > 9 || result.scale() > 3) {
 			throw invalid("The recognized running time is outside the supported numeric range");
 		}
@@ -287,6 +344,55 @@ public class TrainingImportRecognitionMapper {
 			result = result.setScale(2, RoundingMode.UNNECESSARY);
 		}
 		return result;
+	}
+
+	private BigDecimal parseRunningTime(String value) {
+		try {
+			java.util.regex.Matcher threeGroups = java.util.regex.Pattern
+					.compile("^(\\d+)[\\s:;,.]+(\\d{1,2})[\\s:;,.]+(\\d{1,2})$")
+					.matcher(value);
+			if (threeGroups.matches()) {
+				long minutes = Long.parseLong(threeGroups.group(1));
+				int seconds = Integer.parseInt(threeGroups.group(2));
+				if (seconds >= 60) {
+					throw invalid("The recognized running time is outside the valid range");
+				}
+				BigDecimal fraction = new BigDecimal("0." + threeGroups.group(3));
+				return BigDecimal.valueOf(minutes).multiply(BigDecimal.valueOf(60))
+						.add(BigDecimal.valueOf(seconds)).add(fraction);
+			}
+			java.util.regex.Matcher minutesSecondsAndFraction = java.util.regex.Pattern
+					.compile("^(\\d+)[:;](\\d{1,2})[,.](\\d{1,2})$")
+					.matcher(value);
+			if (minutesSecondsAndFraction.matches()) {
+				long minutes = Long.parseLong(minutesSecondsAndFraction.group(1));
+				int seconds = Integer.parseInt(minutesSecondsAndFraction.group(2));
+				if (seconds >= 60) {
+					throw invalid("The recognized running time is outside the valid range");
+				}
+				return BigDecimal.valueOf(minutes).multiply(BigDecimal.valueOf(60))
+						.add(new BigDecimal(minutesSecondsAndFraction.group(2)
+								+ "." + minutesSecondsAndFraction.group(3)));
+			}
+			java.util.regex.Matcher minutesAndSeconds = java.util.regex.Pattern
+					.compile("^(\\d+)[:;\\s]+(\\d{1,2})$")
+					.matcher(value);
+			if (minutesAndSeconds.matches()) {
+				int seconds = Integer.parseInt(minutesAndSeconds.group(2));
+				if (seconds >= 60) {
+					throw invalid("The recognized running time is outside the valid range");
+				}
+				return BigDecimal.valueOf(Long.parseLong(minutesAndSeconds.group(1)))
+						.multiply(BigDecimal.valueOf(60))
+						.add(BigDecimal.valueOf(seconds));
+			}
+			if (value.matches("\\d+[,.]\\d{1,2}")) {
+				value = value.replace(',', '.');
+			}
+			return new BigDecimal(value);
+		} catch (NumberFormatException exception) {
+			throw invalid("The recognized running time is invalid");
+		}
 	}
 
 	private int parsePositiveInteger(String value, String fieldName) {
@@ -353,5 +459,8 @@ public class TrainingImportRecognitionMapper {
 		static MatchedAthlete unresolved(String reason) {
 			return new MatchedAthlete(null, TrainingImportAthleteMatchStatus.UNRESOLVED, reason);
 		}
+	}
+
+	private record AthleteSurnameMatch(Athlete athlete, String normalizedSurname) {
 	}
 }

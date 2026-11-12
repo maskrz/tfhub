@@ -43,6 +43,12 @@ public class TrainingImport {
 	@Column(name = "possible_duplicate", nullable = false, updatable = false)
 	private boolean possibleDuplicate;
 
+	@Column(name = "automatic_retry_count", nullable = false)
+	private int automaticRetryCount;
+
+	@Column(name = "next_retry_at")
+	private OffsetDateTime nextRetryAt;
+
 	@OneToOne(mappedBy = "trainingImport", fetch = FetchType.LAZY, optional = false)
 	private TrainingImportSourceImage sourceImage;
 
@@ -85,12 +91,37 @@ public class TrainingImport {
 		return possibleDuplicate;
 	}
 
+	public int getAutomaticRetryCount() {
+		return automaticRetryCount;
+	}
+
+	public OffsetDateTime getNextRetryAt() {
+		return nextRetryAt;
+	}
+
 	public TrainingImportSourceImage getSourceImage() {
 		return sourceImage;
 	}
 
 	public void changeStatus(TrainingImportStatus status) {
 		this.status = status;
+	}
+
+	public void scheduleAutomaticRetry(OffsetDateTime nextRetryAt) {
+		if (status != TrainingImportStatus.FAILED || nextRetryAt == null) {
+			throw new IllegalStateException("Only a failed import can have a scheduled retry");
+		}
+		this.automaticRetryCount++;
+		this.nextRetryAt = nextRetryAt;
+	}
+
+	public void clearScheduledRetry() {
+		this.nextRetryAt = null;
+	}
+
+	public void resetAutomaticRetries() {
+		this.automaticRetryCount = 0;
+		this.nextRetryAt = null;
 	}
 
 	void attachSourceImage(TrainingImportSourceImage sourceImage) {

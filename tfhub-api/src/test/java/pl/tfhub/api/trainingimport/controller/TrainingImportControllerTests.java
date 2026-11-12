@@ -178,6 +178,7 @@ class TrainingImportControllerTests {
 				42,
 				7,
 				TrainingImportStatus.FAILED,
+				null,
 				java.time.OffsetDateTime.parse("2026-11-12T10:00:00Z"),
 				false,
 				new TrainingImportStatusResponse.Attempt(
@@ -192,6 +193,7 @@ class TrainingImportControllerTests {
 				42,
 				7,
 				TrainingImportStatus.PROCESSING,
+				null,
 				statusResponse.createdAt(),
 				false,
 				new TrainingImportStatusResponse.Attempt(
