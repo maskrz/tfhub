@@ -41,6 +41,20 @@ Katalog opisuje planowaną funkcjonalność interfejsu. Kontrakty API i reguły 
 | FE-RESULT-005 | Edycja wyniku | Planowany |
 | FE-RESULT-006 | Usunięcie wyniku | Planowany |
 
+## Treningi (`FE-TRAINING`)
+
+| ID | Use case | Status |
+|---|---|---|
+| FE-TRAINING-001 | Lista treningów | Implemented |
+| FE-TRAINING-002 | Utworzenie treningu | Implemented |
+| FE-TRAINING-003 | Edycja planu treningu | Implemented |
+| FE-TRAINING-004 | Podgląd treningu | Implemented |
+| FE-TRAINING-005 | Usunięcie treningu | Implemented |
+| FE-TRAINING-006 | Import treningu ze zdjęcia | Planowany |
+| FE-TRAINING-007 | Weryfikacja importu treningu | Planowany |
+| FE-TRAINING-008 | Akceptacja lub odrzucenie importu treningu | Planowany |
+| FE-TRAINING-009 | Uzupełnienie treningu | Implemented |
+
 ## Przyszły zakres
 
 Statystyki, rankingi i wykresy pozostają poza początkowym zakresem. Konkretne przypadki użycia i ich identyfikatory należy dodać po uzgodnieniu wymagań.

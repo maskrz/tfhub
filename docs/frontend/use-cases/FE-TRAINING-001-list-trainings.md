@@ -26,6 +26,7 @@ The view must follow the existing TFHUB visual design and interaction patterns.
 6. For any training, the user can navigate directly to **Edytuj trening** (FE-TRAINING-003) or **Uzupełnij trening** (FE-TRAINING-009).
 7. The user can initiate permanent deletion of a training from its row (FE-TRAINING-005).
 8. The user can initiate training creation (FE-TRAINING-002), subject to the existing role permissions.
+9. The user can start an OCR import by selecting **Importuj ze zdjęcia** (FE-TRAINING-006).
 
 ## 5. Displayed Information
 
@@ -54,6 +55,7 @@ Each item includes its status. The default filter displays all trainings; users 
 
 - Selecting a training opens its details view (FE-TRAINING-004).
 - Provide an action to create a new training (FE-TRAINING-002) for authorized users.
+- Provide **Importuj ze zdjęcia** to start FE-TRAINING-006 for ADMIN and COACH users.
 - Provide separate **Edytuj trening** and **Uzupełnij trening** links for all list items. These links only navigate to FE-TRAINING-003 and FE-TRAINING-009; authorization remains backend-enforced.
 - Display the planned/completed state as a read-only status label.
 - Provide **Usuń** for all items (FE-TRAINING-005), requiring explicit confirmation before permanent deletion.
@@ -98,9 +100,8 @@ The view must be mobile-first and consistent with the existing TFHUB application
 
 ## 11. Out of Scope
 
-- Creating, editing, or completing training data; deletion behavior is specified in FE-TRAINING-005.
+- Creating, editing, completing, or importing training data; import upload behavior is specified in FE-TRAINING-006 and deletion behavior in FE-TRAINING-005.
 - Training details implementation.
-- OCR and training imports.
 - Any backend changes.
 
 ## 12. Acceptance Criteria

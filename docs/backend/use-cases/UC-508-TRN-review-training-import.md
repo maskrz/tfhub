@@ -38,9 +38,9 @@ Reviewing or modifying a draft must not create or modify persisted training sess
     - Execution data for each athlete and segment.
     - Spike usage.
     - Recognition uncertainty indicators and relevant recognition details.
-- The original uploaded image must remain available for comparison with recognized data.
+- The optimized JPEG retained by UC-506 must remain available for comparison with recognized data.
 - The draft must preserve the relationship between definitions, segments, athletes and execution data.
-- The review operation must not modify the original uploaded image or the persisted training data.
+- The review operation must not modify the optimized JPEG or persisted training data.
 
 ### 4.2 Editable Training Information
 
@@ -48,7 +48,6 @@ The authorized user must be able to correct all recognized training information,
 
 - Training name.
 - Training date.
-- Training group, subject to authorization rules.
 - Training definition names.
 - Training segment distances.
 - Training segment rest periods.
@@ -62,19 +61,16 @@ The corrected draft must satisfy the plan rules defined in UC-502 and the athlet
 
 ### 4.3 Training Group
 
-- Every import must remain associated with exactly one existing active training group.
-- ADMIN may change the selected group to any existing active group.
-- COACH may change the selected group only to a group currently assigned to that coach.
-- The group selected during upload is the initial group context for athlete recognition.
-- Changing the group must trigger revalidation of all athlete assignments.
-- Athletes assigned to the previous group must not remain automatically assigned if they do not belong to the newly selected group.
-- The system must not automatically move athletes between groups.
-- The import must not be accepted while any assigned athlete does not belong to its selected group.
+- Every import remains associated with the existing training group selected during upload.
+- The selected group is immutable through processing, review, retry, acceptance and rejection.
+- ADMIN may access imports for any existing group. COACH access is limited to groups currently assigned to that coach.
+- The backend must use the import's selected group as the authoritative scope for athlete matching and acceptance.
 
 ### 4.4 Athlete Matching
 
-- Athlete matching must be restricted to the import's currently selected training group.
+- Athlete matching must be restricted to the immutable training group selected during upload.
 - A recognized athlete may be matched to an existing athlete belonging to that group.
+- The backend must provide import-scoped athlete candidates using the import's group, including for ADMIN users; a client-supplied group identifier must not broaden or change the search scope.
 - An ambiguous or unmatched athlete must remain unresolved until explicitly handled.
 - The authorized user must be able to:
     - Match an unresolved row to an existing athlete from the selected group.
@@ -84,7 +80,6 @@ The corrected draft must satisfy the plan rules defined in UC-502 and the athlet
 - An athlete row marked as skipped must not produce athlete participation or execution records after acceptance.
 - An athlete row must not be assigned to more than one athlete participation within the same training session.
 - An athlete may participate in only one training definition within a given training session.
-- If changing the selected group invalidates an existing athlete assignment, that assignment must become unresolved and require review.
 - Every athlete row must be either correctly matched or explicitly skipped before acceptance.
 
 ### 4.5 Training Definitions and Segments
@@ -123,7 +118,7 @@ The corrected draft must satisfy the plan rules defined in UC-502 and the athlet
 
 - All corrected data must be validated before it can be considered ready for acceptance.
 - The draft must contain a valid training name and date.
-- The draft must contain exactly one existing active training group.
+- The draft must retain the single existing training group selected at upload; the group is read-only and cannot be changed in the draft.
 - The draft must contain at least one valid training definition.
 - Every definition must contain at least one valid segment.
 - All assigned athletes must belong to the selected training group.
@@ -143,7 +138,7 @@ The corrected draft must satisfy the plan rules defined in UC-502 and the athlet
 - A draft must be validated again during acceptance.
 - The system must not automatically accept an import because all recognition fields appear certain.
 - The authorized user confirms the entire import in one operation through UC-509, not individual cells or rows.
-- The original source image must be retained throughout review and after acceptance or rejection.
+- The optimized JPEG must be retained throughout review and after acceptance or rejection.
 
 ## 5. Authorization Rules
 
@@ -151,7 +146,6 @@ The corrected draft must satisfy the plan rules defined in UC-502 and the athlet
 - ADMIN can review imports belonging to any training group.
 - COACH can review imports only while currently assigned to the import's selected group.
 - A coach who is no longer assigned to the import's group cannot retrieve or modify its draft.
-- Changing the import group must be authorized against the requesting user's current group assignments.
 - The backend must derive the requesting user's identity and permissions from the authenticated security context.
 - The backend must not rely on client-supplied user identifiers, roles or group assignments.
 
@@ -164,8 +158,6 @@ The corrected draft must satisfy the plan rules defined in UC-502 and the athlet
 - **Import is not in REVIEW_REQUIRED state:** draft modification is rejected.
 - **Missing or blank training name:** modification is rejected.
 - **Missing or invalid training date:** modification is rejected.
-- **Selected group does not exist or is inactive:** modification is rejected.
-- **COACH selects a group not assigned to them:** modification is rejected.
 - **Athlete does not belong to the selected group:** the assignment is rejected.
 - **Athlete does not exist:** the assignment is rejected.
 - **Athlete is assigned more than once within the same training session:** modification is rejected.
@@ -192,6 +184,7 @@ The response must include at least:
 - Import identifier.
 - Import status.
 - Selected training group identifier and name.
+- The selected training group is read-only.
 - Recognized and corrected training information.
 - Training definitions and segments.
 - Athlete rows and their matching or skipped status.
@@ -199,15 +192,15 @@ The response must include at least:
 - Recognition uncertainty information.
 - Draft validation results indicating whether the import is ready for acceptance.
 
-The exact response structure and field types will be defined during API design.
+Use `GET /api/training-imports/{importId}/draft` to retrieve the draft and `PUT /api/training-imports/{importId}/draft` to atomically save corrections. Use `GET /api/training-imports/{importId}/athlete-candidates?query=...` to search eligible athletes within the import's immutable group. Retrieve the optimized JPEG through `GET /api/training-imports/{importId}/source-image`.
 
 ## 8. Transactional Consistency
 
 - Changes to a draft must be persisted atomically.
 - A failed modification must not leave partially updated draft data.
-- Changing the selected group and revalidating athlete assignments must be performed consistently.
+- The selected group cannot be changed through draft modification.
 - Removing or modifying definitions and segments must preserve valid references within the draft.
-- Draft changes must not affect the original source image.
+- Draft changes must not affect the optimized JPEG.
 - Draft changes must not create or modify persisted training session or execution records.
 - The backend must validate the complete draft before saving it as ready for acceptance.
 
@@ -227,23 +220,22 @@ The exact response structure and field types will be defined during API design.
 
 1. ADMIN can retrieve and review imports belonging to any training group.
 2. COACH can retrieve and review imports only while assigned to the import's group.
-3. The complete draft and original source image are available for review.
+3. The complete draft and optimized JPEG are available for review.
 4. The authorized user can correct training name and date.
-5. The authorized user can change the training group within their authorization scope.
-6. Changing the group invalidates athlete assignments that no longer belong to the selected group.
-7. Athlete matching is restricted to the selected group.
-8. Every athlete row must be matched to an existing athlete or explicitly skipped before acceptance.
-9. The system does not create new athlete records during review.
-10. Training definitions can be added, modified, reordered and removed subject to validation rules.
-11. Training segments can be added, modified, reordered and removed subject to validation rules.
-12. The authorized user can correct execution status, measured result and spike usage independently.
-13. The system distinguishes PENDING, RECORDED, COMPLETED_WITHOUT_RESULT and NOT_COMPLETED execution states.
-14. Measured results are non-negative numeric values and can only be supplied with RECORDED status.
-15. Recognition uncertainty does not prevent manual correction.
-16. The complete draft is validated before it can be considered ready for acceptance.
-17. Saving corrections does not automatically accept or reject the import.
-18. The import remains in REVIEW_REQUIRED state until UC-509 is executed.
-19. Draft changes do not create or modify persisted training session or execution records.
-20. Draft modifications are persisted atomically.
-21. The original source image remains available after review and subsequent acceptance or rejection.
-22. Unauthorized users cannot retrieve or modify training import drafts.
+5. The upload-selected training group is read-only throughout review.
+6. Athlete candidates and assignments are restricted to that group, including for ADMIN users.
+7. Every athlete row must be matched to an existing athlete or explicitly skipped before acceptance.
+8. The system does not create new athlete records during review.
+9. Training definitions can be added, modified, reordered and removed subject to validation rules.
+10. Training segments can be added, modified, reordered and removed subject to validation rules.
+11. The authorized user can correct execution status, measured result and spike usage independently.
+12. The system distinguishes PENDING, RECORDED, COMPLETED_WITHOUT_RESULT and NOT_COMPLETED execution states.
+13. Measured results are non-negative numeric values and can only be supplied with RECORDED status.
+14. Recognition uncertainty does not prevent manual correction.
+15. The complete draft is validated before it can be considered ready for acceptance.
+16. Saving corrections does not automatically accept or reject the import.
+17. The import remains in REVIEW_REQUIRED state until UC-509 is executed.
+18. Draft changes do not create or modify persisted training session or execution records.
+19. Draft modifications are persisted atomically.
+20. The optimized JPEG remains available after review and subsequent acceptance or rejection.
+21. Unauthorized users cannot retrieve or modify training import drafts.

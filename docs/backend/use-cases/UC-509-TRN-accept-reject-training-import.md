@@ -6,7 +6,7 @@ Provide backend operations for accepting or rejecting a reviewed training import
 
 Acceptance must atomically create a persisted training session and all its related data from the validated import draft.
 
-Rejection must preserve the import, its draft and original source image without creating a training session.
+Rejection must preserve the import, its current draft, processing attempts and optimized JPEG without creating a training session.
 
 ## 2. Actors
 
@@ -45,14 +45,14 @@ Rejection must preserve the import, its draft and original source image without 
 - Training definitions and segments must preserve their reviewed order.
 - Execution status, measured results and spike usage must preserve the values confirmed during review.
 - The created training session must have status `PLANNED`.
-- The created training session must retain the group selected in the final reviewed draft.
+- The created training session must retain the immutable group selected during upload.
 - The import must transition to ACCEPTED only after the complete training session and its related data have been successfully persisted.
 
 ### 4.2 Acceptance Validation
 
 - The complete draft must be validated again during acceptance.
 - The draft must contain a non-empty training name and valid date.
-- The draft must reference exactly one existing active training group.
+- The import must reference the existing training group selected during upload; the group is immutable.
 - The requesting user must still be authorized for the selected group.
 - The draft must contain at least one training definition.
 - Every definition must have a non-empty name and at least one valid segment.
@@ -72,11 +72,11 @@ Rejection must preserve the import, its draft and original source image without 
 - The authorized user may explicitly reject an import in REVIEW_REQUIRED state.
 - Rejection changes the import status to REJECTED.
 - Rejection must preserve:
-    - The original uploaded image.
+    - The optimized JPEG retained by UC-506.
     - The generated draft.
     - Recognized and corrected values.
     - Athlete matching decisions.
-    - Processing and review history.
+    - Processing-attempt history and the current corrected draft. The system does not keep a revision history or an audit trail of individual draft edits.
 - Rejection must not create a persisted training session.
 - A rejected import cannot be accepted or edited again.
 - A rejected import remains available for historical inspection, subject to authorization rules.
@@ -93,8 +93,8 @@ Rejection must preserve the import, its draft and original source image without 
 
 ### 4.5 Source Image Retention
 
-- The original uploaded image must be retained after acceptance.
-- The original uploaded image must be retained after rejection.
+- The optimized JPEG must be retained after acceptance.
+- The optimized JPEG must be retained after rejection.
 - Acceptance or rejection must not modify or delete the source image.
 - The source image must remain associated with the import for future inspection.
 
@@ -103,8 +103,7 @@ Rejection must preserve the import, its draft and original source image without 
 - Only authenticated ADMIN and COACH users may accept or reject training imports.
 - ADMIN can accept or reject imports belonging to any existing training group.
 - COACH can accept or reject imports only while currently assigned to the import's selected group.
-- Authorization must be checked against the final group stored in the reviewed draft.
-- If the import group was changed during review, the requesting user must be authorized for the new group at the time of acceptance or rejection.
+- Authorization must be checked against the immutable group selected during upload.
 - A coach who is no longer assigned to the import's group cannot accept or reject it.
 - The backend must derive the requesting user's identity and permissions from the authenticated security context.
 - The backend must not rely on client-supplied user identifiers, roles or group assignments.
@@ -117,7 +116,7 @@ Rejection must preserve the import, its draft and original source image without 
 - **COACH is not currently assigned to the import's group:** the operation returns the same not-found response as for a nonexistent import.
 - **Import is not in REVIEW_REQUIRED state:** acceptance or rejection is rejected.
 - **Draft is missing or invalid:** acceptance is rejected.
-- **Training group does not exist or is inactive:** acceptance is rejected.
+- **Training group does not exist:** acceptance is rejected.
 - **COACH is no longer assigned to the selected group:** acceptance or rejection is rejected.
 - **Training name or date is invalid:** acceptance is rejected.
 - **No valid training definitions exist:** acceptance is rejected.
@@ -146,6 +145,8 @@ A successful acceptance returns information identifying:
 - The final import status.
 - The newly created training session identifier.
 
+Use `POST /api/training-imports/{importId}/accept`.
+
 ### 7.2 Rejection Output
 
 A successful rejection returns information identifying:
@@ -153,7 +154,7 @@ A successful rejection returns information identifying:
 - The import identifier.
 - The final import status.
 
-The exact response structure and field types will be defined during API design.
+Use `POST /api/training-imports/{importId}/reject`.
 
 ## 8. Transactional Consistency
 
@@ -206,8 +207,8 @@ The exact response structure and field types will be defined during API design.
 14. Acceptance is atomic: failure leaves no partially created training data and the import remains REVIEW_REQUIRED.
 15. Rejection changes the import status to REJECTED.
 16. Rejection does not create a training session or execution records.
-17. Rejected imports retain their draft, source image and review history.
-18. Accepted imports retain their original source image.
+17. Rejected imports retain their current draft, optimized JPEG and processing-attempt history; individual draft-edit history is not retained.
+18. Accepted imports retain their optimized JPEG.
 19. ACCEPTED and REJECTED imports cannot be finalized again.
 20. Concurrent requests cannot create duplicate training sessions.
 21. Unauthorized users cannot accept or reject training imports.

@@ -11,16 +11,16 @@ The process must not create or modify persisted training sessions or athlete exe
 ## 2. Actors
 
 - **System** – processes pending training imports asynchronously.
-- **ADMIN** – can initiate and retry processing for imports they are authorized to access.
-- **COACH** – can initiate and retry processing for imports belonging to groups currently assigned to that coach.
+- **ADMIN** – can retry processing for imports they are authorized to access.
+- **COACH** – can retry processing for imports belonging to groups currently assigned to that coach.
 
 ## 3. Preconditions
 
 - A training import has been successfully created through UC-506.
-- The import has an associated source image.
+- The import has an associated optimized JPEG source image.
 - The import has an associated training group.
 - The import is in a state eligible for processing or retry.
-- The requesting user, if initiating or retrying processing, is authorized to access the import.
+- The requesting user, if retrying processing, is authorized to access the import.
 
 ## 4. Business Rules
 
@@ -33,6 +33,7 @@ The process must not create or modify persisted training sessions or athlete exe
 - The system must prevent concurrent processing of the same import.
 - Processing must be associated with the original import identifier.
 - The system must track processing status and relevant timestamps.
+- Each attempt must retain the exact raw model response when the model returns one, including responses that fail validation. This troubleshooting data must not be exposed in API responses or application logs.
 - Processing failures must be recorded without exposing internal implementation details or API credentials.
 
 ### 4.2 Import Processing States
@@ -50,8 +51,9 @@ The exact state transition rules must be enforced by the backend.
 
 ### 4.3 Image Recognition
 
-- The original image retained by UC-506 must be used as the source document.
+- The optimized JPEG retained by UC-506 must be used as the source document.
 - The initial implementation must use Gemini Flash-Lite 3.5 for image understanding and handwriting recognition.
+- Exactly one Gemini model call is made for each processing attempt; the system does not call a fallback or second model.
 - The model must receive the image together with instructions defining the expected training sheet structure and recognition rules.
 - The model must identify the training name and date.
 - The model must identify training definitions and their names.
@@ -114,12 +116,13 @@ Additional recognition rules:
 - The draft must retain original recognized text where applicable.
 - The draft must be editable through UC-508.
 - Processing must not create persisted training session, definition, segment, participation or execution records.
-- The original uploaded image must remain available for subsequent review.
+- The optimized JPEG must remain available for subsequent review.
 
 ### 4.8 Processing Retry
 
-- An import in FAILED state may be retried using the same original source image.
-- Retry must replace the previous unsuccessful or incomplete draft with a newly generated draft.
+- An import in FAILED state may be retried using the same optimized JPEG.
+- Retry must replace the current draft only after the new attempt succeeds and passes basic output validation.
+- A failed retry must leave any existing valid draft unchanged.
 - Retry must not create a second import record.
 - Retry must not create duplicate training session or execution records.
 - A retry must start a new processing attempt associated with the same import identifier.
@@ -132,7 +135,7 @@ Additional recognition rules:
 - Temporary AI service errors must result in a failed processing attempt.
 - Invalid, incomplete or unusable model responses must not produce an accepted draft.
 - The system must validate the model response before creating or replacing the draft.
-- Failure must leave the original uploaded image intact.
+- Failure must leave the optimized JPEG intact.
 - The import must enter FAILED state if processing cannot be completed.
 - Failure information must be available for diagnosis without exposing API keys, credentials or sensitive configuration.
 - The system must not silently accept partially recognized data as a completed import.
@@ -140,7 +143,7 @@ Additional recognition rules:
 ## 5. Authorization Rules
 
 - The system may process pending imports asynchronously without requiring an active user request.
-- Only ADMIN and COACH users may explicitly initiate or retry processing.
+- Only ADMIN and COACH users may explicitly retry failed processing.
 - ADMIN can access imports belonging to any training group.
 - COACH can access and retry imports only while currently assigned to the import's group.
 - A coach who is no longer assigned to the import's group cannot retry its processing.
@@ -165,11 +168,9 @@ A failed processing attempt must not create or modify persisted training session
 
 ## 7. Output
 
-The asynchronous process produces an updated training import containing its current processing state.
+The asynchronous process produces an updated training import containing its current processing state. Clients retrieve the current state from `GET /api/training-imports/{importId}`. An authorized user retries a failed import using `POST /api/training-imports/{importId}/retry`, which returns `202 Accepted`.
 
 When processing succeeds, the import must expose sufficient information to retrieve and review the generated draft through UC-508.
-
-The exact response structure and field types will be defined during API design.
 
 ## 8. Transactional Consistency
 
@@ -177,7 +178,7 @@ The exact response structure and field types will be defined during API design.
 - A draft must become available only after its structure has passed backend validation.
 - Replacing a draft during retry must be atomic.
 - A failed retry must not leave a partially replaced draft.
-- The original source image must remain intact throughout processing and retry.
+- The optimized JPEG must remain intact throughout processing and retry.
 - Processing must never create persisted training session or execution records.
 - Concurrent processing attempts for the same import must be prevented.
 
@@ -213,11 +214,12 @@ The exact response structure and field types will be defined during API design.
 14. Successful processing creates a structured editable draft.
 15. Successful processing changes the import state to REVIEW_REQUIRED.
 16. Failed processing changes the import state to FAILED.
-17. A failed import can be retried using the original source image.
-18. Retry replaces the previous draft without creating a new import record.
+17. A failed import can be retried using the same optimized JPEG.
+18. Retry replaces the current draft only after successful processing and validation, without creating a new import record.
 19. Concurrent processing attempts for the same import are prevented.
-20. The original uploaded image remains available after processing and retry.
+20. The optimized JPEG remains available after processing and retry; the unoptimized upload is not retained.
 21. Processing never creates or modifies persisted training session or execution records.
 22. AI service failures and invalid responses do not produce an accepted draft.
 23. Processing status and failure information are persisted.
-24. Unauthorized users cannot explicitly initiate or retry processing.
+24. The raw model response is retained per attempt when returned and is not exposed to clients or logs.
+25. Unauthorized users cannot retry processing.

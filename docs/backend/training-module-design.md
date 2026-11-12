@@ -12,7 +12,7 @@
 - Historical participation and executions remain valid after the athlete's current group changes.
 - Training executions are separate from `test_results`. Reuse its numeric representation, not its entity or business semantics.
 - Imports and OCR drafts are separate from persisted training data. Only explicit acceptance creates a training and related records.
-- Existing training groups are treated as active. Do not add a group lifecycle field.
+- Training groups have no active/inactive lifecycle. Do not add a group lifecycle field.
 - Do not add a generic exercise abstraction, sheet snapshot tables, draft revision history, audit log, or event-sourcing mechanism.
 
 The existing application uses PostgreSQL, Spring Data JPA, Flyway, identity `BIGINT` primary keys, plural snake_case tables, string-valued enums, and restrictive foreign keys for historical records. Add schema through a new Flyway migration; do not modify an existing migration.
@@ -29,9 +29,9 @@ One persisted training event for one group.
 | `training_group_id` | `BIGINT` | No | FK to `training_groups.id` |
 | `name` | `VARCHAR` | No | Training name |
 | `training_date` | `DATE` | No | Calendar date |
-| `active` | `BOOLEAN` | No | Defaults to `TRUE` |
+| `status` | `VARCHAR(20)` | No | `PLANNED` or `COMPLETED`; defaults to `PLANNED` |
 
-Use `ON DELETE RESTRICT` / `ON UPDATE RESTRICT` for the group FK. Do not add creator-based access. Group immutability is an application invariant: creation sets the group, and no create/edit/import operation may subsequently change it. No trigger is proposed.
+Use `ON DELETE RESTRICT` / `ON UPDATE RESTRICT` for the group FK. Constrain status to `PLANNED` or `COMPLETED`. Do not add creator-based access. Group immutability is an application invariant: creation sets the group, and no create/edit/import operation may subsequently change it. No trigger is proposed.
 
 ### 2.2 `training_definitions`
 
@@ -154,10 +154,11 @@ Processing history for one import. Keep failed attempts; retry does not create a
 | `status` | `VARCHAR` | No | `PROCESSING`, `SUCCEEDED`, or `FAILED` |
 | `started_at` | `TIMESTAMPTZ` | No | Attempt start |
 | `finished_at` | `TIMESTAMPTZ` | Yes | Attempt completion |
+| `raw_model_response` | `TEXT` | Yes | Exact response body, when returned by the model |
 | `failure_code` | `VARCHAR` | Yes | Safe diagnostic category |
 | `failure_message` | `TEXT` | Yes | Safe diagnostic detail |
 
-Enforce unique `(import_id, attempt_number)`, positive attempt number, and at most one processing attempt per import with a partial unique index on `import_id WHERE status = 'PROCESSING'`. Do not store credentials or require retaining the raw model response.
+Enforce unique `(import_id, attempt_number)`, positive attempt number, and at most one processing attempt per import with a partial unique index on `import_id WHERE status = 'PROCESSING'`. Store the raw response for troubleshooting, including invalid responses; it is nullable when no response was received. Keep it server-side only, out of API responses and logs, and protect it as athlete-related data. Never store credentials.
 
 ### 3.4 `training_import_drafts`
 
@@ -256,7 +257,7 @@ erDiagram
   TRAINING_IMPORTS o|--o| TRAINING_SESSIONS : accepted_as
 ```
 
-Use restrictive deletes for training data and import history. Never cascade-delete recorded training data. Child foreign keys and composite-key indexes support detail retrieval. Index training sessions by `(training_group_id, active, training_date DESC, id)` and imports by `(training_group_id, status, created_at)`.
+Use restrictive deletes for training data and import data. Never cascade-delete recorded training data. Child foreign keys and composite-key indexes support detail retrieval. Index training sessions by `(training_group_id, status, training_date DESC, id)` and imports by `(training_group_id, status, created_at)`.
 
 Validate current coach membership, athlete group membership on initial assignment/acceptance, immutable group values, and UC edit rules in transactional services. Do not use the athlete's current group to filter historical participation. At least one definition per training and at least one segment per definition are aggregate rules validated by create/edit/review/accept operations, not triggers.
 
@@ -286,9 +287,11 @@ No ownership, snapshot, audit, revision, or new lifecycle tables are needed for 
 
 ## 6. Image storage
 
-Store one image per import on a persistent filesystem volume, not in PostgreSQL. Compress/optimize before saving: JPEG at approximately 85% quality, resize oversized images to a maximum 2560-pixel long edge without upscaling. The proposed settings are confirmed; validate with representative handwritten sheets during implementation to ensure OCR quality is not noticeably degraded. Do not retain the uncompressed original absent a concrete technical need.
+Store one image per import on a persistent filesystem volume, not in PostgreSQL. Convert to JPEG at approximately 85% quality and resize oversized images to a maximum 2560-pixel long edge without upscaling. Keep only this optimized JPEG; do not retain the uploaded bytes separately. Validate the settings with representative handwritten sheets to ensure OCR quality is not noticeably degraded.
 
-The database stores only the generated internal `storage_key` and metadata; do not expose storage paths in API responses. Coordinate file and database persistence: remove the stored file if import persistence fails, and handle an orphan if the process fails between file placement and database commit. Back up the image volume separately from PostgreSQL and test restoration.
+The database stores only the generated internal `storage_key` and metadata; do not expose storage paths in API responses. Coordinate file and database persistence: write to a temporary file, validate and optimize it, then atomically move it to a generated storage key. Remove the stored file if import persistence fails and clean up an orphan if the process fails between file placement and database commit.
+
+For production Compose, mount a dedicated named volume such as `tfhub-prod-training-import-images` at `/var/lib/tfhub/training-imports` in the API container only, writable by the existing non-root API user. Do not use the API's `/tmp` tmpfs for retained images. Back up the image volume with the database backup set and test a coordinated restoration; existing XLSX/database backups do not contain image files. No automatic import/image deletion is introduced, so enforce upload limits and monitor available disk space.
 
 ## 7. Paper sheet and OCR
 
@@ -296,34 +299,36 @@ A sheet may contain one training header and multiple definition sections; each s
 
 A generated sheet snapshot table is not required by UC-501 through UC-509. OCR maps recognized rows against the selected group and the draft structure. Add print-time snapshots only if a later approved requirement needs exact mapping to assignments as they existed when a sheet was printed.
 
-UC-507 requires Gemini Flash-Lite 3.5. OCR produces a structured draft with recognized text and uncertainty metadata. The user manually reviews and explicitly accepts or rejects the whole draft. No accepted training entities are created during upload, processing, or review.
+UC-507 requires Gemini Flash-Lite 3.5 and exactly one model call per processing attempt. OCR produces a structured draft with recognized text and uncertainty metadata. The user manually reviews and explicitly accepts or rejects the whole draft. No accepted training entities are created during upload, processing, or review.
 
 ## 8. Import lifecycle, retry, and acceptance
 
 Import states: `PENDING → PROCESSING → REVIEW_REQUIRED`; processing failure gives `FAILED`; retry is allowed from `FAILED`; only `REVIEW_REQUIRED` can become `ACCEPTED` or `REJECTED`. Final states cannot be reopened.
 
-Claim processing using a conditional status update or row lock and create an attempt in the same short transaction. Permit only one attempt with `PROCESSING` status per import, enforced by the partial unique index. Run OCR outside the transaction.
+Use a bounded in-process worker that polls pending imports; no external queue is required for the single-instance deployment. Claim processing using a conditional status update or row lock and create an attempt in the same short transaction. Permit only one attempt with `PROCESSING` status per import, enforced by the partial unique index. Run the single model call outside the transaction. On restart or timeout, mark stale attempts failed so the import can be explicitly retried.
 
 Validate new OCR output before atomically replacing the current draft and setting `REVIEW_REQUIRED`. A failed attempt records its failure and leaves any existing valid draft untouched. Retry uses the same optimized source image and creates no second import. Keep recovery simple: a stale processing attempt is marked failed so the import can be explicitly retried; timeout is operational configuration.
 
 Acceptance locks the import, then revalidates the draft, current coach-group authorization, and each matched athlete's current group. In one transaction:
 
-1. Create one active `training_session` using the immutable import group.
+1. Create one `training_session` with status `PLANNED`, using the immutable import group.
 2. Create definitions, segments, matched participations, and executions.
 3. Omit skipped rows from persisted training data.
 4. Set the import's accepted-session link and `ACCEPTED` status.
 
-Any failure rolls back the session and all children and leaves the import unaccepted. Rejection changes status only and retains the image, current draft, and attempt history.
+Any failure rolls back the session and all children and leaves the import unaccepted. Rejection changes status only and retains the optimized image, current draft, and processing attempts. Keep one current draft per import; do not add draft revisions, a review-edit audit log, or a separate review-history model.
 
-## 9. Required UC documentation corrections
+## 9. Implementation alignment
 
-- **UC-503/UC-510:** plan editing and participant/execution completion are separate operations; update cross-references and API contracts accordingly.
-- **UC-508:** remove permission to change the selected group and all group-change/revalidation requirements. The upload-selected group remains immutable through review and finalization.
-- **UC-502, UC-506, UC-508, UC-509:** remove requirements that groups be “active” and errors for inactive groups. Existing `training_groups` has no lifecycle; groups are treated as active.
-- **UC-506, UC-507, UC-508, UC-509:** clarify that the retained source document is the immutable optimized JPEG; the uncompressed upload is not retained by default. Retry uses the same stored JPEG.
-- **UC-507:** clarify that a retry replaces the current draft only after the new attempt succeeds and passes basic validation; a failed retry leaves the existing draft unchanged.
-- Clarify in the training UCs that a measured running result is in seconds, stored using `NUMERIC(12,3)`, and may be zero. Existing test-result validation is strictly positive; training follows the explicit UC nonnegative rule.
+- The upload-selected group is immutable through processing, review, retry, and finalization. Athlete candidates and assignments are restricted to that group.
+- The retained source is the optimized JPEG. The original upload bytes are not retained.
+- Processing attempts retain the raw model response when one is returned; the response is not exposed to clients or written to logs.
+- Each import has one current editable draft and its processing-attempt records. User edits do not create draft versions or an audit trail.
+- Acceptance creates a `PLANNED` training session. The persisted training lifecycle uses `PLANNED` and `COMPLETED`, not the legacy `active` flag.
+- Existing training groups have no lifecycle field; selecting an existing group does not include an active/inactive check.
+- Plan editing and participation/execution completion remain separate operations; import acceptance is the explicit atomic path that creates both.
+- Training measured results use seconds, `NUMERIC(12,3)`, and the nonnegative rule; they do not reuse the positive-only test-result rule.
 
 ## 10. Remaining decisions
 
-No domain decision remains open. The confirmed JPEG settings are quality 85 and a 2560-pixel maximum long edge; OCR quality validation remains an implementation check. The stale-processing timeout is operational configuration, not a schema or business-rule decision.
+The confirmed JPEG settings are quality 85 and a 2560-pixel maximum long edge. OCR quality validation remains an implementation check. The stale-processing and Gemini request timeouts, worker concurrency, and upload limits are operational configuration. Supply `GEMINI_API_KEY` only to the API at runtime; do not put it in the frontend, database, image, or logs. Resolve the provider API model identifier for the approved Gemini Flash-Lite 3.5 model during configuration.
