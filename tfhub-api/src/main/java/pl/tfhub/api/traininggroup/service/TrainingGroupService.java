@@ -6,6 +6,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import pl.tfhub.api.common.authorization.AccessScopeService;
 import pl.tfhub.api.traininggroup.dto.response.TrainingGroupResponse;
+import pl.tfhub.api.traininggroup.entity.TrainingGroup;
+import pl.tfhub.api.traininggroup.exception.TrainingGroupNotFoundException;
+import pl.tfhub.api.traininggroup.repository.TrainingGroupRepository;
 import pl.tfhub.api.user.enums.UserRole;
 
 @Service
@@ -13,10 +16,20 @@ public class TrainingGroupService {
 
 	private final JdbcClient jdbcClient;
 	private final AccessScopeService accessScopeService;
+	private final TrainingGroupRepository trainingGroupRepository;
 
-	public TrainingGroupService(JdbcClient jdbcClient, AccessScopeService accessScopeService) {
+	public TrainingGroupService(
+			JdbcClient jdbcClient,
+			AccessScopeService accessScopeService,
+			TrainingGroupRepository trainingGroupRepository) {
 		this.jdbcClient = jdbcClient;
 		this.accessScopeService = accessScopeService;
+		this.trainingGroupRepository = trainingGroupRepository;
+	}
+
+	@Transactional(readOnly = true)
+	public TrainingGroup getTrainingGroupEntity(long id) {
+		return trainingGroupRepository.findById(id).orElseThrow(() -> new TrainingGroupNotFoundException(id));
 	}
 
 	@Transactional(readOnly = true)

@@ -27,7 +27,9 @@ RUN apk add --no-cache ca-certificates unzip \
     && rm -rf /tmp/rclone /tmp/rclone.zip \
     && apk del unzip \
     && addgroup -S -g 10001 spring \
-    && adduser -S -u 10001 -G spring spring
+    && adduser -S -u 10001 -G spring spring \
+    && mkdir -p /var/lib/tfhub/training-imports \
+    && chown spring:spring /var/lib/tfhub/training-imports
 WORKDIR /app
 COPY --from=build --chown=spring:spring /build/target/tfhub-api-*.jar /app/app.jar
 USER spring

@@ -5,6 +5,7 @@ import java.util.stream.Collectors;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -35,12 +36,18 @@ import pl.tfhub.api.traininggroup.exception.TrainingGroupNotFoundException;
 import pl.tfhub.api.training.exception.InvalidTrainingRequestException;
 import pl.tfhub.api.training.exception.InvalidTrainingIdException;
 import pl.tfhub.api.training.exception.TrainingNotFoundException;
+import pl.tfhub.api.trainingimport.exception.InvalidTrainingImportUploadException;
+import pl.tfhub.api.trainingimport.exception.TrainingImportImageStorageException;
 import pl.tfhub.api.user.exception.IncorrectCurrentPasswordException;
 import pl.tfhub.api.backup.BackupAlreadyRunningException;
 import pl.tfhub.api.backup.BackupExecutionException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @RestControllerAdvice
 public class ApiExceptionHandler {
+
+	private static final Logger LOGGER = LoggerFactory.getLogger(ApiExceptionHandler.class);
 
 	@ExceptionHandler(MethodArgumentNotValidException.class)
 	public ProblemDetail handleValidation(MethodArgumentNotValidException exception) {
@@ -192,6 +199,30 @@ public class ApiExceptionHandler {
 		ProblemDetail problem = ProblemDetail.forStatusAndDetail(
 				HttpStatus.BAD_REQUEST, "Training ID must be a positive integer");
 		problem.setTitle("Invalid training ID");
+		return problem;
+	}
+
+	@ExceptionHandler(InvalidTrainingImportUploadException.class)
+	public ProblemDetail handleInvalidTrainingImportUpload(InvalidTrainingImportUploadException exception) {
+		ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, exception.getMessage());
+		problem.setTitle("Invalid training import upload");
+		return problem;
+	}
+
+	@ExceptionHandler(MaxUploadSizeExceededException.class)
+	public ProblemDetail handleMaxUploadSizeExceeded() {
+		ProblemDetail problem = ProblemDetail.forStatusAndDetail(
+				HttpStatus.PAYLOAD_TOO_LARGE, "The uploaded file exceeds the configured size limit");
+		problem.setTitle("Upload too large");
+		return problem;
+	}
+
+	@ExceptionHandler(TrainingImportImageStorageException.class)
+	public ProblemDetail handleTrainingImportImageStorage(TrainingImportImageStorageException exception) {
+		LOGGER.error("Training import image storage failed", exception);
+		ProblemDetail problem = ProblemDetail.forStatusAndDetail(
+				HttpStatus.INTERNAL_SERVER_ERROR, "The training image could not be stored");
+		problem.setTitle("Training image storage failed");
 		return problem;
 	}
 

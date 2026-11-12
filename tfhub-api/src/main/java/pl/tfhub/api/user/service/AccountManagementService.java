@@ -214,6 +214,11 @@ public class AccountManagementService {
 				.orElseThrow(() -> new AccountNotFoundException(id));
 	}
 
+	@Transactional(readOnly = true)
+	public User getAccountEntity(long id) {
+		return getAccount(id);
+	}
+
 	private User getAccount(long id) {
 		return userRepository.findById(id).orElseThrow(() -> new AccountNotFoundException(id));
 	}

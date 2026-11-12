@@ -92,9 +92,9 @@ Only Nginx publishes a port, bound to host loopback. `backend-network` and `data
 
 PostgreSQL data is stored in the named Docker volume `tfhub-prod-postgres-data`, mounted at `/var/lib/postgresql/data` in the database container.
 
-The database volume is persistent application data. Do not remove it as part of routine deployment or cleanup commands. In particular, `docker compose down -v` must not be used casually because it removes named volumes.
+Optimized training-import JPEGs are stored in the separate named volume `tfhub-prod-training-import-images`, mounted at `/var/lib/tfhub/training-imports` in the API container. The API image creates this directory with ownership for its non-root UID/GID `10001` before the volume is mounted.
 
-Application containers should be replaceable: rebuilding or recreating the `web`, `api`, or `cloudflared` container must not delete PostgreSQL data.
+Both volumes are persistent application data. Do not remove them as part of routine deployment or cleanup commands. In particular, `docker compose down -v` must not be used casually because it removes named volumes. Rebuilding or recreating application containers must not delete either volume.
 
 ## 5. Public access and Cloudflare Tunnel
 
@@ -202,9 +202,9 @@ The real client IP used for login rate limiting must be derived only from a corr
 
 ## 10. Backups and recovery
 
-PostgreSQL backups are required because the database volume alone does not protect against device failure, accidental deletion, or storage corruption.
+Database and training-import image backups are required because their live volumes alone do not protect against device failure, accidental deletion, or storage corruption.
 
-Backups are not automated by this Compose stack. The runbook below provides a manual PostgreSQL dump and restore procedure. For production operations:
+The existing on-demand database backup does not include the image volume. Back up the database dump and `tfhub-prod-training-import-images` together, encrypt and transfer both off-device, and restore them as a coordinated set. Backups are not automated by this Compose stack. For production operations:
 
 - create a database backup daily;
 - encrypt backup files before transferring or storing them outside the Raspberry Pi;
@@ -321,7 +321,7 @@ The named database volume survives this update. Do not use `docker compose down 
 
 ### Database backup and restore
 
-Create a custom-format dump, protect it, and copy it off the Pi:
+Create a custom-format database dump and archive the image volume as one coordinated backup set. Protect both files and copy them off the Pi:
 
 ```sh
 umask 077
@@ -330,6 +330,13 @@ docker compose --env-file .env.production -f docker-compose.prod.yml exec -T db 
   sh -c 'PGPASSWORD="$TFHUB_DB_PASSWORD" pg_dump --format=custom --no-owner --no-acl --username="$TFHUB_DB_USER" "$POSTGRES_DB"' \
   > "$backup"
 chmod 600 "$backup"
+image_backup="$HOME/tfhub-training-import-images-$(date +%F).tar"
+docker run --rm \
+  -v tfhub-prod-training-import-images:/source:ro \
+  -v "$HOME:/backup" \
+  alpine:3.21 \
+  tar -C /source -cf "/backup/$(basename "$image_backup")" .
+chmod 600 "$image_backup"
 ```
 
 **Destructive restore:** this replaces objects in the selected TFHUB database. Confirm the backup and target first, stop the API, restore the dump, and start the API only after a successful restore. It does not stop or alter HomeCenter.
@@ -337,19 +344,27 @@ chmod 600 "$backup"
 ```sh
 set -e
 backup="$HOME/tfhub-YYYY-MM-DD.dump"
+image_backup="$HOME/tfhub-training-import-images-YYYY-MM-DD.tar"
 docker compose --env-file .env.production -f docker-compose.prod.yml stop api
 docker compose --env-file .env.production -f docker-compose.prod.yml exec -T db \
   sh -c 'PGPASSWORD="$TFHUB_DB_PASSWORD" pg_restore --exit-on-error --clean --if-exists --no-owner --no-acl --username="$TFHUB_DB_USER" --dbname="$POSTGRES_DB"' \
   < "$backup"
+docker run --rm \
+  -v tfhub-prod-training-import-images:/target \
+  -v "$HOME:/backup" \
+  alpine:3.21 \
+  sh -c "tar -C /target -xf /backup/$(basename "$image_backup")"
 docker compose --env-file .env.production -f docker-compose.prod.yml start api
 ```
+
+Verify the archive and database dump belong to the same backup date. Extracting into a non-empty image volume preserves unrelated older files; use a clean, separately verified target volume for an exact rollback.
 
 ### Troubleshooting and future tunnel
 
 - If `web` cannot bind its port, set another free loopback port in `TFHUB_HTTP_PORT` and recreate the `web` service.
 - If `api` is unhealthy, inspect `logs api db`; verify the application credentials and that the database volume was initialized successfully.
 - If PostgreSQL credentials were changed after initialization, update the role in the database as well; editing `.env.production` alone does not rotate it.
-- Check free space with `df -h /` and Docker usage with `docker system df`. The SD card is the only database storage in this setup; copy backups off-device.
+- Check free space with `df -h /` and Docker usage with `docker system df`. The SD card holds both database and import-image data; copy backups off-device.
 - The Compose project does not configure Cloudflare Tunnel. In a future controlled change, attach `cloudflared` only to `edge-network` and route it to `web:80`; do not publish the backend or database. Review Nginx's trusted forwarded-header values for the actual tunnel path before enabling remote access.
 
 ## 15. Deployment verification boundaries

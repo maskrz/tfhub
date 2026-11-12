@@ -133,10 +133,11 @@ One immutable optimized image per import, stored on persistent filesystem storag
 | `import_id` | `BIGINT` | No | PK and FK to `training_imports.id` |
 | `storage_key` | `VARCHAR` | No | Unique internal storage key |
 | `media_type` | `VARCHAR` | No | Stored type, initially JPEG |
+| `original_filename` | `VARCHAR(255)` | No | Sanitized client filename metadata; never used as a path |
 | `byte_size` | `BIGINT` | No | Stored file size |
 | `width` | `INTEGER` | No | Stored image width |
 | `height` | `INTEGER` | No | Stored image height |
-| `sha256` | `CHAR(64)` | No | Hash of stored image |
+| `sha256` | `VARCHAR(64)` | No | Hash of stored image |
 
 Index `sha256` non-uniquely to detect exact duplicates. Do not make it unique: duplicate uploads must create separate imports. Do not expose storage keys through the API.
 
@@ -289,9 +290,11 @@ No ownership, snapshot, audit, revision, or new lifecycle tables are needed for 
 
 Store one image per import on a persistent filesystem volume, not in PostgreSQL. Convert to JPEG at approximately 85% quality and resize oversized images to a maximum 2560-pixel long edge without upscaling. Keep only this optimized JPEG; do not retain the uploaded bytes separately. Validate the settings with representative handwritten sheets to ensure OCR quality is not noticeably degraded.
 
-The database stores only the generated internal `storage_key` and metadata; do not expose storage paths in API responses. Coordinate file and database persistence: write to a temporary file, validate and optimize it, then atomically move it to a generated storage key. Remove the stored file if import persistence fails and clean up an orphan if the process fails between file placement and database commit.
+The database stores only the generated internal `storage_key` and metadata; do not expose storage paths in API responses. Coordinate file and database persistence: write to a temporary file, validate and optimize it, then atomically move it to a generated storage key. Remove the stored file if import persistence fails and clean up unreferenced generated files and stale temporary files on application startup if the process fails between file placement and database commit.
 
 For production Compose, mount a dedicated named volume such as `tfhub-prod-training-import-images` at `/var/lib/tfhub/training-imports` in the API container only, writable by the existing non-root API user. Do not use the API's `/tmp` tmpfs for retained images. Back up the image volume with the database backup set and test a coordinated restoration; existing XLSX/database backups do not contain image files. No automatic import/image deletion is introduced, so enforce upload limits and monitor available disk space.
+
+The initial UC-506 limits are a 15 MiB upload, 8,000 pixels per input dimension, and 24 million input pixels; JPEG and PNG are accepted and converted to JPEG at quality 85. These limits are configurable through the `TFHUB_TRAINING_IMPORT_*` environment variables and should be adjusted only after checking memory and disk capacity on the Raspberry Pi.
 
 ## 7. Paper sheet and OCR
 

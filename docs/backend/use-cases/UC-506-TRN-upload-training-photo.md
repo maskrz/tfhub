@@ -36,6 +36,7 @@ Uploading a photo must not create or modify a persisted training session.
 
 - One upload request must contain exactly one image.
 - The system must reject files that are not supported image formats.
+- Supported input formats are JPEG and PNG; other formats are rejected.
 - The system must validate the actual file content rather than relying exclusively on the filename or declared MIME type.
 - The system must enforce configured file size and image dimension limits.
 - The system must reject empty, corrupted or unreadable image files.
