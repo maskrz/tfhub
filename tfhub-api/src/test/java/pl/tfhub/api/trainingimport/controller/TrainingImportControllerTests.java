@@ -11,8 +11,11 @@ import org.springframework.mock.web.MockMultipartFile;
 import pl.tfhub.api.trainingimport.dto.response.TrainingImportUploadResponse;
 import pl.tfhub.api.trainingimport.dto.response.TrainingImportAthleteCandidateResponse;
 import pl.tfhub.api.trainingimport.dto.response.TrainingImportDraftResponse;
+import pl.tfhub.api.trainingimport.dto.response.TrainingImportStatusResponse;
+import pl.tfhub.api.trainingimport.enums.TrainingImportAttemptStatus;
 import pl.tfhub.api.trainingimport.enums.TrainingImportStatus;
 import pl.tfhub.api.trainingimport.service.TrainingImportDraftService;
+import pl.tfhub.api.trainingimport.service.TrainingImportProcessingService;
 import pl.tfhub.api.trainingimport.service.TrainingImportSourceImageService;
 import pl.tfhub.api.trainingimport.service.TrainingImportUploadService;
 import pl.tfhub.api.traininggroup.dto.response.TrainingGroupResponse;
@@ -39,6 +42,9 @@ class TrainingImportControllerTests {
 
 	@MockitoBean
 	private TrainingImportSourceImageService sourceImageService;
+
+	@MockitoBean
+	private TrainingImportProcessingService processingService;
 
 	@Test
 	void acceptsExactlyOneImageAndReturnsUploadDetails() throws Exception {
@@ -164,6 +170,63 @@ class TrainingImportControllerTests {
 				.andExpect(status().isOk())
 				.andExpect(content().contentType(MediaType.IMAGE_JPEG))
 				.andExpect(content().bytes(new byte[] {(byte) 0xff, (byte) 0xd8}));
+	}
+
+	@Test
+	void retrievesSanitizedStatusAndRetriesWithAcceptedResponse() throws Exception {
+		TrainingImportStatusResponse statusResponse = new TrainingImportStatusResponse(
+				42,
+				7,
+				TrainingImportStatus.FAILED,
+				java.time.OffsetDateTime.parse("2026-11-12T10:00:00Z"),
+				false,
+				new TrainingImportStatusResponse.Attempt(
+						2,
+						TrainingImportAttemptStatus.FAILED,
+						java.time.OffsetDateTime.parse("2026-11-12T10:01:00Z"),
+						java.time.OffsetDateTime.parse("2026-11-12T10:02:00Z"),
+						"OUTPUT_VALIDATION_FAILED",
+						"The model response did not match the expected training data structure"));
+		when(processingService.getStatus(42L)).thenReturn(statusResponse);
+		when(processingService.retry(42L)).thenReturn(new TrainingImportStatusResponse(
+				42,
+				7,
+				TrainingImportStatus.PROCESSING,
+				statusResponse.createdAt(),
+				false,
+				new TrainingImportStatusResponse.Attempt(
+						3,
+						TrainingImportAttemptStatus.PROCESSING,
+						java.time.OffsetDateTime.parse("2026-11-12T10:03:00Z"),
+						null,
+						null,
+						null)));
+
+		mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+						.get("/api/training-imports/42"))
+				.andExpect(status().isOk())
+				.andExpect(content().json("""
+						{
+						  "id":42,
+						  "trainingGroupId":7,
+						  "status":"FAILED",
+						  "possibleDuplicate":false,
+						  "latestAttempt":{
+						    "attemptNumber":2,
+						    "status":"FAILED",
+						    "failureCode":"OUTPUT_VALIDATION_FAILED",
+						    "failureMessage":"The model response did not match the expected training data structure"
+						  }
+						}
+						""", false));
+
+		mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+						.post("/api/training-imports/42/retry"))
+				.andExpect(status().isAccepted())
+				.andExpect(content().json("{\"id\":42,\"status\":\"PROCESSING\"}"));
+
+		verify(processingService).getStatus(42L);
+		verify(processingService).retry(42L);
 	}
 
 	private MockMultipartHttpServletRequestBuilder uploadRequest() {

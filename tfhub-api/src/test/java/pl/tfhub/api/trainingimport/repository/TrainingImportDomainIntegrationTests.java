@@ -14,6 +14,8 @@ import java.math.BigDecimal;
 import java.util.Comparator;
 import java.util.Map;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -27,6 +29,7 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.testcontainers.containers.PostgreSQLContainer;
@@ -69,8 +72,11 @@ import pl.tfhub.api.trainingimport.repository.TrainingImportDraftSegmentReposito
 import pl.tfhub.api.trainingimport.repository.TrainingImportRepository;
 import pl.tfhub.api.trainingimport.repository.TrainingImportSourceImageRepository;
 import pl.tfhub.api.trainingimport.service.TrainingImportDraftService;
+import pl.tfhub.api.trainingimport.service.GeminiTrainingRecognitionClient;
 import pl.tfhub.api.trainingimport.service.TrainingImportImageProcessor;
 import pl.tfhub.api.trainingimport.service.TrainingImportImageStorage;
+import pl.tfhub.api.trainingimport.service.TrainingImportProcessingService;
+import pl.tfhub.api.trainingimport.service.TrainingImportProcessingStateService;
 import pl.tfhub.api.trainingimport.service.TrainingImportSourceImageService;
 import pl.tfhub.api.trainingimport.service.TrainingImportUploadService;
 import pl.tfhub.api.user.entity.User;
@@ -82,11 +88,15 @@ import pl.tfhub.api.user.service.AuthenticatedUser;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @SpringBootTest
@@ -151,6 +161,18 @@ class TrainingImportDomainIntegrationTests {
 	private TrainingImportUploadService uploadService;
 
 	@Autowired
+	private TrainingImportProcessingService processingService;
+
+	@Autowired
+	private TrainingImportProcessingStateService processingStateService;
+
+	@Autowired
+	private TrainingImportProperties trainingImportProperties;
+
+	@MockitoBean
+	private GeminiTrainingRecognitionClient geminiClient;
+
+	@Autowired
 	private TrainingImportDraftService draftService;
 
 	@Autowired
@@ -201,6 +223,7 @@ class TrainingImportDomainIntegrationTests {
 
 	@AfterEach
 	void clearSecurityContext() throws IOException {
+		trainingImportProperties.setProcessingEnabled(false);
 		SecurityContextHolder.clearContext();
 		clearImageDirectory(IMAGE_DIRECTORY);
 		Files.deleteIfExists(IMAGE_DIRECTORY);
@@ -465,6 +488,185 @@ class TrainingImportDomainIntegrationTests {
 		jdbcTemplate.update("DELETE FROM user_training_group WHERE user_id = 2 AND training_group_id = 1");
 		assertThrows(TrainingImportNotFoundException.class,
 				() -> sourceImageService.getSourceImage(trainingImport.getId()));
+	}
+
+	@Test
+	void processingPersistsValidatedDraftAndRawResponseWithoutExposingItInStatus() {
+		TrainingImport trainingImport = saveImportWithStoredImage(
+				1, "processing.jpg", "e".repeat(64), new byte[] {(byte) 0xff, (byte) 0xd8, 1, 2});
+		String rawResponse = "{\"provider\":\"private raw response\"}";
+		when(geminiClient.recognize(any())).thenReturn(
+				new GeminiTrainingRecognitionClient.GeminiRecognitionResponse(
+						rawResponse, validRecognition("Recognized session")));
+		Long attemptId = processingStateService.claimPending(trainingImport.getId());
+
+		processingService.processClaimedAttempt(attemptId);
+
+		TrainingImportAttempt attempt = attemptRepository.findById(attemptId).orElseThrow();
+		TrainingImportDraft draft = draftRepository.findByTrainingImport_Id(trainingImport.getId()).orElseThrow();
+		var status = processingService.getStatus(trainingImport.getId());
+		assertEquals(TrainingImportAttemptStatus.SUCCEEDED, attempt.getStatus());
+		assertEquals(rawResponse, attempt.getRawModelResponse());
+		assertEquals(TrainingImportStatus.REVIEW_REQUIRED, status.status());
+		assertEquals("Recognized session", draft.getName());
+		assertEquals(1L, count("training_import_draft_definitions"));
+		assertEquals(1L, count("training_import_draft_segments"));
+		assertEquals(1L, count("training_import_draft_athlete_rows"));
+		assertEquals(1L, count("training_import_draft_executions"));
+		assertEquals(0L, count("training_sessions"));
+		assertFalse(status.toString().contains(rawResponse));
+		verify(geminiClient, times(1)).recognize(any());
+	}
+
+	@Test
+	void invalidRecognitionFailsAttemptAndRetainsRawResponseWithoutTrainingWrites() {
+		TrainingImport trainingImport = saveImportWithStoredImage(
+				1, "invalid-processing.jpg", "f".repeat(64), new byte[] {(byte) 0xff, (byte) 0xd8, 1, 2});
+		String rawResponse = "{\"provider\":\"invalid response body\"}";
+		when(geminiClient.recognize(any())).thenReturn(
+				new GeminiTrainingRecognitionClient.GeminiRecognitionResponse(rawResponse, "{invalid"));
+		Long attemptId = processingStateService.claimPending(trainingImport.getId());
+
+		processingService.processClaimedAttempt(attemptId);
+
+		TrainingImportAttempt attempt = attemptRepository.findById(attemptId).orElseThrow();
+		var status = processingService.getStatus(trainingImport.getId());
+		assertEquals(TrainingImportAttemptStatus.FAILED, attempt.getStatus());
+		assertEquals(rawResponse, attempt.getRawModelResponse());
+		assertEquals("OUTPUT_VALIDATION_FAILED", status.latestAttempt().failureCode());
+		assertFalse(status.toString().contains(rawResponse));
+		assertEquals(0L, count("training_import_drafts"));
+		assertEquals(0L, count("training_sessions"));
+	}
+
+	@Test
+	void retryReplacesDraftOnlyAfterSuccessAndFailedRetryPreservesExistingDraft() {
+		TrainingImport trainingImport = saveReviewDraft(1, "retry.jpg");
+		String storageKey = imageStorage.store(new byte[] {(byte) 0xff, (byte) 0xd8, 1, 2});
+		jdbcTemplate.update(
+				"UPDATE training_import_source_images SET storage_key = ? WHERE import_id = ?",
+				storageKey, trainingImport.getId());
+		TrainingImportDraft originalDraft =
+				draftRepository.findByTrainingImport_Id(trainingImport.getId()).orElseThrow();
+		String originalDraftName = originalDraft.getName();
+		trainingImport.changeStatus(TrainingImportStatus.FAILED);
+		trainingImportRepository.saveAndFlush(trainingImport);
+
+		String failedRawResponse = "{\"provider\":\"failed retry\"}";
+		when(geminiClient.recognize(any())).thenReturn(
+				new GeminiTrainingRecognitionClient.GeminiRecognitionResponse(
+						failedRawResponse, "{\"definitions\":[]}"));
+		Long failedAttemptId = processingStateService.claimRetry(trainingImport.getId());
+		processingService.processClaimedAttempt(failedAttemptId);
+		TrainingImportDraft afterFailure =
+				draftRepository.findByTrainingImport_Id(trainingImport.getId()).orElseThrow();
+		assertEquals(originalDraft.getId(), afterFailure.getId());
+		assertEquals(originalDraftName, afterFailure.getName());
+		assertEquals(TrainingImportStatus.FAILED,
+				trainingImportRepository.findById(trainingImport.getId()).orElseThrow().getStatus());
+
+		trainingImport = trainingImportRepository.findById(trainingImport.getId()).orElseThrow();
+		String successfulRawResponse = "{\"provider\":\"successful retry\"}";
+		when(geminiClient.recognize(any())).thenReturn(
+				new GeminiTrainingRecognitionClient.GeminiRecognitionResponse(
+						successfulRawResponse, validRecognition("Replacement session")));
+		Long successfulAttemptId = processingStateService.claimRetry(trainingImport.getId());
+		processingService.processClaimedAttempt(successfulAttemptId);
+
+		TrainingImportAttempt successfulAttempt =
+				attemptRepository.findById(successfulAttemptId).orElseThrow();
+		assertEquals(TrainingImportAttemptStatus.SUCCEEDED, successfulAttempt.getStatus(),
+				successfulAttempt.getFailureCode() + ": " + successfulAttempt.getFailureMessage());
+		TrainingImportDraft afterSuccess =
+				draftRepository.findByTrainingImport_Id(trainingImport.getId()).orElseThrow();
+		assertEquals(originalDraft.getId(), afterSuccess.getId());
+		assertEquals("Replacement session", afterSuccess.getName());
+		assertEquals(successfulAttemptId, afterSuccess.getGeneratedByAttempt().getId());
+		assertEquals(TrainingImportStatus.REVIEW_REQUIRED,
+				trainingImportRepository.findById(trainingImport.getId()).orElseThrow().getStatus());
+		assertEquals(TrainingImportAttemptStatus.FAILED,
+				attemptRepository.findById(failedAttemptId).orElseThrow().getStatus());
+		assertEquals(failedRawResponse,
+				attemptRepository.findById(failedAttemptId).orElseThrow().getRawModelResponse());
+		assertEquals(successfulRawResponse,
+				attemptRepository.findById(successfulAttemptId).orElseThrow().getRawModelResponse());
+		assertEquals(0L, count("training_sessions"));
+		verify(geminiClient, times(2)).recognize(any());
+	}
+
+	@Test
+	void duplicatePendingClaimDoesNotCreateAnotherAttemptOrCallGemini() {
+		TrainingImport trainingImport = saveImportWithStoredImage(
+				1, "duplicate-claim.jpg", "1".repeat(64), new byte[] {(byte) 0xff, (byte) 0xd8, 1, 2});
+
+		Long firstAttemptId = processingStateService.claimPending(trainingImport.getId());
+		Long duplicateAttemptId = processingStateService.claimPending(trainingImport.getId());
+
+		assertNotNull(firstAttemptId);
+		assertNull(duplicateAttemptId);
+		assertEquals(1L, count("training_import_attempts"));
+		verify(geminiClient, never()).recognize(any());
+	}
+
+	@Test
+	void pendingUploadIsProcessedAsynchronouslyByTheQueuePoller() throws Exception {
+		trainingImportProperties.setProcessingEnabled(true);
+		CountDownLatch recognitionStarted = new CountDownLatch(1);
+		when(geminiClient.recognize(any())).thenAnswer(invocation -> {
+			recognitionStarted.countDown();
+			return new GeminiTrainingRecognitionClient.GeminiRecognitionResponse(
+					"{\"provider\":\"async\"}", validRecognition("Asynchronous session"));
+		});
+
+		TrainingImportUploadResponse upload = uploadService.upload(1, createUpload("async.png"));
+
+		assertEquals(TrainingImportStatus.PENDING, upload.status());
+		verify(geminiClient, never()).recognize(any());
+		processingService.scheduleNextPendingImport();
+		assertTrue(recognitionStarted.await(5, TimeUnit.SECONDS));
+
+		long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+		TrainingImportStatus status = TrainingImportStatus.PROCESSING;
+		while (status == TrainingImportStatus.PROCESSING && System.nanoTime() < deadline) {
+			status = trainingImportRepository.findById(upload.id()).orElseThrow().getStatus();
+			if (status == TrainingImportStatus.PROCESSING) {
+				Thread.sleep(25);
+			}
+		}
+
+		assertEquals(TrainingImportStatus.REVIEW_REQUIRED, status);
+		assertEquals("Asynchronous session",
+				draftRepository.findByTrainingImport_Id(upload.id()).orElseThrow().getName());
+		assertEquals(0L, count("training_sessions"));
+		verify(geminiClient, times(1)).recognize(any());
+		trainingImportProperties.setProcessingEnabled(false);
+	}
+
+	private String validRecognition(String trainingName) {
+		return """
+				{
+				  "name":{"value":"%s","originalText":"%s","uncertain":false,"uncertaintyReason":null},
+				  "trainingDate":{"value":"2026-11-10","originalText":"10.11.2026","uncertain":false,"uncertaintyReason":null},
+				  "recognizedGroupName":"Group A",
+				  "definitions":[{
+				    "sequenceNumber":1,
+				    "name":{"value":"Main set","originalText":"Main set","uncertain":false,"uncertaintyReason":null},
+				    "segments":[{
+				      "sequenceNumber":1,
+				      "distanceM":{"value":"400","originalText":"400 m","uncertain":false,"uncertaintyReason":null},
+				      "restAfterSeconds":{"value":"60","originalText":"60 s","uncertain":false,"uncertaintyReason":null}
+				    }],
+				    "athleteRows":[{
+				      "recognizedName":"Ada Lovelace","firstName":"Ada","lastName":"Lovelace",
+				      "uncertain":false,"uncertaintyReason":null,
+				      "executions":[{
+				        "segmentSequenceNumber":1,"recognizedText":"12.3","status":"RECORDED",
+				        "measuredResult":"12.3","usesSpikes":true,"uncertain":false,"uncertaintyReason":null
+				      }]
+				    }]
+				  }]
+				}
+				""".formatted(trainingName, trainingName);
 	}
 
 	private TrainingImport saveImportWithImage(String filename, String hash) {

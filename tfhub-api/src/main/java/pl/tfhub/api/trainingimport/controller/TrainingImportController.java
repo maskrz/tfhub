@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.multipart.MultipartHttpServletRequest;
 import pl.tfhub.api.trainingimport.dto.response.TrainingImportUploadResponse;
+import pl.tfhub.api.trainingimport.dto.response.TrainingImportStatusResponse;
 import pl.tfhub.api.trainingimport.dto.response.TrainingImportAthleteCandidateResponse;
 import pl.tfhub.api.trainingimport.dto.response.TrainingImportDraftResponse;
 import pl.tfhub.api.trainingimport.dto.request.TrainingImportDraftUpdateRequest;
@@ -23,6 +24,7 @@ import pl.tfhub.api.trainingimport.exception.InvalidTrainingImportUploadExceptio
 import pl.tfhub.api.trainingimport.service.TrainingImportDraftService;
 import pl.tfhub.api.trainingimport.service.TrainingImportSourceImageService;
 import pl.tfhub.api.trainingimport.service.TrainingImportUploadService;
+import pl.tfhub.api.trainingimport.service.TrainingImportProcessingService;
 
 @RestController
 @RequestMapping("/api/training-imports")
@@ -31,14 +33,17 @@ public class TrainingImportController {
 	private final TrainingImportUploadService uploadService;
 	private final TrainingImportDraftService draftService;
 	private final TrainingImportSourceImageService sourceImageService;
+	private final TrainingImportProcessingService processingService;
 
 	public TrainingImportController(
 			TrainingImportUploadService uploadService,
 			TrainingImportDraftService draftService,
-			TrainingImportSourceImageService sourceImageService) {
+			TrainingImportSourceImageService sourceImageService,
+			TrainingImportProcessingService processingService) {
 		this.uploadService = uploadService;
 		this.draftService = draftService;
 		this.sourceImageService = sourceImageService;
+		this.processingService = processingService;
 	}
 
 	@PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
@@ -51,6 +56,16 @@ public class TrainingImportController {
 			throw new InvalidTrainingImportUploadException("Exactly one image file is required");
 		}
 		return ResponseEntity.accepted().body(uploadService.upload(trainingGroupId, images.get(0)));
+	}
+
+	@GetMapping("/{importId}")
+	public TrainingImportStatusResponse getStatus(@PathVariable long importId) {
+		return processingService.getStatus(importId);
+	}
+
+	@PostMapping("/{importId}/retry")
+	public ResponseEntity<TrainingImportStatusResponse> retry(@PathVariable long importId) {
+		return ResponseEntity.accepted().body(processingService.retry(importId));
 	}
 
 	@GetMapping("/{importId}/draft")

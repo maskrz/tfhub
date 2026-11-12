@@ -43,6 +43,8 @@ import pl.tfhub.api.trainingimport.exception.TrainingImportDraftNotFoundExceptio
 import pl.tfhub.api.trainingimport.exception.TrainingImportImageStorageException;
 import pl.tfhub.api.trainingimport.exception.TrainingImportNotFoundException;
 import pl.tfhub.api.trainingimport.exception.TrainingImportNotReviewableException;
+import pl.tfhub.api.trainingimport.exception.TrainingImportNotRetryableException;
+import pl.tfhub.api.trainingimport.exception.TrainingImportWorkerUnavailableException;
 import pl.tfhub.api.user.exception.IncorrectCurrentPasswordException;
 import pl.tfhub.api.backup.BackupAlreadyRunningException;
 import pl.tfhub.api.backup.BackupExecutionException;
@@ -239,6 +241,22 @@ public class ApiExceptionHandler {
 	public ProblemDetail handleTrainingImportNotReviewable(TrainingImportNotReviewableException exception) {
 		ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, exception.getMessage());
 		problem.setTitle("Training import is not reviewable");
+		return problem;
+	}
+
+	@ExceptionHandler(TrainingImportNotRetryableException.class)
+	public ProblemDetail handleTrainingImportNotRetryable(TrainingImportNotRetryableException exception) {
+		ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, exception.getMessage());
+		problem.setTitle("Training import cannot be retried");
+		return problem;
+	}
+
+	@ExceptionHandler(TrainingImportWorkerUnavailableException.class)
+	public ProblemDetail handleTrainingImportWorkerUnavailable(
+			TrainingImportWorkerUnavailableException exception) {
+		ProblemDetail problem = ProblemDetail.forStatusAndDetail(
+				HttpStatus.SERVICE_UNAVAILABLE, exception.getMessage());
+		problem.setTitle("Training import worker is unavailable");
 		return problem;
 	}
 

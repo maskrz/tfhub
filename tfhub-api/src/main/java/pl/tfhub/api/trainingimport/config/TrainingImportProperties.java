@@ -26,6 +26,30 @@ public class TrainingImportProperties {
 	@Positive
 	private long maxImagePixels = 24_000_000;
 
+	private boolean processingEnabled = true;
+
+	private String geminiApiKey = "";
+
+	private String geminiModel = "";
+
+	@Positive
+	private int geminiMaxOutputTokens = 8_192;
+
+	@Positive
+	private long geminiConnectTimeoutMs = 5_000;
+
+	@Positive
+	private long processingRequestTimeoutMs = 90_000;
+
+	@Positive
+	private long processingStaleTimeoutMs = 1_200_000;
+
+	@Positive
+	private long processingPollIntervalMs = 5_000;
+
+	@Positive
+	private int processingQueueCapacity = 8;
+
 	public Path getStoragePath() {
 		return storagePath;
 	}
@@ -64,5 +88,77 @@ public class TrainingImportProperties {
 
 	public void setMaxImagePixels(long maxImagePixels) {
 		this.maxImagePixels = maxImagePixels;
+	}
+
+	public boolean isProcessingEnabled() {
+		return processingEnabled;
+	}
+
+	public void setProcessingEnabled(boolean processingEnabled) {
+		this.processingEnabled = processingEnabled;
+	}
+
+	public String getGeminiApiKey() {
+		return geminiApiKey;
+	}
+
+	public void setGeminiApiKey(String geminiApiKey) {
+		this.geminiApiKey = geminiApiKey;
+	}
+
+	public String getGeminiModel() {
+		return geminiModel;
+	}
+
+	public void setGeminiModel(String geminiModel) {
+		this.geminiModel = geminiModel;
+	}
+
+	public int getGeminiMaxOutputTokens() {
+		return geminiMaxOutputTokens;
+	}
+
+	public void setGeminiMaxOutputTokens(int geminiMaxOutputTokens) {
+		this.geminiMaxOutputTokens = geminiMaxOutputTokens;
+	}
+
+	public long getGeminiConnectTimeoutMs() {
+		return geminiConnectTimeoutMs;
+	}
+
+	public void setGeminiConnectTimeoutMs(long geminiConnectTimeoutMs) {
+		this.geminiConnectTimeoutMs = geminiConnectTimeoutMs;
+	}
+
+	public long getProcessingRequestTimeoutMs() {
+		return processingRequestTimeoutMs;
+	}
+
+	public void setProcessingRequestTimeoutMs(long processingRequestTimeoutMs) {
+		this.processingRequestTimeoutMs = processingRequestTimeoutMs;
+	}
+
+	public long getProcessingStaleTimeoutMs() {
+		return processingStaleTimeoutMs;
+	}
+
+	public void setProcessingStaleTimeoutMs(long processingStaleTimeoutMs) {
+		this.processingStaleTimeoutMs = processingStaleTimeoutMs;
+	}
+
+	public long getProcessingPollIntervalMs() {
+		return processingPollIntervalMs;
+	}
+
+	public void setProcessingPollIntervalMs(long processingPollIntervalMs) {
+		this.processingPollIntervalMs = processingPollIntervalMs;
+	}
+
+	public int getProcessingQueueCapacity() {
+		return processingQueueCapacity;
+	}
+
+	public void setProcessingQueueCapacity(int processingQueueCapacity) {
+		this.processingQueueCapacity = processingQueueCapacity;
 	}
 }

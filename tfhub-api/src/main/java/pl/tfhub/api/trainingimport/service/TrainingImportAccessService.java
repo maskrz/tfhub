@@ -24,11 +24,22 @@ public class TrainingImportAccessService {
 
 	@Transactional(readOnly = true)
 	public TrainingImport getAccessibleImport(long importId) {
+		return findAccessibleImport(importId, false);
+	}
+
+	@Transactional
+	public TrainingImport getAccessibleImportForUpdate(long importId) {
+		return findAccessibleImport(importId, true);
+	}
+
+	private TrainingImport findAccessibleImport(long importId, boolean lock) {
 		if (importId <= 0) {
 			throw new InvalidTrainingImportIdException();
 		}
 		accessScopeService.requireCoachOrAdmin();
-		TrainingImport trainingImport = importRepository.findById(importId)
+		TrainingImport trainingImport = (lock
+				? importRepository.findByIdForUpdate(importId)
+				: importRepository.findById(importId))
 				.orElseThrow(() -> new TrainingImportNotFoundException(importId));
 		if (accessScopeService.currentUser().role() == UserRole.COACH
 				&& !accessScopeService.assignedGroupIds().contains(trainingImport.getTrainingGroup().getId())) {

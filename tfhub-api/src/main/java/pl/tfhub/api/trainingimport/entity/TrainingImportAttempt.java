@@ -135,4 +135,32 @@ public class TrainingImportAttempt {
 	public String getFailureMessage() {
 		return failureMessage;
 	}
+
+	public void markSucceeded(OffsetDateTime finishedAt, String rawModelResponse) {
+		requireProcessing();
+		this.status = TrainingImportAttemptStatus.SUCCEEDED;
+		this.finishedAt = finishedAt;
+		this.rawModelResponse = rawModelResponse;
+		this.failureCode = null;
+		this.failureMessage = null;
+	}
+
+	public void markFailed(
+			OffsetDateTime finishedAt,
+			String rawModelResponse,
+			String failureCode,
+			String failureMessage) {
+		requireProcessing();
+		this.status = TrainingImportAttemptStatus.FAILED;
+		this.finishedAt = finishedAt;
+		this.rawModelResponse = rawModelResponse;
+		this.failureCode = failureCode;
+		this.failureMessage = failureMessage;
+	}
+
+	private void requireProcessing() {
+		if (status != TrainingImportAttemptStatus.PROCESSING || finishedAt != null) {
+			throw new IllegalStateException("Only a processing attempt can be completed");
+		}
+	}
 }

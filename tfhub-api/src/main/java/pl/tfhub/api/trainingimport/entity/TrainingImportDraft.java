@@ -76,6 +76,16 @@ public class TrainingImportDraft {
 				: Collections.unmodifiableMap(new LinkedHashMap<>(recognitionMetadata));
 	}
 
+	public void replaceGeneratedContent(
+			TrainingImportAttempt generatedByAttempt,
+			String name,
+			LocalDate trainingDate,
+			Map<String, Object> recognitionMetadata) {
+		this.generatedByAttempt = Objects.requireNonNull(generatedByAttempt);
+		update(name, trainingDate);
+		setRecognitionMetadata(recognitionMetadata);
+	}
+
 	public Long getId() {
 		return id;
 	}
