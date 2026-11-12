@@ -228,14 +228,16 @@
       </fieldset>
     </form>
 
-    <dialog #confirmDialog (cancel)="$event.preventDefault(); closeDialog()">
-      @switch (dialogAction()) {
+    <dialog #confirmDialog class="confirmation-modal" (cancel)="$event.preventDefault(); closeDialog()">
+      <div class="modal-content">
+        @switch (dialogAction()) {
         @case ('accept') { <h2>Zaakceptować import?</h2><p>Powstanie trening z zapisanych danych importu.</p> }
         @case ('reject') { <h2>Odrzucić import?</h2><p>Import zostanie zamknięty bez tworzenia treningu. Niezapisane zmiany nie zostaną zachowane.</p> }
         @case ('remove-definition') { <h2>Usunąć podgrupę?</h2><p>Podgrupa i powiązane dane zawodników oraz wyników zostaną usunięte z wersji roboczej po zapisaniu.</p> }
         @case ('remove-segment') { <h2>Usunąć odcinek?</h2><p>Powiązane wyniki tego odcinka zostaną usunięte z wersji roboczej po zapisaniu.</p> }
-      }
-      <div class="actions">
+        }
+      </div>
+      <div class="modal-footer">
         <button type="button" class="button button--secondary" [disabled]="busy()" (click)="closeDialog()">Anuluj</button>
         <button type="button" class="button button--primary" [disabled]="busy()" (click)="confirmDialogAction()">
           @if (dialogAction() === 'accept') { Zaakceptuj trening }

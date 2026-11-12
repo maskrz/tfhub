@@ -7,6 +7,7 @@ import java.util.Map;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import pl.tfhub.api.training.dto.request.AddTrainingParticipationRequest;
+import pl.tfhub.api.training.dto.request.CompleteTrainingRequest;
 import pl.tfhub.api.training.dto.request.CreateTrainingDefinitionRequest;
 import pl.tfhub.api.training.dto.request.CreateTrainingRequest;
 import pl.tfhub.api.training.dto.request.CreateTrainingSegmentRequest;
@@ -115,7 +116,8 @@ public class TrainingImportFinalizationService {
 			}
 		}
 
-		trainingCompletionService.addImportedParticipations(created.id(), participations);
+		trainingCompletionService.completeTraining(
+				created.id(), new CompleteTrainingRequest(participations, List.of(), List.of()));
 		trainingImport.accept(created.id());
 		importRepository.saveAndFlush(trainingImport);
 		return new TrainingImportAcceptanceResponse(

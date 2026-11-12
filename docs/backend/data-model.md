@@ -286,7 +286,7 @@ No separate Competition entity is required initially.
 
 ## 7 Training Session Status
 
-Each persisted training session has a required `status` column stored as `VARCHAR(20)`, defaulting to `PLANNED` and constrained to `PLANNED` or `COMPLETED`. The Java enum values match. New sessions created directly or from an accepted import start as `PLANNED`. The first successful UC-510 save changes the status to `COMPLETED`, even when some segment executions remain `PENDING`; failed saves do not change it.
+Each persisted training session has a required `status` column stored as `VARCHAR(20)`, defaulting to `PLANNED` and constrained to `PLANNED` or `COMPLETED`. The Java enum values match. Sessions created directly start as `PLANNED`; accepting an import atomically creates a `COMPLETED` session. The first successful UC-510 save changes the status to `COMPLETED`, even when some segment executions remain `PENDING`; failed saves do not change it.
 
 The status describes workflow progress, not availability or authorization. Both planned and completed sessions remain accessible to authorized users and may be edited or corrected. There is no inactive training status; sessions are removed through the hard-delete operation.
 

@@ -316,10 +316,10 @@ Validate new OCR output before atomically replacing the current draft and settin
 
 Acceptance locks the import, then revalidates the draft, current coach-group authorization, and each matched athlete's current group. In one transaction:
 
-1. Create one `training_session` with status `PLANNED`, using the immutable import group.
+1. Create one `training_session` using the immutable import group.
 2. Create definitions, segments, matched participations, and executions.
 3. Omit skipped rows from persisted training data.
-4. Set the import's accepted-session link and `ACCEPTED` status.
+4. Mark the training `COMPLETED` and set the import's accepted-session link and `ACCEPTED` status.
 
 Any failure rolls back the session and all children and leaves the import unaccepted. Rejection changes status only and retains the optimized image, current draft, and processing attempts. Keep one current draft per import; do not add draft revisions, a review-edit audit log, or a separate review-history model.
 
@@ -329,7 +329,7 @@ Any failure rolls back the session and all children and leaves the import unacce
 - The retained source is the optimized JPEG. The original upload bytes are not retained.
 - Processing attempts retain the raw model response when one is returned; the response is not exposed to clients and is excluded from logs unless Gemini diagnostic logging is explicitly enabled.
 - Each import has one current editable draft and its processing-attempt records. User edits do not create draft versions or an audit trail.
-- Acceptance creates a `PLANNED` training session. The persisted training lifecycle uses `PLANNED` and `COMPLETED`, not the legacy `active` flag.
+- Acceptance creates a `COMPLETED` training session, even if some executions are `PENDING`. The persisted training lifecycle uses `PLANNED` and `COMPLETED`, not the legacy `active` flag.
 - Existing training groups have no lifecycle field; selecting an existing group does not include an active/inactive check.
 - Plan editing and participation/execution completion remain separate operations; import acceptance is the explicit atomic path that creates both.
 - Training measured results use seconds, `NUMERIC(12,3)`, and the nonnegative rule; they do not reuse the positive-only test-result rule.

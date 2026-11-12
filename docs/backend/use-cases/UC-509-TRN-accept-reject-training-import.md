@@ -44,7 +44,7 @@ Rejection must preserve the import, its current draft, processing attempts and o
 - An athlete may participate in only one training definition within the created training session.
 - Training definitions and segments must preserve their reviewed order.
 - Execution status, measured results and spike usage must preserve the values confirmed during review.
-- The created training session must have status `PLANNED`.
+- The created training session must have status `COMPLETED`, even if some executions remain `PENDING`.
 - The created training session must retain the immutable group selected during upload.
 - The import must transition to ACCEPTED only after the complete training session and its related data have been successfully persisted.
 
@@ -202,7 +202,7 @@ Use `POST /api/training-imports/{importId}/reject`.
 7. All athlete rows must be matched or explicitly skipped before acceptance.
 8. Only existing athletes belonging to the selected group can be persisted as participants.
 9. Skipped athlete rows do not create athlete participations or execution records.
-10. Acceptance creates exactly one training session with status `PLANNED`.
+10. Acceptance creates exactly one training session with status `COMPLETED`, even if some executions remain `PENDING`.
 11. The created training session contains the reviewed definitions, segments, participants and execution data. Import acceptance remains an atomic path that creates a complete session; normal post-creation participation and execution changes use UC-510.
 12. Execution statuses, measured results and spike usage are preserved.
 13. The import transitions to ACCEPTED only after successful creation of all training data.

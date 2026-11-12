@@ -47,7 +47,7 @@ The operation must enforce role-based access and training group visibility rules
 
 ### 4.4 Training Status
 
-- A newly created session has status `PLANNED`.
+- A session created directly through UC-502 has status `PLANNED`; acceptance of an import through UC-509 creates a `COMPLETED` session.
 - The first successful UC-510 completion save changes its status to `COMPLETED`, even if some execution values remain `PENDING`.
 - Completed sessions remain editable and can be corrected by authorized users.
 - Only planned sessions are included by default. Completed sessions are included only when the caller explicitly sets `includeCompleted=true`.

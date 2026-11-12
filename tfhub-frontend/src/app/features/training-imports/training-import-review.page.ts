@@ -416,7 +416,7 @@ export class TrainingImportReviewPage implements OnInit {
       takeUntilDestroyed(this.destroyRef),
     ).subscribe(() => {
       this.rejected.set(true);
-      this.message.set('Import został odrzucony. Trening nie został utworzony.');
+      void this.router.navigate(['/trainings']);
     });
   }
 

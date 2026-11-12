@@ -548,7 +548,14 @@ class TrainingImportDomainIntegrationTests {
 		assertEquals(3L, row.athlete().id());
 		assertEquals(2, row.executions().size());
 		assertEquals(new BigDecimal("12.340"), row.executions().getFirst().measuredResult());
-		finalizationService.accept(trainingImport.getId());
+		var accepted = finalizationService.accept(trainingImport.getId());
+		var training = trainingDetailsService.getTraining(accepted.trainingId());
+		assertEquals(pl.tfhub.api.training.enums.TrainingStatus.COMPLETED, training.status());
+		var addedExecutions = training.definitions().get(1).participations().getFirst().executions();
+		assertTrue(addedExecutions.stream().anyMatch(execution -> execution.status() == TrainingExecutionStatus.PENDING));
+		assertTrue(addedExecutions.stream().anyMatch(execution ->
+				execution.status() == TrainingExecutionStatus.RECORDED
+						&& new BigDecimal("12.340").compareTo(execution.measuredResult()) == 0));
 		assertEquals(2L, count("training_athlete_participations"));
 		assertEquals(4L, count("training_segment_executions"));
 	}
@@ -586,7 +593,7 @@ class TrainingImportDomainIntegrationTests {
 	}
 
 	@Test
-	void acceptsReviewedDraftAtomicallyAndCreatesPlannedTrainingWithExecutionData() {
+	void acceptsReviewedDraftAtomicallyAndCreatesCompletedTrainingWithExecutionData() {
 		TrainingImport trainingImport = saveReviewDraft(1, "accept.jpg");
 		TrainingImportDraftResponse initial = draftService.getDraft(trainingImport.getId());
 		TrainingImportDraftResponse reviewed = draftService.updateDraft(
@@ -606,7 +613,7 @@ class TrainingImportDomainIntegrationTests {
 		var training = trainingDetailsService.getTraining(accepted.trainingId());
 		assertEquals("Corrected intervals", training.name());
 		assertEquals(java.time.LocalDate.parse("2026-11-11"), training.trainingDate());
-		assertEquals(pl.tfhub.api.training.enums.TrainingStatus.PLANNED, training.status());
+		assertEquals(pl.tfhub.api.training.enums.TrainingStatus.COMPLETED, training.status());
 		assertEquals(1, training.definitions().size());
 		assertEquals(2, training.definitions().getFirst().segments().size());
 		assertEquals(1, training.definitions().getFirst().participations().size());
@@ -632,6 +639,8 @@ class TrainingImportDomainIntegrationTests {
 
 		var accepted = finalizationService.accept(skippedImport.getId());
 
+		assertEquals(pl.tfhub.api.training.enums.TrainingStatus.COMPLETED,
+				trainingDetailsService.getTraining(accepted.trainingId()).status());
 		assertEquals(0L, jdbcTemplate.queryForObject(
 				"SELECT COUNT(*) FROM training_athlete_participations WHERE training_session_id = ?",
 				Long.class, accepted.trainingId()));

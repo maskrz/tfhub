@@ -409,6 +409,7 @@ describe('TrainingImportReviewPage', () => {
 
   it('rejects only after confirmation and blocks duplicate or competing actions', async () => {
     await createPage();
+    const navigate = vi.spyOn(router, 'navigate').mockResolvedValue(true);
     const pending = new Subject<{ importId: number; status: 'REJECTED' }>();
     api.reject.mockReturnValue(pending);
     fixture.componentInstance.confirmReject();
@@ -424,8 +425,7 @@ describe('TrainingImportReviewPage', () => {
     pending.next({ importId: 21, status: 'REJECTED' });
     pending.complete();
     fixture.detectChanges();
-    expect(fixture.nativeElement.textContent).toContain('Import został odrzucony');
-    expect(fixture.nativeElement.textContent).toContain('Wróć do listy treningów');
+    expect(navigate).toHaveBeenCalledWith(['/trainings']);
   });
 
   it('opens and cancels rejection using the visible controls without making a request', async () => {
@@ -444,12 +444,14 @@ describe('TrainingImportReviewPage', () => {
 
   it('keeps unsaved data and permits retry when rejection fails', async () => {
     await createPage();
+    const navigate = vi.spyOn(router, 'navigate').mockResolvedValue(true);
     api.reject.mockReturnValue(throwError(() => new Error('network')));
     fixture.componentInstance.definitions.at(0).controls.name.setValue('Nowa nazwa');
     fixture.componentInstance.confirmReject();
     fixture.componentInstance.confirmDialogAction();
     fixture.detectChanges();
     expect(fixture.componentInstance.rejected()).toBe(false);
+    expect(navigate).not.toHaveBeenCalled();
     expect(fixture.componentInstance.definitions.at(0).controls.name.value).toBe('Nowa nazwa');
     expect(fixture.nativeElement.textContent).toContain('Nie udało się odrzucić');
   });

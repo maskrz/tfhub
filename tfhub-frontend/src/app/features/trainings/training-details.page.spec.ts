@@ -104,6 +104,8 @@ describe('TrainingDetailsPage', () => {
     expect(fixture.nativeElement.querySelector('a[href="/trainings/12/edit"]')?.textContent.trim()).toBe('Edytuj trening');
     expect(fixture.nativeElement.querySelector('a[href="/trainings/12/complete"]')?.textContent.trim()).toBe('Uzupełnij trening');
     expect(fixture.nativeElement.querySelector('.delete-training-button')).toBeTruthy();
+    expect(fixture.nativeElement.querySelectorAll('.training-actions')).toHaveLength(1);
+    expect(fixture.nativeElement.querySelectorAll('.training-actions > .button')).toHaveLength(3);
   });
 
   it('shows completed trainings with edit and completion actions', async () => {

@@ -103,12 +103,21 @@ input, select { box-sizing: border-box; max-width: 100%; width: 100%; }
 details label { margin-top: .5rem; }
 .actions, .item-actions { display: flex; flex-wrap: wrap; gap: .5rem; }
 .actions { justify-content: flex-end; }
-dialog { border: 1px solid #d8deea; border-radius: .75rem; max-width: min(32rem, 90vw); padding: 1.5rem; }
-dialog::backdrop { background: rgb(0 0 0 / 45%); }
+.confirmation-modal { border: 0; border-radius: .8rem; box-shadow: 0 1.2rem 3.5rem rgb(15 23 42 / 25%); color: #172033; max-height: min(90dvh, 42rem); max-width: min(34rem, calc(100vw - 2rem)); overflow: auto; padding: 0; width: 100%; }
+.confirmation-modal::backdrop { background: rgb(19 27 40 / 48%); }
+.modal-content { display: grid; gap: 1rem; padding: 1.5rem; }
+.modal-content h2 { color: #141c2b; font-size: 1.5rem; }
+.modal-content p { color: #39445a; line-height: 1.5; margin: 0; }
+.modal-footer { border-top: 1px solid #dce1ea; display: flex; flex-wrap: wrap; gap: .7rem; justify-content: flex-end; padding: 1rem 1.5rem; }
 .visually-hidden { clip-path: inset(50%); height: 1px; overflow: hidden; position: absolute; white-space: nowrap; width: 1px; }
 @media (max-width: 600px) {
   .page { gap: .75rem; }
   .summary-fields { display: grid; width: 100%; }
   .summary-fields input { min-width: 0; }
   th, td { padding: .65rem .75rem; }
+}
+@media (max-width: 520px) {
+  .confirmation-modal { border-radius: .7rem; max-height: 94dvh; max-width: calc(100vw - 1rem); }
+  .modal-content { padding: 1rem; }
+  .modal-footer { padding: .8rem 1rem; }
 }

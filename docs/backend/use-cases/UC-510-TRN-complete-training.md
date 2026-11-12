@@ -46,7 +46,7 @@ The training plan is managed separately through UC-503 – Edit Training.
 
 ### 3.4 Training Status
 
-- A newly created training has status `PLANNED`.
+- A training created directly through UC-502 has status `PLANNED`; acceptance of an import through UC-509 creates a `COMPLETED` training.
 - The first successful UC-510 save changes its status to `COMPLETED`, regardless of whether some executions remain `PENDING`.
 - A failed save does not change the status.
 - A completed training remains editable through UC-503 and UC-510 so authorized users can correct its plan and execution data.
