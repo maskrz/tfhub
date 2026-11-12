@@ -1,0 +1,60 @@
+:host { display: contents; }
+
+.modal {
+  border: 0;
+  border-radius: .8rem;
+  box-shadow: 0 1.2rem 3.5rem rgb(15 23 42 / 25%);
+  color: #172033;
+  max-height: min(90dvh, 52rem);
+  max-width: min(42rem, calc(100vw - 2rem));
+  overflow: auto;
+  padding: 0;
+  width: 100%;
+}
+
+.modal::backdrop { background: rgb(19 27 40 / 48%); }
+.modal-header { align-items: center; border-bottom: 1px solid #dce1ea; display: flex; justify-content: space-between; padding: 1.25rem 1.5rem; }
+.modal-header h2 { font-size: 1.55rem; letter-spacing: -.025em; margin: 0; }
+.modal-content { display: grid; gap: 1.3rem; padding: 1.5rem; }
+.modal-footer { border-top: 1px solid #dce1ea; display: flex; flex-wrap: wrap; gap: .7rem; justify-content: flex-end; padding: 1rem 1.5rem; }
+.field { display: grid; gap: .45rem; min-width: 0; }
+.field label { color: #20283a; font-weight: 650; }
+.field label span { color: #bd3434; }
+.field-hint { color: #59667e; font-size: .9rem; }
+.field-error { color: #a12e2e; font-size: .9rem; }
+.groups-error { align-items: center; display: flex; flex-wrap: wrap; gap: .75rem; }
+.groups-error .button { min-height: 2.5rem; }
+.file-control {
+  background: #fff;
+  border: 1px solid var(--field-border);
+  border-radius: var(--field-radius);
+  color: var(--field-text);
+  min-height: var(--field-height);
+  padding: .55rem;
+  width: 100%;
+}
+.file-control:focus-visible { box-shadow: var(--field-focus-shadow); outline: 2px solid var(--field-border-focus); }
+.file-control:disabled { opacity: var(--button-disabled-opacity); }
+.file-control::file-selector-button {
+  background: #fff;
+  border: 1px solid var(--button-border);
+  border-radius: .45rem;
+  color: var(--button-secondary-text);
+  cursor: pointer;
+  font: inherit;
+  font-weight: 600;
+  margin-right: .75rem;
+  min-height: 2rem;
+  padding: .35rem .7rem;
+}
+.selected-file { color: #20283a; margin: 0; overflow-wrap: anywhere; }
+.feedback { border: 1px solid #d8deea; border-radius: .65rem; margin: 0; padding: .85rem 1rem; }
+.feedback.error { background: #fff1f1; border-color: #eccaca; color: #8d2929; }
+
+@media (max-width: 520px) {
+  .modal { border-radius: .7rem; max-height: 94dvh; max-width: calc(100vw - 1rem); }
+  .modal-header { padding: 1rem; }
+  .modal-content { padding: 1rem; }
+  .modal-footer { display: grid; grid-template-columns: 1fr 1fr; padding: .8rem 1rem; }
+  .modal-footer .button { justify-content: center; width: 100%; }
+}

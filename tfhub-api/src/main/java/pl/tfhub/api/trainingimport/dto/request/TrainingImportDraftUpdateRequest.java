@@ -32,7 +32,7 @@ public record TrainingImportDraftUpdateRequest(
 	public record Segment(
 			Long id,
 			@Positive int sequenceNumber,
-			@Positive int distanceM,
+			@Positive Integer distanceM,
 			@PositiveOrZero Integer restAfterSeconds,
 			boolean recognitionReviewed) {
 	}

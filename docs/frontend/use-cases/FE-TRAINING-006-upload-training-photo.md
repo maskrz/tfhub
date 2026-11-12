@@ -17,9 +17,9 @@ Allow an authorized user to upload one training-sheet photo and start an asynchr
 2. The frontend loads available groups using the existing accessible-groups API.
 3. The user selects one group and one training-sheet image.
 4. The frontend submits `trainingGroupId` and the image as multipart form data to `POST /api/training-imports`.
-5. On success, the frontend shows the duplicate warning if indicated by the response and opens the import status/review route using the returned import ID.
-6. The frontend polls `GET /api/training-imports/{importId}` while the import is `PENDING` or `PROCESSING`.
-7. When status becomes `REVIEW_REQUIRED`, the frontend opens FE-TRAINING-007. When status becomes `FAILED`, the frontend displays the processing error and offers retry on the import status view.
+5. On success, the modal closes and the training list refreshes active import rows, showing a duplicate warning when indicated.
+6. The training list polls `GET /api/training-imports` every five seconds while an import is `PENDING`, `PROCESSING`, or `FAILED` with a scheduled automatic retry.
+7. A `REVIEW_REQUIRED` row links to draft review. A `FAILED` row displays the safe processing error and offers retry on the training list.
 
 ## 4. Group and Image Selection
 
@@ -32,9 +32,9 @@ Allow an authorized user to upload one training-sheet photo and start an asynchr
 
 ## 5. Processing Status and Retry
 
-Display understandable Polish labels for `PENDING`, `PROCESSING`, `REVIEW_REQUIRED` and `FAILED`. Poll only while processing is active, stop polling when the page is left or a terminal/review state is reached, and do not use WebSockets.
+Display understandable Polish labels for `PENDING`, `PROCESSING`, `REVIEW_REQUIRED` and `FAILED`. Refresh the import list while processing is active or an automatic retry is scheduled, stop polling when the page is left or no import requires it, and do not use WebSockets.
 
-For `FAILED`, display the safe backend failure message and a **Ponów przetwarzanie** action. Disable repeated retry while the request is pending. Call `POST /api/training-imports/{importId}/retry`; on success resume polling. Retry uses the same retained optimized JPEG and must not create another import.
+For `FAILED`, display the safe backend failure message and a **Ponów przetwarzanie** action in its training-list row. Disable repeated retry while the request is pending. Call `POST /api/training-imports/{importId}/retry`; on success refresh the list and resume polling. Retry uses the same retained optimized JPEG and must not create another import.
 
 The frontend must not display raw model responses or internal storage paths. Acceptance is always a separate explicit action in FE-TRAINING-008.
 
@@ -53,15 +53,15 @@ The frontend must not display raw model responses or internal storage paths. Acc
 - Accepting or rejecting an import (FE-TRAINING-008).
 - Editing a persisted training or creating athletes.
 - Retaining or displaying the unoptimized upload.
-- Any backend changes.
+- Review, acceptance and rejection UI.
 
 ## 8. Acceptance Criteria
 
 1. ADMIN and COACH users can upload only for groups allowed by UC-506.
 2. The user must select exactly one group and one image.
 3. The upload is sent as multipart data to UC-506 and does not wait for OCR completion.
-4. Success displays the returned import status and possible-duplicate warning.
-5. `PENDING` and `PROCESSING` statuses are polled; `REVIEW_REQUIRED` proceeds to review and `FAILED` permits retry.
+4. Success refreshes the active-import rows and displays the possible-duplicate warning.
+5. Active processing and scheduled automatic retries are polled; `REVIEW_REQUIRED` links to review and `FAILED` permits retry.
 6. Retry calls UC-507, is not repeatable while pending, and resumes status polling.
 7. Upload or retry failure does not display success or create a misleading UI state.
 8. The selected group is read-only after upload.

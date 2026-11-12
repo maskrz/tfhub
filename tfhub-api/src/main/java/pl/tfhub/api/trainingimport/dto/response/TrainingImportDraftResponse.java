@@ -31,7 +31,7 @@ public record TrainingImportDraftResponse(
 	public record Segment(
 			long id,
 			int sequenceNumber,
-			int distanceM,
+			Integer distanceM,
 			Integer restAfterSeconds,
 			Map<String, Object> recognitionMetadata,
 			boolean recognitionReviewed) {

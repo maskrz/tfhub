@@ -8,9 +8,17 @@ import { MultiSelectDropdownComponent, MultiSelectOption } from '../../shared/mu
 import { TrainingListItem, TrainingStatus } from './training.model';
 import { TrainingsApiService } from './trainings-api.service';
 import { TrainingDeleteConfirmationComponent } from './training-delete-confirmation.component';
+import { TrainingImportUploadModalComponent } from '../training-imports/training-import-upload-modal.component';
+import { TrainingImportListItem, TrainingImportStatus, TrainingImportUploadResponse } from '../training-imports/training-import.model';
+import { TrainingImportsApiService } from '../training-imports/training-imports-api.service';
 
 @Component({
-  imports: [MultiSelectDropdownComponent, RouterLink, TrainingDeleteConfirmationComponent],
+  imports: [
+    MultiSelectDropdownComponent,
+    RouterLink,
+    TrainingDeleteConfirmationComponent,
+    TrainingImportUploadModalComponent,
+  ],
   selector: 'app-trainings-page',
   styleUrl: './trainings.page.scss',
   templateUrl: './trainings.page.html',
@@ -21,6 +29,12 @@ export class TrainingsPage implements OnInit {
   readonly errorMessage = signal<string | null>(null);
   readonly successMessage = signal<string | null>(null);
   readonly trainingPendingDeletion = signal<TrainingListItem | null>(null);
+  readonly importModalOpen = signal(false);
+  readonly imports = signal<TrainingImportListItem[]>([]);
+  readonly importsLoading = signal(false);
+  readonly importsError = signal<string | null>(null);
+  readonly retryingImportIds = signal<number[]>([]);
+  readonly importRetryErrors = signal<Record<number, string>>({});
   readonly query = signal('');
   readonly selectedGroupIds = signal<number[]>([]);
   readonly statusFilter = signal<'' | TrainingStatus>('');
@@ -74,10 +88,17 @@ export class TrainingsPage implements OnInit {
 
   readonly auth = inject(AuthService);
   private readonly api = inject(TrainingsApiService);
+  private readonly importsApi = inject(TrainingImportsApiService);
   private readonly destroyRef = inject(DestroyRef);
+  private importRefreshTimer: ReturnType<typeof setTimeout> | null = null;
+  private importRefreshPending = false;
 
   ngOnInit(): void {
     this.loadTrainings();
+    this.refreshImports();
+    this.destroyRef.onDestroy(() => {
+      if (this.importRefreshTimer !== null) clearTimeout(this.importRefreshTimer);
+    });
   }
 
   onSearchInput(event: Event): void {
@@ -139,6 +160,113 @@ export class TrainingsPage implements OnInit {
 
   closeDeletionConfirmation(): void {
     this.trainingPendingDeletion.set(null);
+  }
+
+  openImportModal(): void {
+    this.successMessage.set(null);
+    this.importModalOpen.set(true);
+  }
+
+  closeImportModal(): void {
+    this.importModalOpen.set(false);
+  }
+
+  onTrainingImportUploaded(response: TrainingImportUploadResponse): void {
+    this.importModalOpen.set(false);
+    this.successMessage.set(response.possibleDuplicate
+      ? 'Zdjęcie przesłano. Możliwy duplikat: istnieje podobny import treningu.'
+      : 'Zdjęcie przesłano do przetworzenia.');
+    this.refreshImports();
+  }
+
+  refreshImports(): void {
+    if (this.importRefreshTimer !== null) {
+      clearTimeout(this.importRefreshTimer);
+      this.importRefreshTimer = null;
+    }
+    if (this.importsLoading()) {
+      this.importRefreshPending = true;
+      return;
+    }
+    this.importsLoading.set(true);
+    this.importsApi.getActive().pipe(
+      catchError((error: unknown) => {
+        this.importsError.set(this.getImportErrorMessage(error, 'Nie udało się pobrać importów treningów.'));
+        return EMPTY;
+      }),
+      finalize(() => {
+        this.importsLoading.set(false);
+        if (this.destroyRef.destroyed) return;
+        if (this.importRefreshPending) {
+          this.importRefreshPending = false;
+          this.refreshImports();
+        } else if (this.imports().some((item) => this.importMayChange(item))) {
+          this.importRefreshTimer = setTimeout(() => this.refreshImports(), 5000);
+        }
+      }),
+      takeUntilDestroyed(this.destroyRef),
+    ).subscribe((imports) => {
+      this.imports.set(imports);
+      this.importsError.set(null);
+    });
+  }
+
+  retryImport(item: TrainingImportListItem): void {
+    if (item.status !== 'FAILED' || this.retryingImportIds().includes(item.id)) return;
+    this.retryingImportIds.update((ids) => [...ids, item.id]);
+    this.importRetryErrors.update((errors) => {
+      const updated = { ...errors };
+      delete updated[item.id];
+      return updated;
+    });
+    this.importsApi.retry(item.id).pipe(
+      catchError((error: unknown) => {
+        this.importRetryErrors.update((errors) => ({
+          ...errors,
+          [item.id]: this.getImportErrorMessage(error, 'Nie udało się ponowić przetwarzania.'),
+        }));
+        return EMPTY;
+      }),
+      finalize(() => this.retryingImportIds.update((ids) => ids.filter((id) => id !== item.id))),
+      takeUntilDestroyed(this.destroyRef),
+    ).subscribe((response) => {
+      this.imports.update((items) => items.map((current) => current.id === item.id
+        ? {
+          ...current,
+          status: response.status,
+          nextRetryAt: response.nextRetryAt,
+          failureMessage: response.latestAttempt?.failureMessage ?? null,
+        }
+        : current));
+      this.refreshImports();
+    });
+  }
+
+  importStatusLabel(status: TrainingImportStatus): string {
+    const labels: Record<TrainingImportStatus, string> = {
+      PENDING: 'Oczekuje na przetworzenie',
+      PROCESSING: 'Przetwarzanie',
+      REVIEW_REQUIRED: 'Wymaga weryfikacji',
+      FAILED: 'Błąd przetwarzania',
+      ACCEPTED: 'Zaakceptowany',
+      REJECTED: 'Odrzucony',
+    };
+    return labels[status];
+  }
+
+  private importMayChange(item: TrainingImportListItem): boolean {
+    return item.status === 'PENDING' || item.status === 'PROCESSING'
+      || (item.status === 'FAILED' && item.nextRetryAt !== null);
+  }
+
+  private getImportErrorMessage(error: unknown, fallback: string): string {
+    if (error instanceof HttpErrorResponse && error.status === 401) {
+      return 'Sesja wygasła lub użytkownik nie jest zalogowany.';
+    }
+    if (error instanceof HttpErrorResponse && error.status === 403) {
+      return 'Brak dostępu do importów treningów.';
+    }
+    return fallback;
   }
 
   onTrainingDeleted(trainingId: number): void {

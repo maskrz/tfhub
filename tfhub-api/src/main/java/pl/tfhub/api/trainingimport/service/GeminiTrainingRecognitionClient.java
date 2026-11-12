@@ -9,7 +9,10 @@ import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Base64;
+import java.util.UUID;
 import java.util.regex.Pattern;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
@@ -22,6 +25,7 @@ import pl.tfhub.api.trainingimport.config.TrainingImportProperties;
 @Component
 public class GeminiTrainingRecognitionClient {
 
+	private static final Logger LOGGER = LoggerFactory.getLogger(GeminiTrainingRecognitionClient.class);
 	private static final String API_ENDPOINT =
 			"https://generativelanguage.googleapis.com/v1beta/models/";
 	private static final Pattern MODEL_ID = Pattern.compile("[A-Za-z0-9._-]{1,100}");
@@ -53,6 +57,8 @@ public class GeminiTrainingRecognitionClient {
 
 		try {
 			String requestBody = objectMapper.writeValueAsString(createRequest(optimizedJpeg));
+			String diagnosticId = properties.isGeminiDiagnosticLoggingEnabled()
+					? UUID.randomUUID().toString() : null;
 			HttpRequest request = HttpRequest.newBuilder()
 					.uri(URI.create(API_ENDPOINT + model + ":generateContent"))
 					.timeout(Duration.ofMillis(properties.getProcessingRequestTimeoutMs()))
@@ -60,8 +66,16 @@ public class GeminiTrainingRecognitionClient {
 					.header("x-goog-api-key", apiKey)
 					.POST(HttpRequest.BodyPublishers.ofString(requestBody, StandardCharsets.UTF_8))
 					.build();
+			if (diagnosticId != null) {
+				LOGGER.info("Gemini diagnostic id={} request method=POST url={} content-type=application/json body={}",
+						diagnosticId, request.uri(), redactApiKey(requestBody, apiKey));
+			}
 			HttpResponse<String> response = httpClient.send(
 					request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+			if (diagnosticId != null) {
+				LOGGER.info("Gemini diagnostic id={} response status={} body={}",
+						diagnosticId, response.statusCode(), redactApiKey(response.body(), apiKey));
+			}
 			if (response.statusCode() < 200 || response.statusCode() >= 300) {
 				throw providerFailure(response.statusCode());
 			}
@@ -82,6 +96,12 @@ public class GeminiTrainingRecognitionClient {
 			throw new TrainingImportProcessingException(
 					"GEMINI_REQUEST_FAILED", "Gemini could not process the training image");
 		}
+	}
+
+	private String redactApiKey(String body, String apiKey) {
+		String escapedKey = objectMapper.writeValueAsString(apiKey);
+		escapedKey = escapedKey.substring(1, escapedKey.length() - 1);
+		return body.replace(apiKey, "[REDACTED]").replace(escapedKey, "[REDACTED]");
 	}
 
 	private ObjectNode createRequest(byte[] image) {

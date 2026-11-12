@@ -56,6 +56,12 @@ public class TrainingImportFinalizationService {
 		TrainingImport trainingImport = getReviewableImportForUpdate(importId);
 		TrainingImportDraftResponse draft = draftService.getDraft(importId);
 		if (!draft.validation().readyForAcceptance()) {
+			var distanceIssue = draft.validation().issues().stream()
+					.filter(issue -> issue.code().equals("SEGMENT_DISTANCE_UNRESOLVED"))
+					.findFirst();
+			if (distanceIssue.isPresent()) {
+				throw new InvalidTrainingImportDraftException(distanceIssue.get().message());
+			}
 			throw new InvalidTrainingImportDraftException(
 					"Training import draft contains unresolved validation issues");
 		}

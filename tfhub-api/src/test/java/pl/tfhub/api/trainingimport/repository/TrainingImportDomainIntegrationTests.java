@@ -82,6 +82,7 @@ import pl.tfhub.api.trainingimport.service.TrainingImportProcessingService;
 import pl.tfhub.api.trainingimport.service.TrainingImportProcessingStateService;
 import pl.tfhub.api.trainingimport.service.TrainingImportSourceImageService;
 import pl.tfhub.api.trainingimport.service.TrainingImportUploadService;
+import pl.tfhub.api.trainingimport.service.TrainingImportListService;
 import pl.tfhub.api.user.entity.User;
 import pl.tfhub.api.user.enums.UserRole;
 import pl.tfhub.api.user.repository.UserRepository;
@@ -168,6 +169,9 @@ class TrainingImportDomainIntegrationTests {
 
 	@Autowired
 	private TrainingImportUploadService uploadService;
+
+	@Autowired
+	private TrainingImportListService importListService;
 
 	@Autowired
 	private TrainingImportProcessingService processingService;
@@ -274,6 +278,62 @@ class TrainingImportDomainIntegrationTests {
 		assertTrue(second.isPossibleDuplicate());
 		assertTrue(sourceImageRepository.existsBySha256(TEST_HASH));
 		assertEquals(2L, sourceImageRepository.countBySha256(TEST_HASH));
+	}
+
+	@Test
+	void listsOnlyActiveImportsWithinCurrentGroupScopeWithSafeSummaryData() {
+		TrainingImport pending = saveImportWithImage(1, "pending.jpg", TEST_HASH);
+		TrainingImport failed = saveImportWithImage(1, "failed.jpg", TEST_HASH);
+		TrainingImport review = saveReviewDraft(2, "review.jpg");
+		TrainingImport rejected = saveImportWithImage(1, "rejected.jpg", TEST_HASH);
+		TrainingImport processing = saveImportWithImage(2, "processing.jpg", TEST_HASH);
+		TrainingImport accepted = saveImportWithImage(1, "accepted.jpg", TEST_HASH);
+		jdbcTemplate.update("UPDATE training_imports SET status = 'PROCESSING' WHERE id = ?", processing.getId());
+		jdbcTemplate.update("UPDATE training_imports SET status = 'FAILED', next_retry_at = CURRENT_TIMESTAMP WHERE id = ?",
+				failed.getId());
+		jdbcTemplate.update("UPDATE training_imports SET status = 'REJECTED' WHERE id = ?", rejected.getId());
+		jdbcTemplate.update("""
+				INSERT INTO training_sessions (id, name, training_date, training_group_id)
+				VALUES (1, 'Accepted training', CURRENT_DATE, 1)
+				""");
+		jdbcTemplate.update("""
+				UPDATE training_imports SET status = 'ACCEPTED', accepted_training_session_id = 1
+				WHERE id = ?
+				""", accepted.getId());
+		jdbcTemplate.update("""
+				INSERT INTO training_import_attempts
+					(import_id, attempt_number, model_name, status, started_at, finished_at, raw_model_response, failure_message)
+				VALUES (?, 1, 'model', 'FAILED', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 'private response', 'Safe failure')
+				""", failed.getId());
+		jdbcTemplate.update("""
+				INSERT INTO training_import_attempts
+					(import_id, attempt_number, model_name, status, started_at, finished_at, failure_message)
+				VALUES (?, 2, 'model', 'FAILED', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 'Latest safe failure')
+				""", failed.getId());
+
+		var adminList = importListService.listActive();
+		assertEquals(4, adminList.size());
+		assertEquals(processing.getId(), adminList.getFirst().id());
+		var failedSummary = adminList.stream().filter(item -> item.id() == failed.getId()).findFirst().orElseThrow();
+		assertEquals("Group A", failedSummary.trainingGroupName());
+		assertEquals("Latest safe failure", failedSummary.failureMessage());
+		assertNotNull(failedSummary.nextRetryAt());
+		var reviewSummary = adminList.stream().filter(item -> item.id() == review.getId()).findFirst().orElseThrow();
+		assertNotNull(reviewSummary.name());
+		assertNotNull(reviewSummary.trainingDate());
+
+		setAuthenticatedUser(2, UserRole.COACH);
+		var coachList = importListService.listActive();
+		assertEquals(2, coachList.size());
+		assertTrue(coachList.stream().anyMatch(item -> item.id() == pending.getId()));
+		assertFalse(coachList.stream().anyMatch(item -> item.id() == review.getId()));
+		jdbcTemplate.update("DELETE FROM user_training_group WHERE user_id = 2 AND training_group_id = 1");
+		assertTrue(importListService.listActive().isEmpty());
+
+		setAuthenticatedUser(3, UserRole.ATHLETE);
+		assertThrows(AccessDeniedException.class, () -> importListService.listActive());
+		SecurityContextHolder.clearContext();
+		assertThrows(AccessDeniedException.class, () -> importListService.listActive());
 	}
 
 	@Test
@@ -686,6 +746,96 @@ class TrainingImportDomainIntegrationTests {
 		assertEquals(0L, count("training_sessions"));
 		assertFalse(status.toString().contains(rawResponse));
 		verify(geminiClient, times(1)).recognize(any());
+	}
+
+	@Test
+	void unresolvedDistanceSurvivesProcessingAndCanBeCorrectedBeforeAcceptance() {
+		TrainingImport trainingImport = saveImportWithStoredImage(
+				1, "unresolved-distance.jpg", "c".repeat(64), new byte[] {(byte) 0xff, (byte) 0xd8, 1, 2});
+		when(geminiClient.recognize(any())).thenReturn(
+				new GeminiTrainingRecognitionClient.GeminiRecognitionResponse(
+						"raw", validRecognition("Recognized session").replace("\"value\":\"400\"", "\"value\":null")));
+		Long attemptId = processingStateService.claimPending(trainingImport.getId());
+		processingService.processClaimedAttempt(attemptId);
+
+		assertEquals(TrainingImportAttemptStatus.SUCCEEDED, attemptRepository.findById(attemptId).orElseThrow().getStatus());
+		TrainingImportDraftResponse response = draftService.getDraft(trainingImport.getId());
+		assertEquals(TrainingImportStatus.REVIEW_REQUIRED, response.status());
+		var definition = response.definitions().getFirst();
+		var segment = definition.segments().getFirst();
+		var row = definition.athleteRows().getFirst();
+		assertNull(segment.distanceM());
+		assertEquals(1, segment.sequenceNumber());
+		assertEquals(60, segment.restAfterSeconds());
+		assertEquals(Boolean.TRUE, segment.recognitionMetadata().get("uncertain"));
+		assertEquals(new BigDecimal("12.300"), row.executions().getFirst().measuredResult());
+		assertTrue(response.validation().issues().stream().anyMatch(issue ->
+				issue.code().equals("SEGMENT_DISTANCE_UNRESOLVED") && issue.path().endsWith("/segments/1/distanceM")));
+		var error = assertThrows(InvalidTrainingImportDraftException.class,
+				() -> finalizationService.accept(trainingImport.getId()));
+		assertTrue(error.getMessage().contains("Definition 1, segment 1"));
+		assertEquals(0L, count("training_sessions"));
+
+		var execution = row.executions().getFirst();
+		TrainingImportDraftUpdateRequest request = new TrainingImportDraftUpdateRequest(
+				response.name(), response.trainingDate(), false,
+				List.of(new TrainingImportDraftUpdateRequest.Definition(
+						definition.id(), definition.name(), definition.sequenceNumber(),
+						List.of(new TrainingImportDraftUpdateRequest.Segment(
+								segment.id(), segment.sequenceNumber(), 400, segment.restAfterSeconds(), true)),
+						List.of(new TrainingImportDraftUpdateRequest.AthleteRow(
+								row.id(), row.recognizedName(), row.athlete().id(), row.matchStatus(),
+								List.of(new TrainingImportDraftUpdateRequest.Execution(
+										execution.id(), execution.segmentSequenceNumber(), execution.status(),
+										execution.measuredResult(), execution.usesSpikes(), false)))))));
+		var corrected = draftService.updateDraft(trainingImport.getId(), request);
+		assertTrue(corrected.validation().readyForAcceptance());
+		var accepted = finalizationService.accept(trainingImport.getId());
+		var training = trainingDetailsService.getTraining(accepted.trainingId());
+		assertEquals(400, training.definitions().getFirst().segments().getFirst().distanceM());
+	}
+
+	@Test
+	void unparseableDistanceIsPersistedForReview() {
+		TrainingImport trainingImport = saveImportWithStoredImage(
+				1, "unparseable-distance.jpg", "c".repeat(64), new byte[] {(byte) 0xff, (byte) 0xd8, 1, 2});
+		when(geminiClient.recognize(any())).thenReturn(
+				new GeminiTrainingRecognitionClient.GeminiRecognitionResponse(
+						"raw", validRecognition("Recognized session").replace("\"value\":\"400\"", "\"value\":\"???\"")));
+		Long attemptId = processingStateService.claimPending(trainingImport.getId());
+		processingService.processClaimedAttempt(attemptId);
+		var result = draftService.getDraft(trainingImport.getId());
+		var segment = result.definitions().getFirst().segments().getFirst();
+		assertEquals(TrainingImportStatus.REVIEW_REQUIRED, result.status());
+		assertNull(segment.distanceM());
+		assertEquals(Boolean.TRUE, segment.recognitionMetadata().get("uncertain"));
+		assertEquals("Recognized session", result.name());
+		assertEquals("12.3", result.definitions().getFirst().athleteRows().getFirst()
+				.executions().getFirst().recognizedText());
+	}
+
+	@Test
+	void reviewCanSaveAnOtherwiseResolvedDraftWithAnUnresolvedDistance() {
+		TrainingImport trainingImport = saveReviewDraft(1, "partially-reviewed.jpg");
+		var original = draftService.getDraft(trainingImport.getId());
+		var valid = updateRequest(original, 1, false);
+		var definition = valid.definitions().getFirst();
+		var first = definition.segments().getFirst();
+		var unresolved = new TrainingImportDraftUpdateRequest(
+				valid.name(), valid.trainingDate(), valid.recognitionReviewed(),
+				List.of(new TrainingImportDraftUpdateRequest.Definition(
+						definition.id(), definition.name(), definition.sequenceNumber(),
+						List.of(new TrainingImportDraftUpdateRequest.Segment(
+										first.id(), first.sequenceNumber(), null, first.restAfterSeconds(), false),
+								definition.segments().get(1)),
+						definition.athleteRows())));
+		var saved = draftService.updateDraft(trainingImport.getId(), unresolved);
+		var segment = saved.definitions().getFirst().segments().get(1);
+		assertNull(segment.distanceM());
+		assertFalse(saved.validation().readyForAcceptance());
+		assertTrue(saved.validation().issues().stream().anyMatch(issue -> issue.code().equals("SEGMENT_DISTANCE_UNRESOLVED")));
+		assertEquals(2, saved.definitions().getFirst().segments().size());
+		assertEquals(2, saved.definitions().getFirst().athleteRows().getFirst().executions().size());
 	}
 
 	@Test

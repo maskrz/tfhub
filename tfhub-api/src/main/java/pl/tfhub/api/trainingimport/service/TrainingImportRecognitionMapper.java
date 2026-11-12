@@ -13,7 +13,9 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import tools.jackson.core.JacksonException;
+import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.node.ObjectNode;
 import org.springframework.stereotype.Component;
 import pl.tfhub.api.athlete.entity.Athlete;
 import pl.tfhub.api.athlete.repository.AthleteRepository;
@@ -55,16 +57,16 @@ public class TrainingImportRecognitionMapper {
 			List<TrainingImportRecognizedDraft.Segment> segments = new ArrayList<>();
 			for (TrainingImportRecognitionData.Segment segment : definition.segments()) {
 				validateSegment(segment, segmentSequences);
-				int distanceM = parsePositiveInteger(segment.distanceM().value(), "segment distance");
+				Integer distanceM = parseRecognizedDistance(segment.distanceM());
 				Integer restAfterSeconds = parseOptionalNonNegativeInteger(
 						segment.restAfterSeconds().value(), "segment rest");
 				Map<String, Object> metadata = new LinkedHashMap<>();
-				boolean segmentUncertain = isUncertain(segment.distanceM())
+				boolean segmentUncertain = distanceM == null || distanceUncertain(segment.distanceM())
 						|| isUncertain(segment.restAfterSeconds());
 				metadata.put("uncertain", segmentUncertain);
 				metadata.put("manuallyReviewed", false);
 				Map<String, Object> fields = new LinkedHashMap<>();
-				fields.put("distanceM", fieldMetadata(segment.distanceM()));
+				fields.put("distanceM", distanceMetadata(segment.distanceM(), distanceM));
 				fields.put("restAfterSeconds", fieldMetadata(segment.restAfterSeconds()));
 				metadata.put("fields", fields);
 				segments.add(new TrainingImportRecognizedDraft.Segment(
@@ -144,9 +146,47 @@ public class TrainingImportRecognitionMapper {
 			throw invalid("The model response did not contain structured training data");
 		}
 		try {
-			return objectMapper.readValue(candidateText, TrainingImportRecognitionData.class);
+			JsonNode root = objectMapper.readTree(candidateText);
+			normalizeDistanceFields(root);
+			return objectMapper.treeToValue(root, TrainingImportRecognitionData.class);
 		} catch (JacksonException | IllegalArgumentException exception) {
 			throw invalid("The model response did not match the expected training data structure");
+		}
+	}
+
+	private void normalizeDistanceFields(JsonNode root) {
+		JsonNode definitions = root.path("definitions");
+		if (!definitions.isArray()) {
+			return;
+		}
+		for (JsonNode definition : definitions) {
+			JsonNode segments = definition.path("segments");
+			if (!segments.isArray()) {
+				continue;
+			}
+			for (JsonNode segment : segments) {
+				if (!(segment instanceof ObjectNode segmentObject)) {
+					continue;
+				}
+				JsonNode field = segment.get("distanceM");
+				if (field != null && !field.isNull() && !(field instanceof ObjectNode)) {
+					String original = field.isTextual() ? field.textValue() : field.toString();
+					ObjectNode replacement = segmentObject.putObject("distanceM");
+					replacement.putNull("value");
+					replacement.put("originalText", original);
+					replacement.put("uncertain", true);
+				} else if (field instanceof ObjectNode fieldObject) {
+					JsonNode value = field.get("value");
+					if (value != null && (value.isArray() || value.isObject())) {
+						if (!field.hasNonNull("originalText")) {
+							fieldObject.put("originalText", value.toString());
+						}
+						fieldObject.putNull("value");
+					} else if (value != null && !value.isNull() && !value.isTextual()) {
+						fieldObject.put("value", value.toString());
+					}
+				}
+			}
 		}
 	}
 
@@ -185,11 +225,7 @@ public class TrainingImportRecognitionMapper {
 				|| !sequences.add(segment.sequenceNumber())) {
 			throw invalid("Training segment ordering is invalid");
 		}
-		requireField(segment.distanceM(), "segment distance");
 		requireField(segment.restAfterSeconds(), "segment rest");
-		if (segment.distanceM().value() == null) {
-			throw invalid("A training segment distance could not be recognized");
-		}
 	}
 
 	private void validateAthleteRow(TrainingImportRecognitionData.AthleteRow row) {
@@ -395,12 +431,36 @@ public class TrainingImportRecognitionMapper {
 		}
 	}
 
-	private int parsePositiveInteger(String value, String fieldName) {
-		int parsed = parseInteger(value, fieldName);
-		if (parsed <= 0) {
-			throw invalid("The recognized " + fieldName + " must be positive");
+	private Integer parseRecognizedDistance(TrainingImportRecognitionData.RecognizedField field) {
+		if (field == null || field.value() == null) {
+			return null;
 		}
-		return parsed;
+		try {
+			int value = Integer.parseInt(field.value().strip());
+			return value > 0 ? value : null;
+		} catch (NumberFormatException exception) {
+			return null;
+		}
+	}
+
+	private Map<String, Object> distanceMetadata(
+			TrainingImportRecognitionData.RecognizedField field, Integer distance) {
+		Map<String, Object> metadata = new LinkedHashMap<>();
+		metadata.put("uncertain", distance == null || distanceUncertain(field));
+		metadata.put("manuallyReviewed", false);
+		if (field != null) {
+			putIfPresent(metadata, "originalText",
+					field.originalText() != null ? field.originalText() : field.value());
+			putIfPresent(metadata, "uncertaintyReason", field.uncertaintyReason());
+		}
+		if (distance == null) {
+			metadata.putIfAbsent("uncertaintyReason", "Segment distance could not be recognized");
+		}
+		return Map.copyOf(metadata);
+	}
+
+	private boolean distanceUncertain(TrainingImportRecognitionData.RecognizedField field) {
+		return field == null || !Boolean.FALSE.equals(field.uncertain());
 	}
 
 	private Integer parseOptionalNonNegativeInteger(String value, String fieldName) {
@@ -429,7 +489,7 @@ public class TrainingImportRecognitionMapper {
 	}
 
 	private boolean isUncertain(TrainingImportRecognitionData.RecognizedField field) {
-		return Boolean.TRUE.equals(field.uncertain());
+		return field == null || Boolean.TRUE.equals(field.uncertain());
 	}
 
 	private Map<String, Object> fieldMetadata(TrainingImportRecognitionData.RecognizedField field) {

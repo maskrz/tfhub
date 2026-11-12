@@ -1,0 +1,62 @@
+<section class="page" aria-labelledby="page-title">
+  <div class="page-heading">
+    <h1 id="page-title">Status importu treningu</h1>
+    <p>Import pozostaje przypisany do wybranej grupy treningowej.</p>
+  </div>
+
+  @if (loading()) {
+    <p class="feedback" role="status">Pobieranie statusu importu...</p>
+  }
+
+  @if (errorMessage(); as message) {
+    <p class="feedback error" role="status">{{ message }}</p>
+  }
+
+  @if (importStatus(); as status) {
+    <section class="status-card" aria-label="Szczegóły importu">
+      <dl>
+        <div>
+          <dt>Status</dt>
+          <dd>{{ statusText(status.status) }}</dd>
+        </div>
+        <div>
+          <dt>Grupa treningowa</dt>
+          <dd>Grupa nr {{ status.trainingGroupId }}</dd>
+        </div>
+        <div>
+          <dt>Identyfikator importu</dt>
+          <dd>{{ status.id }}</dd>
+        </div>
+      </dl>
+
+      @if (status.possibleDuplicate) {
+        <p class="duplicate-warning" role="status">
+          Możliwy duplikat: istnieje podobny import treningu. Ten import jest przetwarzany niezależnie.
+        </p>
+      }
+
+      @if (status.status === 'PENDING' || status.status === 'PROCESSING') {
+        <p class="feedback" role="status">
+          {{ polling() ? 'Status jest automatycznie odświeżany.' : 'Oczekiwanie na aktualizację statusu...' }}
+        </p>
+      }
+
+      @if (status.status === 'FAILED') {
+        @if (status.latestAttempt?.failureMessage; as failureMessage) {
+          <p class="failure-message" role="alert">{{ failureMessage }}</p>
+        }
+        @if (retryErrorMessage(); as retryError) {
+          <p class="feedback error" role="alert">{{ retryError }}</p>
+        }
+        <button
+          type="button"
+          class="button button--primary"
+          [disabled]="retrying()"
+          (click)="retry()"
+        >
+          {{ retrying() ? 'Ponawianie...' : 'Ponów przetwarzanie' }}
+        </button>
+      }
+    </section>
+  }
+</section>

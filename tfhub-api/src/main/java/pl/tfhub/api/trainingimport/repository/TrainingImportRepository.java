@@ -10,8 +10,29 @@ import java.time.OffsetDateTime;
 import jakarta.persistence.LockModeType;
 import pl.tfhub.api.trainingimport.entity.TrainingImport;
 import pl.tfhub.api.trainingimport.enums.TrainingImportStatus;
+import pl.tfhub.api.trainingimport.dto.response.TrainingImportListItemResponse;
 
 public interface TrainingImportRepository extends JpaRepository<TrainingImport, Long> {
+
+	@Query("""
+			SELECT new pl.tfhub.api.trainingimport.dto.response.TrainingImportListItemResponse(
+				i.id, g.id, g.name, i.status, i.nextRetryAt, i.createdAt, i.possibleDuplicate,
+				d.name, d.trainingDate, a.failureMessage)
+			FROM TrainingImport i
+			JOIN i.trainingGroup g
+			LEFT JOIN TrainingImportDraft d ON d.trainingImport = i
+			LEFT JOIN TrainingImportAttempt a ON a.trainingImport = i
+				AND a.attemptNumber = (
+					SELECT MAX(latest.attemptNumber) FROM TrainingImportAttempt latest
+					WHERE latest.trainingImport = i
+				)
+			WHERE i.status IN :statuses AND (:admin = true OR g.id IN :groupIds)
+			ORDER BY i.createdAt DESC, i.id DESC
+			""")
+	java.util.List<TrainingImportListItemResponse> findActiveForGroups(
+			@Param("statuses") java.util.List<TrainingImportStatus> statuses,
+			@Param("admin") boolean admin,
+			@Param("groupIds") java.util.List<Long> groupIds);
 
 	@Lock(LockModeType.PESSIMISTIC_WRITE)
 	@Query("SELECT trainingImport FROM TrainingImport trainingImport WHERE trainingImport.id = :id")

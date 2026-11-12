@@ -47,8 +47,8 @@ public class TrainingImportDraftSegment {
 	@Column(name = "sequence_number", nullable = false)
 	private int sequenceNumber;
 
-	@Column(name = "distance_m", nullable = false)
-	private int distanceM;
+	@Column(name = "distance_m")
+	private Integer distanceM;
 
 	@Column(name = "rest_after_seconds")
 	private Integer restAfterSeconds;
@@ -64,7 +64,7 @@ public class TrainingImportDraftSegment {
 			TrainingImportDraft draft,
 			TrainingImportDraftDefinition definition,
 			int sequenceNumber,
-			int distanceM,
+			Integer distanceM,
 			Integer restAfterSeconds,
 			Map<String, Object> recognitionMetadata) {
 		this.draft = Objects.requireNonNull(draft);
@@ -73,8 +73,9 @@ public class TrainingImportDraftSegment {
 		setRecognitionMetadata(recognitionMetadata);
 	}
 
-	public void update(int sequenceNumber, int distanceM, Integer restAfterSeconds) {
-		if (sequenceNumber <= 0 || distanceM <= 0 || (restAfterSeconds != null && restAfterSeconds < 0)) {
+	public void update(int sequenceNumber, Integer distanceM, Integer restAfterSeconds) {
+		if (sequenceNumber <= 0 || (distanceM != null && distanceM <= 0)
+				|| (restAfterSeconds != null && restAfterSeconds < 0)) {
 			throw new IllegalArgumentException("Invalid training import draft segment");
 		}
 		this.sequenceNumber = sequenceNumber;
@@ -104,7 +105,7 @@ public class TrainingImportDraftSegment {
 		return sequenceNumber;
 	}
 
-	public int getDistanceM() {
+	public Integer getDistanceM() {
 		return distanceM;
 	}
 

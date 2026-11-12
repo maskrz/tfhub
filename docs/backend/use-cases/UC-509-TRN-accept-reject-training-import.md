@@ -57,6 +57,7 @@ Rejection must preserve the import, its current draft, processing attempts and o
 - The draft must contain at least one training definition.
 - Every definition must have a non-empty name and at least one valid segment.
 - Every segment must have a positive distance and valid unique ordering within its definition.
+- A null distance blocks acceptance; the validation error identifies the definition and segment.
 - All athlete rows must be explicitly matched or skipped.
 - All matched athletes must exist and belong to the selected group at the time of acceptance.
 - No athlete may be assigned to multiple definitions within the same training session.

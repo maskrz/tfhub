@@ -9,11 +9,46 @@ import pl.tfhub.api.training.enums.TrainingExecutionStatus;
 import pl.tfhub.api.trainingimport.enums.TrainingImportAthleteMatchStatus;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 class TrainingImportRecognitionMapperTests {
+
+	@Test
+	void retainsUnresolvedDistancesAndOtherRecognizedData() {
+		TrainingImportRecognitionMapper mapper =
+				new TrainingImportRecognitionMapper(new ObjectMapper(), mock(AthleteRepository.class));
+		String input = recognition("""
+				[{"recognizedName":"Runner Name","firstName":"Runner","lastName":"Name",
+				  "uncertain":false,"uncertaintyReason":null,"executions":%s}]
+				""".formatted(executions()));
+		for (String replacement : List.of("null", "\"\"", "\"not a distance\"", "\"0\"", "\"-10\"", "true")) {
+			var draft = mapper.validateAndMap(input.replace("\"value\":\"400\"", "\"value\":" + replacement), 7L);
+			var definition = draft.definitions().getFirst();
+			var segment = definition.segments().getFirst();
+			assertNull(segment.distanceM(), replacement);
+			assertEquals(1, segment.sequenceNumber());
+			assertEquals(60, segment.restAfterSeconds());
+			assertEquals(Boolean.TRUE, segment.recognitionMetadata().get("uncertain"));
+			assertEquals(200, definition.segments().get(1).distanceM());
+			assertEquals(TrainingExecutionStatus.RECORDED, definition.athleteRows().getFirst()
+					.executions().getFirst().status());
+		}
+		var draft = mapper.validateAndMap(input.replaceFirst(
+				"\"distanceM\":\\{[^}]*\\}", "\"distanceM\":null"), 7L);
+		assertNull(draft.definitions().getFirst().segments().getFirst().distanceM());
+		for (String field : List.of("\"distanceM\":\"\"", "\"distanceM\":{\"value\":{}}",
+				"\"distanceM\":{\"value\":[]}")) {
+			draft = mapper.validateAndMap(input.replaceFirst("\"distanceM\":\\{[^}]*\\}", field), 7L);
+			assertNull(draft.definitions().getFirst().segments().getFirst().distanceM(), field);
+			assertEquals(Boolean.TRUE, draft.definitions().getFirst().segments().getFirst()
+					.recognitionMetadata().get("uncertain"));
+		}
+		draft = mapper.validateAndMap(input.replace("\"value\":\"400\"", "\"value\":400"), 7L);
+		assertEquals(400, draft.definitions().getFirst().segments().getFirst().distanceM());
+	}
 
 	@Test
 	void normalizesTimesAndPreservesStatusSpikeAndUncertaintyIndependently() {

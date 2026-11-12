@@ -1,0 +1,161 @@
+<section class="page">
+  <header class="page-heading">
+    <div>
+      <a routerLink="/trainings" class="back-link">← Lista treningów</a>
+      <h1>Weryfikacja importu</h1>
+    </div>
+  </header>
+
+  @if (loading()) { <p role="status">Pobieranie importu...</p> }
+  @if (error(); as text) { <p class="feedback error" role="alert">{{ text }}</p> }
+  @if (message(); as text) { <p class="feedback" role="status">{{ text }}</p> }
+
+  @if (draft(); as current) {
+    <details class="card">
+      <summary>Zdjęcie do porównania</summary>
+      @if (imageError()) {
+        <p class="feedback error" role="alert">Nie udało się pobrać zdjęcia importu.</p>
+      } @else {
+        <img [src]="imageUrl()" alt="Zdjęcie zaimportowanego treningu" (error)="imageError.set(true)" />
+      }
+    </details>
+
+    @if (!current.validation.readyForAcceptance) {
+      <p class="feedback warning" role="status">
+        Import wymaga poprawienia lub potwierdzenia danych przed akceptacją.
+      </p>
+    }
+
+    <form [formGroup]="form" (ngSubmit)="save()">
+      <fieldset [disabled]="saving() || accepting()">
+        <div class="card">
+          <p>Grupa treningowa: <strong>{{ current.trainingGroup.name }}</strong></p>
+          <label>Nazwa treningu
+            <input type="text" formControlName="name" maxlength="255" required />
+          </label>
+          <label>Data treningu
+            <input type="date" formControlName="trainingDate" required />
+          </label>
+          @if (isUncertain(current.recognitionMetadata)) {
+            <label class="checkbox"><input type="checkbox" formControlName="recognitionReviewed" />
+              Potwierdzam nazwę, datę i nazwy wariantów
+            </label>
+          }
+        </div>
+
+        <div formArrayName="definitions">
+          @for (definition of current.definitions; track definition.id; let d = $index) {
+            <section class="card" [formGroupName]="d">
+              <h2>Wariant {{ definition.sequenceNumber }}</h2>
+              <label>Nazwa wariantu
+                <input type="text" formControlName="name" maxlength="255" required />
+              </label>
+              <div formArrayName="segments">
+                @for (segment of definition.segments; track segment.id; let s = $index) {
+                  <div class="item" [formGroupName]="s">
+                    <h3>Odcinek {{ segment.sequenceNumber }}</h3>
+                    <label>Dystans (m)
+                      <input type="number" formControlName="distanceM" min="1" max="2147483647" step="1"
+                        [attr.aria-describedby]="'distance-' + segment.id" />
+                    </label>
+                    <p [id]="'distance-' + segment.id" class="hint">
+                      @if (segment.distanceM === null) {
+                        Nie rozpoznano dystansu — wpisz dodatnią wartość przed akceptacją.
+                      } @else if (isUncertain(segment.recognitionMetadata)) {
+                        Rozpoznany dystans wymaga weryfikacji.
+                      }
+                      @if (originalDistance(segment); as text) { Odczyt ze zdjęcia: {{ text }} }
+                    </p>
+                    <label>Przerwa po odcinku (s)
+                      <input type="number" formControlName="restAfterSeconds" min="0" max="2147483647" step="1" />
+                    </label>
+                    @if (isUncertain(segment.recognitionMetadata)) {
+                      <label class="checkbox"><input type="checkbox" formControlName="recognitionReviewed" />
+                        Potwierdzam dane odcinka
+                      </label>
+                    }
+                  </div>
+                }
+              </div>
+              <div formArrayName="athleteRows">
+                @for (row of definition.athleteRows; track row.id; let r = $index) {
+                  <div class="item" [formGroupName]="r">
+                    <h3>Zawodnik: {{ row.recognizedName }}</h3>
+                    <label>Przypisanie
+                      <select formControlName="matchStatus">
+                        <option value="UNRESOLVED">Do rozstrzygnięcia</option>
+                        <option value="MATCHED">Przypisz zawodnika</option>
+                        <option value="SKIPPED">Pomiń wiersz</option>
+                      </select>
+                    </label>
+                    @if (rows(d).at(r).controls.matchStatus.value === 'MATCHED') {
+                      <label>Zawodnik z wybranej grupy
+                        <select formControlName="athleteId">
+                          <option [ngValue]="null">Wybierz zawodnika</option>
+                          @for (candidate of candidates(); track candidate.id) {
+                            <option [ngValue]="candidate.id">
+                              {{ candidate.firstName }} {{ candidate.lastName }}{{ candidate.birthYear ? ' (' + candidate.birthYear + ')' : '' }}
+                            </option>
+                          }
+                        </select>
+                      </label>
+                    }
+                    <div formArrayName="executions">
+                      @for (execution of row.executions; track execution.id; let e = $index) {
+                        <div class="execution" [formGroupName]="e">
+                          <h4>Odcinek {{ execution.segmentSequenceNumber }}</h4>
+                          @if (execution.recognizedText) { <p class="hint">Odczyt: {{ execution.recognizedText }}</p> }
+                          <label>Status
+                            <select formControlName="status">
+                              <option value="PENDING">Brak informacji</option>
+                              <option value="RECORDED">Zapisany wynik</option>
+                              <option value="COMPLETED_WITHOUT_RESULT">Ukończono bez wyniku</option>
+                              <option value="NOT_COMPLETED">Nie ukończono</option>
+                            </select>
+                          </label>
+                          <label>Wynik
+                            <input type="number" formControlName="measuredResult" min="0" step="0.001" />
+                          </label>
+                          <p class="hint">Wynik jest wymagany tylko dla statusu „Zapisany wynik”.</p>
+                          <label>Kolce
+                            <select formControlName="usesSpikes">
+                              <option [ngValue]="null">Do rozstrzygnięcia</option>
+                              <option [ngValue]="true">Tak</option>
+                              <option [ngValue]="false">Nie</option>
+                            </select>
+                          </label>
+                          @if (isUncertain(execution.recognitionMetadata)) {
+                            <label class="checkbox"><input type="checkbox" formControlName="recognitionReviewed" />
+                              Potwierdzam wynik i oznaczenia
+                            </label>
+                          }
+                        </div>
+                      }
+                    </div>
+                  </div>
+                }
+              </div>
+            </section>
+          }
+        </div>
+        <div class="actions">
+          <button type="submit" class="button button--secondary" [disabled]="saving() || accepting()">
+            {{ saving() ? 'Zapisywanie...' : 'Zapisz zmiany' }}
+          </button>
+          <button type="button" class="button button--primary"
+            [disabled]="saving() || accepting() || form.dirty || !current.validation.readyForAcceptance"
+            (click)="confirmAccept()">Zaakceptuj trening</button>
+        </div>
+      </fieldset>
+    </form>
+
+    <dialog #acceptDialog (cancel)="$event.preventDefault(); closeDialog()">
+      <h2>Zaakceptować import?</h2>
+      <p>Powstanie trening z zapisanych danych importu.</p>
+      <div class="actions">
+        <button type="button" class="button button--secondary" [disabled]="accepting()" (click)="closeDialog()">Anuluj</button>
+        <button type="button" class="button button--primary" [disabled]="accepting()" (click)="accept()">Zaakceptuj trening</button>
+      </div>
+    </dialog>
+  }
+</section>

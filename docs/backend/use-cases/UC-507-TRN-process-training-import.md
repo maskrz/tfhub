@@ -33,7 +33,7 @@ The process must not create or modify persisted training sessions or athlete exe
 - The system must prevent concurrent processing of the same import.
 - Processing must be associated with the original import identifier.
 - The system must track processing status and relevant timestamps.
-- Each attempt must retain the exact raw model response when the model returns one, including responses that fail validation. This troubleshooting data must not be exposed in API responses or application logs.
+- Each attempt must retain the exact raw model response when the model returns one, including responses that fail validation. This troubleshooting data must not be exposed in API responses or application logs by default. Explicit opt-in diagnostic logging may include request and response bodies as described in the training module design.
 - Processing failures must be recorded without exposing internal implementation details or API credentials.
 
 ### 4.2 Import Processing States
@@ -121,6 +121,7 @@ Additional recognition rules:
 - The draft must contain recognized training information, definitions, segments, participants and execution data.
 - The draft must preserve the association between each athlete, definition, segment and recognized execution.
 - The draft must include recognition uncertainty and unresolved athlete matching information.
+- A missing, empty, unparseable or non-positive segment distance is stored as null, flagged uncertain, and retained with its segment and other recognized data for review.
 - The draft must retain original recognized text where applicable.
 - The draft must be editable through UC-508.
 - Processing must not create persisted training session, definition, segment, participation or execution records.
@@ -240,7 +241,7 @@ When processing succeeds, the import must expose sufficient information to retri
 21. Processing never creates or modifies persisted training session or execution records.
 22. AI service failures and invalid responses do not produce an accepted draft.
 23. Processing status and failure information are persisted.
-24. The raw model response is retained per attempt when returned and is not exposed to clients or logs.
+24. The raw model response is retained per attempt when returned and is not exposed to clients or logged by default; explicitly enabled diagnostics may log it with the request body.
 25. Unauthorized users cannot retry processing.
 26. Temporary failures are retried automatically after 30 seconds, 2 minutes and 5 minutes, with no more than three automatic retries per processing cycle.
 27. The import remains FAILED while waiting for an automatic retry, and its status response includes the scheduled `nextRetryAt`.

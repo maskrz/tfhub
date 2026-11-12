@@ -32,6 +32,8 @@ public class TrainingImportProperties {
 
 	private String geminiModel = "";
 
+	private boolean geminiDiagnosticLoggingEnabled = false;
+
 	@Positive
 	private int geminiMaxOutputTokens = 8_192;
 
@@ -112,6 +114,14 @@ public class TrainingImportProperties {
 
 	public void setGeminiModel(String geminiModel) {
 		this.geminiModel = geminiModel;
+	}
+
+	public boolean isGeminiDiagnosticLoggingEnabled() {
+		return geminiDiagnosticLoggingEnabled;
+	}
+
+	public void setGeminiDiagnosticLoggingEnabled(boolean geminiDiagnosticLoggingEnabled) {
+		this.geminiDiagnosticLoggingEnabled = geminiDiagnosticLoggingEnabled;
 	}
 
 	public int getGeminiMaxOutputTokens() {

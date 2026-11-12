@@ -4,7 +4,12 @@
       <h1 id="page-title">Treningi</h1>
     </div>
     @if (auth.currentUser()?.role === 'ADMIN' || auth.currentUser()?.role === 'COACH') {
-      <a class="button button--primary" routerLink="/trainings/new">Dodaj trening</a>
+      <div class="page-actions">
+        <button type="button" class="button button--secondary" (click)="openImportModal()">
+          Importuj ze zdjęcia
+        </button>
+        <a class="button button--primary" routerLink="/trainings/new">Dodaj trening</a>
+      </div>
     }
   </div>
 
@@ -81,6 +86,18 @@
     </label>
   </div>
 
+  @if (importsLoading() && imports().length === 0) {
+    <p class="feedback imports-feedback" role="status">Ładowanie importów treningów...</p>
+  }
+  @if (importsError(); as message) {
+    <div class="feedback error imports-feedback" role="alert">
+      <p>{{ message }}</p>
+      <button type="button" class="button button--secondary retry-button" (click)="refreshImports()">
+        Spróbuj ponownie
+      </button>
+    </div>
+  }
+
   @if (loading()) {
     <p class="feedback" role="status">Ładowanie treningów...</p>
   } @else if (errorMessage(); as message) {
@@ -90,11 +107,13 @@
         Spróbuj ponownie
       </button>
     </div>
-  } @else if (visibleTrainings().length === 0) {
+  } @else if (visibleTrainings().length === 0 && imports().length === 0) {
     <p class="feedback" role="status">
       {{ hasSearchQuery ? 'Nie znaleziono treningów pasujących do wyszukiwania.' : 'Brak treningów do wyświetlenia.' }}
     </p>
-  } @else {
+  }
+
+  @if (imports().length > 0 || (!loading() && !errorMessage() && visibleTrainings().length > 0)) {
     <div class="table-surface">
       <table>
         <thead>
@@ -136,7 +155,48 @@
           </tr>
         </thead>
         <tbody>
-          @for (training of visibleTrainings(); track training.id) {
+          @for (item of imports(); track item.id) {
+            <tr class="import-row">
+              <td data-label="Trening">
+                <strong>{{ item.name || 'Import ze zdjęcia' }}</strong>
+                <span class="import-detail">Import nr {{ item.id }}</span>
+                @if (item.possibleDuplicate) {
+                  <span class="import-warning">Możliwy duplikat</span>
+                }
+              </td>
+              <td data-label="Data">{{ item.trainingDate ? formatDate(item.trainingDate) : '—' }}</td>
+              <td data-label="Grupa treningowa">{{ item.trainingGroupName }}</td>
+              <td data-label="Liczba uczestników">—</td>
+              <td data-label="Status">
+                <span class="status-badge">{{ importStatusLabel(item.status) }}</span>
+                @if (item.status === 'FAILED' && item.failureMessage) {
+                  <span class="import-error">{{ item.failureMessage }}</span>
+                }
+                @if (item.status === 'FAILED' && item.nextRetryAt) {
+                  <span class="import-detail">Zaplanowano automatyczne ponowienie.</span>
+                }
+              </td>
+              <td data-label="Akcje" class="training-actions">
+                @if (item.status === 'FAILED') {
+                  <button type="button" class="button button--secondary"
+                    [disabled]="retryingImportIds().includes(item.id)"
+                    (click)="retryImport(item)">
+                    {{ retryingImportIds().includes(item.id) ? 'Ponawianie...' : 'Ponów przetwarzanie' }}
+                  </button>
+                  @if (importRetryErrors()[item.id]; as message) {
+                    <span class="import-error" role="alert">{{ message }}</span>
+                  }
+                } @else if (item.status === 'REVIEW_REQUIRED') {
+                  <a class="button button--secondary" [routerLink]="['/training-imports', item.id, 'review']">
+                    Zweryfikuj import
+                  </a>
+                } @else {
+                  <span class="import-detail">Przetwarzanie w toku.</span>
+                }
+              </td>
+            </tr>
+          }
+          @for (training of (!loading() && !errorMessage() ? visibleTrainings() : []); track training.id) {
             <tr>
               <td data-label="Trening">
                 <a class="training-link" [routerLink]="['/trainings', training.id]">
@@ -183,5 +243,12 @@
     [trainingName]="training.name"
     (deleted)="onTrainingDeleted($event)"
     (cancelled)="closeDeletionConfirmation()"
+  />
+}
+
+@if (importModalOpen()) {
+  <app-training-import-upload-modal
+    (uploaded)="onTrainingImportUploaded($event)"
+    (cancelled)="closeImportModal()"
   />
 }

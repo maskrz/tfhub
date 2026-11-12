@@ -1,0 +1,30 @@
+:host { display: block; }
+.page { margin: 0 auto; max-width: 90rem; padding: clamp(1rem, 3vw, 3rem); }
+.page-heading { margin-bottom: 1.5rem; }
+.back-link { color: #365b48; font-weight: 600; }
+h1 { color: #141c2b; font-size: clamp(2rem, 5vw, 3rem); }
+h2, h3, h4 { color: #20283a; margin: .5rem 0; }
+.card, .item, .execution {
+  border: 1px solid #d8deea;
+  border-radius: .75rem;
+  display: grid;
+  gap: .75rem;
+  margin-bottom: 1rem;
+  min-width: 0;
+  padding: 1rem;
+}
+.card { background: #fff; }
+.item, .execution { background: #f7f8fa; margin-top: .75rem; }
+fieldset { border: 0; margin: 0; padding: 0; }
+label { display: grid; font-weight: 600; gap: .4rem; }
+input, select { max-width: 32rem; width: 100%; }
+.checkbox { align-items: center; display: flex; }
+.checkbox input { width: auto; }
+.hint { color: #526078; font-size: .9rem; margin: 0; }
+.feedback { background: #eff8f2; border-radius: .5rem; padding: .8rem; }
+.error { background: #fff1f1; color: #8d2929; }
+.warning { background: #fff7dd; color: #755300; }
+.actions { display: flex; flex-wrap: wrap; gap: .75rem; justify-content: flex-end; }
+img { display: block; height: auto; margin-top: 1rem; max-width: 100%; }
+dialog { border: 1px solid #d8deea; border-radius: .75rem; max-width: min(32rem, 90vw); padding: 1.5rem; }
+dialog::backdrop { background: rgb(0 0 0 / 45%); }

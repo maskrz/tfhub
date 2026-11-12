@@ -17,6 +17,7 @@ import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.multipart.MultipartHttpServletRequest;
 import pl.tfhub.api.trainingimport.dto.response.TrainingImportUploadResponse;
 import pl.tfhub.api.trainingimport.dto.response.TrainingImportStatusResponse;
+import pl.tfhub.api.trainingimport.dto.response.TrainingImportListItemResponse;
 import pl.tfhub.api.trainingimport.dto.response.TrainingImportAthleteCandidateResponse;
 import pl.tfhub.api.trainingimport.dto.response.TrainingImportDraftResponse;
 import pl.tfhub.api.trainingimport.dto.response.TrainingImportAcceptanceResponse;
@@ -28,6 +29,7 @@ import pl.tfhub.api.trainingimport.service.TrainingImportSourceImageService;
 import pl.tfhub.api.trainingimport.service.TrainingImportUploadService;
 import pl.tfhub.api.trainingimport.service.TrainingImportProcessingService;
 import pl.tfhub.api.trainingimport.service.TrainingImportFinalizationService;
+import pl.tfhub.api.trainingimport.service.TrainingImportListService;
 
 @RestController
 @RequestMapping("/api/training-imports")
@@ -38,18 +40,26 @@ public class TrainingImportController {
 	private final TrainingImportSourceImageService sourceImageService;
 	private final TrainingImportProcessingService processingService;
 	private final TrainingImportFinalizationService finalizationService;
+	private final TrainingImportListService listService;
 
 	public TrainingImportController(
 			TrainingImportUploadService uploadService,
 			TrainingImportDraftService draftService,
 			TrainingImportSourceImageService sourceImageService,
 			TrainingImportProcessingService processingService,
-			TrainingImportFinalizationService finalizationService) {
+			TrainingImportFinalizationService finalizationService,
+			TrainingImportListService listService) {
 		this.uploadService = uploadService;
 		this.draftService = draftService;
 		this.sourceImageService = sourceImageService;
 		this.processingService = processingService;
 		this.finalizationService = finalizationService;
+		this.listService = listService;
+	}
+
+	@GetMapping
+	public List<TrainingImportListItemResponse> listActive() {
+		return listService.listActive();
 	}
 
 	@PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)

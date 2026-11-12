@@ -161,7 +161,7 @@ Processing history for one import. Keep failed attempts; retry does not create a
 | `failure_code` | `VARCHAR` | Yes | Safe diagnostic category |
 | `failure_message` | `TEXT` | Yes | Safe diagnostic detail |
 
-Enforce unique `(import_id, attempt_number)`, positive attempt number, and at most one processing attempt per import with a partial unique index on `import_id WHERE status = 'PROCESSING'`. Store the raw response for troubleshooting, including invalid responses; it is nullable when no response was received. Keep it server-side only, out of API responses and logs, and protect it as athlete-related data. Never store credentials.
+Enforce unique `(import_id, attempt_number)`, positive attempt number, and at most one processing attempt per import with a partial unique index on `import_id WHERE status = 'PROCESSING'`. Store the raw response for troubleshooting, including invalid responses; it is nullable when no response was received. Keep it server-side only and out of API responses. Logs exclude it by default; the explicitly enabled Gemini diagnostic mode described below is an exception. Protect stored responses as athlete-related data. Never store credentials.
 
 ### 3.4 `training_import_drafts`
 
@@ -197,11 +197,11 @@ Enforce unique `(draft_id, sequence_number)` and `(id, draft_id)`. Name must not
 | `draft_id` | `BIGINT` | No | Parent draft |
 | `definition_id` | `BIGINT` | No | Parent draft definition |
 | `sequence_number` | `INTEGER` | No | Segment order |
-| `distance_m` | `INTEGER` | No | Corrected distance |
+| `distance_m` | `INTEGER` | Yes | Corrected distance; null means OCR could not resolve it |
 | `rest_after_seconds` | `INTEGER` | Yes | Optional rest |
 | `recognition_metadata` | `JSONB` | No | Recognition details |
 
-Enforce `UNIQUE (id, draft_id, definition_id)` and `FOREIGN KEY (definition_id, draft_id)` to `training_import_draft_definitions(id, draft_id)`. Sequence and distance must be positive; rest must be nonnegative when present.
+Enforce `UNIQUE (id, draft_id, definition_id)` and `FOREIGN KEY (definition_id, draft_id)` to `training_import_draft_definitions(id, draft_id)`. Sequence must be positive; distance must be positive when present; rest must be nonnegative when present. Migration V11 permits null only on draft segments. Unresolved distances require review and block acceptance; final training segments remain non-null and positive.
 
 ### 3.7 `training_import_draft_athlete_rows`
 
@@ -327,7 +327,7 @@ Any failure rolls back the session and all children and leaves the import unacce
 
 - The upload-selected group is immutable through processing, review, retry, and finalization. Athlete candidates and assignments are restricted to that group.
 - The retained source is the optimized JPEG. The original upload bytes are not retained.
-- Processing attempts retain the raw model response when one is returned; the response is not exposed to clients or written to logs.
+- Processing attempts retain the raw model response when one is returned; the response is not exposed to clients and is excluded from logs unless Gemini diagnostic logging is explicitly enabled.
 - Each import has one current editable draft and its processing-attempt records. User edits do not create draft versions or an audit trail.
 - Acceptance creates a `PLANNED` training session. The persisted training lifecycle uses `PLANNED` and `COMPLETED`, not the legacy `active` flag.
 - Existing training groups have no lifecycle field; selecting an existing group does not include an active/inactive check.
@@ -337,3 +337,5 @@ Any failure rolls back the session and all children and leaves the import unacce
 ## 10. Remaining decisions
 
 The confirmed JPEG settings are quality 85 and a 2560-pixel maximum long edge. OCR quality validation remains an implementation check. The stale-processing and Gemini request timeouts, worker concurrency, and upload limits are operational configuration. Supply `GEMINI_API_KEY` only to the API at runtime; do not put it in the frontend, database, image, or logs. Resolve the provider API model identifier for the approved Gemini Flash-Lite 3.5 model during configuration.
+
+For temporary troubleshooting, `TFHUB_GEMINI_DIAGNOSTIC_LOGGING_ENABLED=true` enables INFO logs of the full JSON request body, including the prompt and base64-encoded optimized photo, and the full response body and HTTP status, including provider errors. A diagnostic ID correlates each request and response. The default is `false`; request authentication headers are not logged and occurrences of the configured API key in logged bodies are redacted. These logs can contain athlete data and large images: enable only in a controlled environment, restrict access and retention of every log destination, and turn it off after troubleshooting. A network failure has no response body to log.

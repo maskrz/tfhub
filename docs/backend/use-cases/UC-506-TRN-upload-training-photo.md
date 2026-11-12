@@ -106,6 +106,8 @@ A failed upload must not leave an import record that references a missing or inc
 
 A successful `POST /api/training-imports` accepts multipart fields `trainingGroupId` and one `image`, creates the import in `PENDING`, and returns `202 Accepted`. The asynchronous processor starts without waiting for OCR in the upload request. Clients retrieve status using `GET /api/training-imports/{importId}`.
 
+`GET /api/training-imports` returns active import summaries for the current ADMIN or COACH. ADMIN sees all groups; COACH sees only currently assigned groups. The list includes `PENDING`, `PROCESSING`, `REVIEW_REQUIRED` and `FAILED`, excludes `ACCEPTED` and `REJECTED`, and is ordered by creation time and ID descending. Each item contains `id`, `trainingGroupId`, `trainingGroupName`, `status`, `nextRetryAt`, `createdAt`, `possibleDuplicate`, nullable draft `name` and `trainingDate`, and the latest attempt's safe nullable `failureMessage`. No source path or raw model response is exposed. These summaries remain separate from UC-501 persisted training sessions.
+
 The response must include at least:
 
 - Import identifier.

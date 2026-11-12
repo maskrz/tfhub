@@ -1,0 +1,95 @@
+<dialog #dialog class="modal" aria-labelledby="modal-title" (cancel)="onDialogCancel($event)">
+  <div class="modal-header">
+    <h2 id="modal-title">Importuj trening ze zdjęcia</h2>
+    <button
+      type="button"
+      class="button button--icon close-button"
+      aria-label="Anuluj i zamknij okno"
+      [disabled]="uploading()"
+      (click)="cancel()"
+    >×</button>
+  </div>
+
+  <form id="training-import-form" class="modal-content" (submit)="$event.preventDefault(); submit()" novalidate>
+    @if (errorMessage(); as message) {
+      <p class="feedback error" role="alert">{{ message }}</p>
+    }
+
+    <div class="field">
+      <label for="training-group">Grupa treningowa <span aria-hidden="true">*</span></label>
+      <select
+        id="training-group"
+        class="field-control select-with-arrow"
+        [value]="trainingGroupId.value ?? ''"
+        [disabled]="groupsLoading() || groups().length === 0 || uploading()"
+        [attr.aria-invalid]="attemptedSubmit() && trainingGroupId.invalid ? 'true' : null"
+        [attr.aria-describedby]="attemptedSubmit() && trainingGroupId.invalid
+          ? 'training-group-hint training-group-error'
+          : 'training-group-hint'"
+        (change)="onGroupChange($event)"
+      >
+        <option value="" disabled>Wybierz grupę treningową</option>
+        @for (group of groups(); track group.id) {
+          <option [value]="group.id">{{ group.name }}</option>
+        }
+      </select>
+      @if (groupsLoading()) {
+        <span class="field-hint" role="status">Ładowanie grup treningowych...</span>
+      } @else if (groups().length === 0 && !groupsError()) {
+        <span class="field-hint" role="status">Nie masz dostępnych grup treningowych.</span>
+      }
+      <span class="field-hint" id="training-group-hint">Wybierz grupę, do której należy trening.</span>
+      @if (attemptedSubmit() && trainingGroupId.invalid) {
+        <span class="field-error" id="training-group-error">Wybierz grupę treningową.</span>
+      }
+      @if (groupsError(); as message) {
+        <div class="field-error groups-error" role="alert">
+          <span>{{ message }}</span>
+          <button type="button" class="button button--secondary" (click)="retryLoadingGroups()">
+            Spróbuj ponownie
+          </button>
+        </div>
+      }
+    </div>
+
+    <div class="field">
+      <label for="training-image">Zdjęcie karty treningowej <span aria-hidden="true">*</span></label>
+      <input
+        id="training-image"
+        class="file-control"
+        type="file"
+        accept=".jpg,.jpeg,.png,image/jpeg,image/png"
+        [disabled]="uploading()"
+        [attr.aria-describedby]="imageError() || (attemptedSubmit() && !selectedImage())
+          ? 'training-image-hint training-image-error'
+          : 'training-image-hint'"
+        (change)="onImageChange($event)"
+      />
+      @if (selectedImage(); as image) {
+        <p class="selected-file" role="status">Wybrany plik: <strong>{{ image.name }}</strong></p>
+      }
+      <span class="field-hint" id="training-image-hint">
+        Obsługiwane formaty: JPEG i PNG. Możesz wybrać inny plik przed wysłaniem.
+      </span>
+      @if (imageError(); as message) {
+        <span class="field-error" id="training-image-error" role="alert">{{ message }}</span>
+      } @else if (attemptedSubmit() && !selectedImage()) {
+        <span class="field-error" id="training-image-error">Wybierz jedno zdjęcie.</span>
+      }
+    </div>
+  </form>
+
+  <footer class="modal-footer">
+    <button type="button" class="button button--secondary" [disabled]="uploading()" (click)="cancel()">
+      Anuluj
+    </button>
+    <button
+      type="submit"
+      form="training-import-form"
+      class="button button--primary"
+      [disabled]="!canSubmit"
+    >
+      {{ uploading() ? 'Przesyłanie...' : 'Prześlij zdjęcie' }}
+    </button>
+  </footer>
+</dialog>

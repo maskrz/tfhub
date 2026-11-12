@@ -7,6 +7,8 @@ import { AuthService } from '../../core/auth/auth.service';
 import { TrainingListItem } from './training.model';
 import { TrainingsApiService } from './trainings-api.service';
 import { TrainingsPage } from './trainings.page';
+import { TrainingImportsApiService } from '../training-imports/training-imports-api.service';
+import { TrainingImportListItem, TrainingImportStatusResponse } from '../training-imports/training-import.model';
 
 const trainings: TrainingListItem[] = [
   {
@@ -39,26 +41,49 @@ const completedTraining: TrainingListItem = {
   status: 'COMPLETED',
 };
 
+const pendingImport: TrainingImportListItem = {
+  id: 21,
+  trainingGroupId: 1,
+  trainingGroupName: 'Sprint',
+  status: 'PENDING',
+  nextRetryAt: null,
+  createdAt: '2026-11-12T10:00:00Z',
+  possibleDuplicate: true,
+  name: null,
+  trainingDate: null,
+  failureMessage: null,
+};
+
 describe('TrainingsPage', () => {
   let fixture: ComponentFixture<TrainingsPage>;
   let api: {
     getAll: ReturnType<typeof vi.fn>;
     deleteTraining: ReturnType<typeof vi.fn>;
   };
+  let importsApi: {
+    getActive: ReturnType<typeof vi.fn>;
+    retry: ReturnType<typeof vi.fn>;
+  };
 
   async function createPage(
     getAll: () => Observable<TrainingListItem[]> = () => of(trainings),
     waitForResponse = true,
+    getImports: () => Observable<TrainingImportListItem[]> = () => of([]),
   ): Promise<void> {
     api = {
       getAll: vi.fn(getAll),
       deleteTraining: vi.fn(() => of(void 0)),
+    };
+    importsApi = {
+      getActive: vi.fn(getImports),
+      retry: vi.fn(() => of({})),
     };
     await TestBed.configureTestingModule({
       imports: [TrainingsPage],
       providers: [
         provideRouter([]),
         { provide: TrainingsApiService, useValue: api },
+        { provide: TrainingImportsApiService, useValue: importsApi },
         {
           provide: AuthService,
           useValue: {
@@ -319,5 +344,159 @@ describe('TrainingsPage', () => {
 
     expect(visibleNames()).toEqual(['Trening wytrzymałościowy', 'Sprint']);
     expect(dateSort.closest('th')?.getAttribute('aria-sort')).toBe('ascending');
+  });
+
+  it('shows imports at the top even when training filters exclude all trainings', async () => {
+    const review = {
+      ...pendingImport,
+      id: 22,
+      status: 'REVIEW_REQUIRED' as const,
+      name: 'Rozpoznany trening',
+      trainingDate: '2026-11-11',
+    };
+    await createPage(() => of(trainings), true, () => of([review, pendingImport]));
+    setSearch('nieznany');
+    const rows = fixture.nativeElement.querySelectorAll('tbody tr') as NodeListOf<HTMLElement>;
+    expect(rows).toHaveLength(2);
+    expect(rows[0].textContent).toContain('Rozpoznany trening');
+    expect(rows[0].textContent).toContain('Zweryfikuj import');
+    expect(rows[0].querySelector('a')?.getAttribute('href')).toContain('/training-imports/22/review');
+    expect(rows[1].textContent).toContain('Możliwy duplikat');
+    expect(rows[1].textContent).toContain('Oczekuje na przetworzenie');
+  });
+
+  it('refreshes only imports every five seconds until processing finishes', async () => {
+    vi.useFakeTimers();
+    try {
+      let request = 0;
+      await createPage(() => of(trainings), false, () => {
+        request++;
+        return of(request === 1 ? [pendingImport] : [{ ...pendingImport, status: 'REVIEW_REQUIRED' }]);
+      });
+      expect(importsApi.getActive).toHaveBeenCalledOnce();
+      await vi.advanceTimersByTimeAsync(4999);
+      expect(importsApi.getActive).toHaveBeenCalledOnce();
+      await vi.advanceTimersByTimeAsync(1);
+      fixture.detectChanges();
+      expect(importsApi.getActive).toHaveBeenCalledTimes(2);
+      expect(api.getAll).toHaveBeenCalledOnce();
+      expect(fixture.nativeElement.textContent).toContain('Wymaga weryfikacji');
+      await vi.advanceTimersByTimeAsync(10000);
+      expect(importsApi.getActive).toHaveBeenCalledTimes(2);
+    } finally {
+      fixture.destroy();
+      vi.useRealTimers();
+    }
+  });
+
+  it('continues polling failed imports with an automatic retry and stops on destruction', async () => {
+    vi.useFakeTimers();
+    try {
+      await createPage(() => of(trainings), false, () => of([{
+        ...pendingImport,
+        status: 'FAILED',
+        nextRetryAt: '2026-11-12T10:00:30Z',
+      }]));
+      await vi.advanceTimersByTimeAsync(5000);
+      expect(importsApi.getActive).toHaveBeenCalledTimes(2);
+      fixture.destroy();
+      await vi.advanceTimersByTimeAsync(10000);
+      expect(importsApi.getActive).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('preserves rows after a refresh error and retries the failed fetch without overlapping', async () => {
+    vi.useFakeTimers();
+    try {
+      const request = new Subject<TrainingImportListItem[]>();
+      let call = 0;
+      await createPage(() => of(trainings), false, () => {
+        call++;
+        return call === 1 ? of([pendingImport]) : request;
+      });
+      await vi.advanceTimersByTimeAsync(5000);
+      fixture.componentInstance.refreshImports();
+      expect(importsApi.getActive).toHaveBeenCalledTimes(2);
+      request.error(new HttpErrorResponse({ status: 500 }));
+      fixture.detectChanges();
+      expect(fixture.nativeElement.textContent).toContain('Import nr 21');
+      expect(fixture.nativeElement.textContent).toContain('Nie udało się pobrać importów treningów.');
+      expect(importsApi.getActive).toHaveBeenCalledTimes(3);
+    } finally {
+      fixture.destroy();
+      vi.useRealTimers();
+    }
+  });
+
+  it('retries failed imports once while pending and refreshes the list on success', async () => {
+    const failed = { ...pendingImport, status: 'FAILED' as const, failureMessage: 'Bezpieczny błąd' };
+    const retry = new Subject<TrainingImportStatusResponse>();
+    await createPage(() => of(trainings), true, () => of([failed]));
+    importsApi.retry.mockReturnValue(retry);
+    const button = fixture.nativeElement.querySelector('.import-row button') as HTMLButtonElement;
+    expect(fixture.nativeElement.textContent).toContain('Bezpieczny błąd');
+    button.click();
+    button.click();
+    fixture.detectChanges();
+    expect(importsApi.retry).toHaveBeenCalledOnce();
+    expect(importsApi.retry).toHaveBeenCalledWith(21);
+    expect(button.disabled).toBe(true);
+    retry.next({
+      id: 21, trainingGroupId: 1, status: 'PROCESSING', nextRetryAt: null,
+      createdAt: pendingImport.createdAt, possibleDuplicate: true, latestAttempt: null,
+    });
+    retry.complete();
+    expect(importsApi.getActive).toHaveBeenCalledTimes(2);
+  });
+
+  it('keeps a failed import and displays an error if its retry fails', async () => {
+    const failed = { ...pendingImport, status: 'FAILED' as const, failureMessage: 'Bezpieczny błąd' };
+    await createPage(() => of(trainings), true, () => of([failed]));
+    importsApi.retry.mockReturnValue(throwError(() => new HttpErrorResponse({ status: 500 })));
+    (fixture.nativeElement.querySelector('.import-row button') as HTMLButtonElement).click();
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.textContent).toContain('Nie udało się ponowić przetwarzania.');
+    expect(fixture.nativeElement.textContent).toContain('Bezpieczny błąd');
+    expect((fixture.nativeElement.querySelector('.import-row button') as HTMLButtonElement).disabled).toBe(false);
+    expect(importsApi.getActive).toHaveBeenCalledOnce();
+  });
+
+  it('keeps polling after retry succeeds even when the immediate refresh fails', async () => {
+    vi.useFakeTimers();
+    try {
+      let request = 0;
+      const failed = { ...pendingImport, status: 'FAILED' as const };
+      await createPage(() => of(trainings), false, () => {
+        request++;
+        if (request === 2) return throwError(() => new HttpErrorResponse({ status: 500 }));
+        return of(request === 1 ? [failed] : [{ ...pendingImport, status: 'PROCESSING' }]);
+      });
+      importsApi.retry.mockReturnValue(of({
+        id: 21, trainingGroupId: 1, status: 'PROCESSING', nextRetryAt: null,
+        createdAt: pendingImport.createdAt, possibleDuplicate: true, latestAttempt: null,
+      }));
+      fixture.componentInstance.retryImport(failed);
+      fixture.detectChanges();
+      expect(fixture.nativeElement.textContent).toContain('Przetwarzanie');
+      expect(fixture.nativeElement.textContent).toContain('Nie udało się pobrać importów treningów.');
+      await vi.advanceTimersByTimeAsync(5000);
+      expect(importsApi.getActive).toHaveBeenCalledTimes(3);
+    } finally {
+      fixture.destroy();
+      vi.useRealTimers();
+    }
+  });
+
+  it('refreshes imports after upload without navigating away', async () => {
+    await createPage();
+    fixture.componentInstance.onTrainingImportUploaded({
+      id: 21, trainingGroupId: 1, status: 'PENDING', possibleDuplicate: true,
+    });
+    fixture.detectChanges();
+    expect(importsApi.getActive).toHaveBeenCalledTimes(2);
+    expect(fixture.nativeElement.textContent).toContain('Możliwy duplikat');
   });
 });

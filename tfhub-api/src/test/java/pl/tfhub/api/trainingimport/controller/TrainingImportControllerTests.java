@@ -21,9 +21,12 @@ import pl.tfhub.api.trainingimport.service.TrainingImportProcessingService;
 import pl.tfhub.api.trainingimport.service.TrainingImportSourceImageService;
 import pl.tfhub.api.trainingimport.service.TrainingImportUploadService;
 import pl.tfhub.api.trainingimport.service.TrainingImportFinalizationService;
+import pl.tfhub.api.trainingimport.service.TrainingImportListService;
+import pl.tfhub.api.trainingimport.dto.response.TrainingImportListItemResponse;
 import pl.tfhub.api.traininggroup.dto.response.TrainingGroupResponse;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -51,6 +54,25 @@ class TrainingImportControllerTests {
 
 	@MockitoBean
 	private TrainingImportFinalizationService finalizationService;
+
+	@MockitoBean
+	private TrainingImportListService listService;
+
+	@Test
+	void listsActiveImportSummaries() throws Exception {
+		when(listService.listActive()).thenReturn(java.util.List.of(new TrainingImportListItemResponse(
+				42, 7, "Group A", TrainingImportStatus.FAILED, null,
+				java.time.OffsetDateTime.parse("2026-11-12T10:00:00Z"), true, null, null, "Safe error")));
+		mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+						.get("/api/training-imports"))
+				.andExpect(status().isOk())
+				.andExpect(content().json("""
+						[{"id":42,"trainingGroupId":7,"trainingGroupName":"Group A","status":"FAILED",
+						  "nextRetryAt":null,"createdAt":"2026-11-12T10:00:00Z","possibleDuplicate":true,
+						  "name":null,"trainingDate":null,"failureMessage":"Safe error"}]
+						""", true));
+		verify(listService).listActive();
+	}
 
 	@Test
 	void acceptsExactlyOneImageAndReturnsUploadDetails() throws Exception {
@@ -113,6 +135,41 @@ class TrainingImportControllerTests {
 						  "validation": {"readyForAcceptance": true, "issues": []}
 						}
 						""", true));
+	}
+
+	@Test
+	void draftApiReturnsAndAcceptsUnresolvedDistances() throws Exception {
+		var draft = new TrainingImportDraftResponse(
+				42, TrainingImportStatus.REVIEW_REQUIRED, new TrainingGroupResponse(7, "Group A"),
+				"Intervals", java.time.LocalDate.parse("2026-11-10"), java.util.Map.of(), false,
+				java.util.List.of(new TrainingImportDraftResponse.Definition(
+						5, "Main set", 1,
+						java.util.List.of(new TrainingImportDraftResponse.Segment(
+								6, 1, null, 60, java.util.Map.of("uncertain", true), false)),
+						java.util.List.of())),
+				new TrainingImportDraftResponse.Validation(false, java.util.List.of(
+						new TrainingImportDraftResponse.ValidationIssue(
+								"SEGMENT_DISTANCE_UNRESOLVED", "definitions/5/segments/1/distanceM",
+								"Definition 1, segment 1 requires a positive distance"))));
+		when(draftService.getDraft(42L)).thenReturn(draft);
+		when(draftService.updateDraft(eq(42L), any())).thenReturn(draft);
+		mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+						.get("/api/training-imports/42/draft"))
+				.andExpect(status().isOk())
+				.andExpect(content().json("""
+						{"definitions":[{"segments":[{"distanceM":null,"recognitionMetadata":{"uncertain":true}}]}],
+						 "validation":{"readyForAcceptance":false}}
+						""", false));
+		mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+						.put("/api/training-imports/42/draft").contentType(MediaType.APPLICATION_JSON)
+						.content("""
+								{"name":"Intervals","trainingDate":"2026-11-10","recognitionReviewed":false,"definitions":[{
+								 "name":"Main set","sequenceNumber":1,
+								 "segments":[{"sequenceNumber":1,"distanceM":null,"recognitionReviewed":false}],"athleteRows":[]}]}
+								"""))
+				.andExpect(status().isOk());
+		verify(draftService).updateDraft(eq(42L), argThat(request ->
+				request.definitions().getFirst().segments().getFirst().distanceM() == null));
 	}
 
 	@Test

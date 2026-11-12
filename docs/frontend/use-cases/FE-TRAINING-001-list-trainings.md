@@ -27,6 +27,7 @@ The view must follow the existing TFHUB visual design and interaction patterns.
 7. The user can initiate permanent deletion of a training from its row (FE-TRAINING-005).
 8. The user can initiate training creation (FE-TRAINING-002), subject to the existing role permissions.
 9. The user can start an OCR import by selecting **Importuj ze zdjęcia** (FE-TRAINING-006).
+10. Active OCR imports are shown as separate rows above persisted trainings, independently of training filters and sorting.
 
 ## 5. Displayed Information
 
@@ -41,6 +42,8 @@ Use the actual response DTO returned by the implemented UC-501 endpoint. Do not 
 
 Each item includes its status. The default filter displays all trainings; users can select planned or completed trainings.
 
+Retrieve active import summaries separately from `GET /api/training-imports`. Show their group, processing status, duplicate warning, recognized name and training date when available, and a distinct import identifier; do not present them as persisted sessions. Accepted and rejected imports are not included. Pending values that are not yet recognized are displayed as unavailable. Failed imports display the safe failure message when available and provide retry. Review-required imports link to the draft review screen.
+
 ## 6. Search, Filtering, and Sorting
 
 - Provide search and filtering only where appropriate for the available training data and consistent with existing TFHUB list views.
@@ -50,6 +53,7 @@ Each item includes its status. The default filter displays all trainings; users 
 - Follow existing list sorting conventions where applicable.
 - Provide a status filter with **Planowane**, **Zakończone**, and **Wszystkie statusy** options, following existing TFHUB status-filter patterns.
 - Load completed trainings through UC-501's `includeCompleted` option; apply the selected status filter to the returned data.
+- Training search, filters and sorting do not hide or reorder active import rows.
 
 ## 7. Navigation and Actions
 
@@ -91,6 +95,7 @@ The view must be mobile-first and consistent with the existing TFHUB application
 - Display a consistent empty state when no trainings are available or match the current filters.
 - Display errors using the existing application error-handling and notification patterns.
 - Handle failed requests without breaking the rest of the application.
+- Load imports independently of trainings. While any import is `PENDING`, `PROCESSING`, or `FAILED` with `nextRetryAt`, refresh only the import list every five seconds, without overlapping requests. Stop when no import meets these conditions or the view is left. Preserve the last successful import list and report refresh errors.
 
 ## 10. Authorization
 
@@ -118,4 +123,5 @@ The view must be mobile-first and consistent with the existing TFHUB application
 - Loading, empty, and error states are handled.
 - The view is responsive and usable on mobile devices.
 - The visual style and behavior of controls match existing TFHUB views.
+- Active imports are shown above trainings and refresh independently while processing or an automatic retry is scheduled.
 - Existing frontend functionality remains unaffected.

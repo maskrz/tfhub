@@ -13,7 +13,7 @@ Allow an authorized user to inspect and correct the current OCR draft before the
 
 ## 3. Main Flow
 
-1. The frontend opens the import ID returned by FE-TRAINING-006 and retrieves `GET /api/training-imports/{importId}/draft`.
+1. The user selects a review-required import from the training list and the frontend retrieves `GET /api/training-imports/{importId}/draft`.
 2. The frontend retrieves the optimized JPEG from `GET /api/training-imports/{importId}/source-image`.
 3. The user compares the image with recognized data, corrects the draft and resolves every athlete row by matching or explicitly skipping it.
 4. The frontend retrieves athlete candidates from `GET /api/training-imports/{importId}/athlete-candidates?query=...`.
@@ -34,6 +34,8 @@ The user may:
 
 The group selected at upload is read-only. Athlete candidate results and assignments must be restricted to that group for both ADMIN and COACH users. The user cannot create athletes or change their group assignments.
 
+The current review screen supports correcting existing draft fields, resolving athlete rows, and confirming uncertain values. Adding, removing, and reordering definitions or segments remains unimplemented.
+
 ## 5. Validation and Saving
 
 - Keep all athlete rows matched or explicitly skipped before acceptance; show unresolved rows clearly.
@@ -49,7 +51,7 @@ The group selected at upload is read-only. Athlete candidate results and assignm
 - All user-facing text must be in Polish.
 - Show loading, empty, validation and API error states.
 - Disable repeated save submissions while saving.
-- If processing is still pending or failed, show the current status and retry path from FE-TRAINING-006 instead of an editable draft.
+- If processing is still pending or failed, show the current status and retry path on the training list from FE-TRAINING-006 instead of an editable draft.
 - Do not display raw model responses or internal storage paths.
 - Keep the image and editing workflow usable on mobile without requiring horizontal scrolling for the whole page.
 

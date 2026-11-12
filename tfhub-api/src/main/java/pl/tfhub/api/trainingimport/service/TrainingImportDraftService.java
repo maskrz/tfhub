@@ -202,7 +202,9 @@ public class TrainingImportDraftService {
 
 		DraftData updated = loadDraftData(draft);
 		TrainingImportDraftResponse response = toResponse(draft, updated, trainingImport);
-		if (!response.validation().readyForAcceptance()) {
+		if (response.validation().issues().stream().anyMatch(issue ->
+				!issue.code().equals("SEGMENT_DISTANCE_UNRESOLVED")
+						&& !issue.code().equals("SEGMENT_DISTANCE_REVIEW_REQUIRED"))) {
 			throw new InvalidTrainingImportDraftException(
 					"Training import draft contains unresolved validation issues");
 		}
@@ -375,9 +377,19 @@ public class TrainingImportDraftService {
 		Map<Long, Integer> segmentCounts = new HashMap<>();
 		for (TrainingImportDraftSegment segment : data.segments()) {
 			segmentCounts.merge(segment.getDefinition().getId(), 1, Integer::sum);
-			addRecognitionIssue(issues, "definitions/" + segment.getDefinition().getId()
-					+ "/segments/" + segment.getSequenceNumber(), segment.getRecognitionMetadata(),
-					TrainingImportRecognitionMetadata.isReviewed(segment.getRecognitionMetadata()));
+			String path = "definitions/" + segment.getDefinition().getId()
+					+ "/segments/" + segment.getSequenceNumber();
+			if (segment.getDistanceM() == null || segment.getDistanceM() <= 0) {
+				issues.add(issue("SEGMENT_DISTANCE_UNRESOLVED", path + "/distanceM",
+						"Definition " + segment.getDefinition().getSequenceNumber() + ", segment "
+								+ segment.getSequenceNumber() + " requires a positive distance"));
+			}
+			if (TrainingImportRecognitionMetadata.isUncertain(segment.getRecognitionMetadata())
+					&& !TrainingImportRecognitionMetadata.isReviewed(segment.getRecognitionMetadata())) {
+				issues.add(issue(segment.getDistanceM() == null
+								? "SEGMENT_DISTANCE_REVIEW_REQUIRED" : "RECOGNITION_REVIEW_REQUIRED",
+						path, "Uncertain recognized values must be confirmed or corrected"));
+			}
 		}
 		for (TrainingImportDraftDefinition definition : data.definitions()) {
 			if (segmentCounts.getOrDefault(definition.getId(), 0) == 0) {
@@ -481,7 +493,8 @@ public class TrainingImportDraftService {
 			}
 			Set<Integer> segmentSequences = new HashSet<>();
 			for (TrainingImportDraftUpdateRequest.Segment segment : definition.segments()) {
-				if (segment == null || segment.sequenceNumber() <= 0 || segment.distanceM() <= 0
+				if (segment == null || segment.sequenceNumber() <= 0
+						|| (segment.distanceM() != null && segment.distanceM() <= 0)
 						|| (segment.restAfterSeconds() != null && segment.restAfterSeconds() < 0)
 						|| !segmentSequences.add(segment.sequenceNumber())) {
 					throw invalid("Segment values must be valid and sequence numbers unique within a definition");
@@ -493,7 +506,8 @@ public class TrainingImportDraftService {
 							|| !old.getDefinition().getId().equals(definition.id())) {
 						throw invalid("A segment ID does not belong to its definition or is duplicated");
 					}
-					if (TrainingImportRecognitionMetadata.isUncertain(old.getRecognitionMetadata())
+					if (segment.distanceM() != null
+							&& TrainingImportRecognitionMetadata.isUncertain(old.getRecognitionMetadata())
 							&& !segment.recognitionReviewed()) {
 						throw invalid("Uncertain segment information must be confirmed or corrected");
 					}

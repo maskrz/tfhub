@@ -22,7 +22,7 @@ record TrainingImportRecognizedDraft(
 
 	record Segment(
 			int sequenceNumber,
-			int distanceM,
+			Integer distanceM,
 			Integer restAfterSeconds,
 			Map<String, Object> recognitionMetadata) {
 	}

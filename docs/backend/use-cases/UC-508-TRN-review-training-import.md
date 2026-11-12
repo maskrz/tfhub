@@ -89,7 +89,7 @@ The corrected draft must satisfy the plan rules defined in UC-502 and the athlet
 - At least one training definition must remain in the draft.
 - Every training definition must contain at least one segment.
 - The authorized user may add, modify, reorder or remove segments.
-- Every segment must have a positive distance.
+- A segment distance may remain unresolved (null) in a draft. Any supplied distance must be positive, and every distance must be resolved before acceptance.
 - Segment order must be unique within its definition.
 - Each segment may define a rest period after its execution.
 - The rest period after the final segment is optional.
@@ -165,7 +165,7 @@ The corrected draft must satisfy the plan rules defined in UC-502 and the athlet
 - **Training definition has a blank name:** modification is rejected.
 - **Training definition has no segments:** modification is rejected.
 - **Training definition is removed while it is the last remaining definition:** modification is rejected.
-- **Segment has an invalid or non-positive distance:** modification is rejected.
+- **Segment has a non-positive distance:** modification is rejected. A null distance may be saved but prevents acceptance.
 - **Duplicate or invalid segment order:** modification is rejected.
 - **Execution data references a missing athlete row or segment:** modification is rejected.
 - **Invalid execution status or measured result:** modification is rejected.

@@ -4,7 +4,19 @@ Extract the training name, calendar date, training definitions, ordered segments
 
 For the training name, date, definition names, segment distances, rest periods, and athlete names, use ordinary transcription of the relevant table fields. Preserve the existing meaning and structure of these fields. Do not apply any execution-cell time, dash, correction, or spike rules below to these fields. Do not infer values for blank or unreadable fields.
 
-For every recognized text field, provide value, originalText, uncertain, and uncertaintyReason. Use null for an unreadable value and set uncertain=true. Dates must use YYYY-MM-DD. Distances are positive whole metres. Rest periods are non-negative whole seconds or null when absent. For optional fields such as restAfterSeconds, if the field is visibly absent or intentionally empty, return value=null, originalText=null, uncertain=false. If a value appears to be present but cannot be read, return value=null, preserve the visible originalText where possible, and set uncertain=true. Preserve the athlete name as recognized, and provide firstName and lastName separately only when they can be read; do not guess missing name parts.
+## Segment and column detection
+
+Identify the actual training segments from the visible table structure and content. Do not assume that the sheet always contains a fixed number of segment columns.
+
+Return only segments that are actually present in the training definition. A segment is present when its column is visibly part of the training structure, for example when it has a distance, rest value, or corresponding athlete execution cells containing handwritten data.
+
+Do not create additional segments merely because the table has empty template columns, unused grid columns, or space for more entries. In particular, do not return trailing empty segments when all athlete execution cells in those columns are blank and no segment distance or rest period is written.
+
+If a segment column is visibly present but its distance is blank, unreadable, or uncertain, keep that segment in the output and mark its distance as requiring verification. Do not remove a real segment just because its distance cannot be recognized.
+
+Determine the number of segments independently for each training definition. Preserve the original left-to-right order and assign consecutive sequenceNumber values starting at 1.
+
+For every recognized text field, provide value, originalText, uncertain, and uncertaintyReason. Use null for an unreadable value and set uncertain=true. Dates must use YYYY-MM-DD. Distances are positive whole metres. If a segment is clearly present but its distance is blank, unreadable, or cannot be confidently interpreted, return value=null, preserve the visible text in originalText where possible, and set uncertain=true with a specific uncertaintyReason. Never omit the segment or invent a distance in this situation. If the distance is clearly absent because the column is an unused template column rather than an actual segment, do not return that column as a segment. Rest periods are non-negative whole seconds or null when absent. For optional fields such as restAfterSeconds, if the field is visibly absent or intentionally empty, return value=null, originalText=null, uncertain=false. If a value appears to be present but cannot be read, return value=null, preserve the visible originalText where possible, and set uncertain=true. Preserve the athlete name as recognized, and provide firstName and lastName separately only when they can be read; do not guess missing name parts.
 
 The following detailed rules apply ONLY to athlete execution cells. They must not change how training names, dates, definition names, distances, rest periods, or athlete names are transcribed.
 
