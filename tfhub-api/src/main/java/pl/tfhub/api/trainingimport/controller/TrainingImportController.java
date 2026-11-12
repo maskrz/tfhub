@@ -19,12 +19,15 @@ import pl.tfhub.api.trainingimport.dto.response.TrainingImportUploadResponse;
 import pl.tfhub.api.trainingimport.dto.response.TrainingImportStatusResponse;
 import pl.tfhub.api.trainingimport.dto.response.TrainingImportAthleteCandidateResponse;
 import pl.tfhub.api.trainingimport.dto.response.TrainingImportDraftResponse;
+import pl.tfhub.api.trainingimport.dto.response.TrainingImportAcceptanceResponse;
+import pl.tfhub.api.trainingimport.dto.response.TrainingImportRejectionResponse;
 import pl.tfhub.api.trainingimport.dto.request.TrainingImportDraftUpdateRequest;
 import pl.tfhub.api.trainingimport.exception.InvalidTrainingImportUploadException;
 import pl.tfhub.api.trainingimport.service.TrainingImportDraftService;
 import pl.tfhub.api.trainingimport.service.TrainingImportSourceImageService;
 import pl.tfhub.api.trainingimport.service.TrainingImportUploadService;
 import pl.tfhub.api.trainingimport.service.TrainingImportProcessingService;
+import pl.tfhub.api.trainingimport.service.TrainingImportFinalizationService;
 
 @RestController
 @RequestMapping("/api/training-imports")
@@ -34,16 +37,19 @@ public class TrainingImportController {
 	private final TrainingImportDraftService draftService;
 	private final TrainingImportSourceImageService sourceImageService;
 	private final TrainingImportProcessingService processingService;
+	private final TrainingImportFinalizationService finalizationService;
 
 	public TrainingImportController(
 			TrainingImportUploadService uploadService,
 			TrainingImportDraftService draftService,
 			TrainingImportSourceImageService sourceImageService,
-			TrainingImportProcessingService processingService) {
+			TrainingImportProcessingService processingService,
+			TrainingImportFinalizationService finalizationService) {
 		this.uploadService = uploadService;
 		this.draftService = draftService;
 		this.sourceImageService = sourceImageService;
 		this.processingService = processingService;
+		this.finalizationService = finalizationService;
 	}
 
 	@PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
@@ -66,6 +72,16 @@ public class TrainingImportController {
 	@PostMapping("/{importId}/retry")
 	public ResponseEntity<TrainingImportStatusResponse> retry(@PathVariable long importId) {
 		return ResponseEntity.accepted().body(processingService.retry(importId));
+	}
+
+	@PostMapping("/{importId}/accept")
+	public TrainingImportAcceptanceResponse accept(@PathVariable long importId) {
+		return finalizationService.accept(importId);
+	}
+
+	@PostMapping("/{importId}/reject")
+	public TrainingImportRejectionResponse reject(@PathVariable long importId) {
+		return finalizationService.reject(importId);
 	}
 
 	@GetMapping("/{importId}/draft")

@@ -124,6 +124,8 @@ One upload and its workflow state.
 
 Restrict deletion of referenced users, groups, and accepted sessions. Accepted session ID must be set exactly when status is `ACCEPTED`.
 
+When a training session is permanently deleted under UC-505, delete its linked accepted import and all import-owned database rows first; remove the optimized image after commit.
+
 ### 3.2 `training_import_source_images`
 
 One immutable optimized image per import, stored on persistent filesystem storage rather than in PostgreSQL.

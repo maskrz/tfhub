@@ -28,6 +28,7 @@ Deletion is irreversible. It removes the training session, its definitions and s
   - Training segments.
   - Athlete participations.
   - Segment executions, including measured results and spike usage.
+- If an accepted training import is linked to the session, permanently delete that import and its owned draft, attempts, and source-image metadata as part of the same transaction. Remove its optimized image after commit; the existing image-storage recovery removes any orphan if filesystem cleanup fails.
 - The operation must not delete or modify the associated training group, athletes, or their other data.
 - Database foreign keys remain restrictive; the service deletes dependent records in dependency order rather than relying on cascading deletes.
 - No tombstone or soft-deleted training record is retained.
@@ -37,6 +38,7 @@ Deletion is irreversible. It removes the training session, its definitions and s
 - A deleted training session no longer appears in UC-501 results, including when `includeCompleted=true`.
 - UC-504 returns not found for the deleted session.
 - Deletion does not change the training group's assignment or any athlete's current group.
+- An accepted import linked to the deleted session is no longer available for historical inspection.
 
 ## 5. Authorization Rules
 
@@ -67,16 +69,17 @@ Deletion is irreversible. It removes the training session, its definitions and s
 
 ## 8. Transactional Consistency
 
-- The complete deletion is atomic.
+- The training and linked-import database deletion is atomic.
 - Delete segment executions and participations before segments and definitions, then delete the session.
 - If any step fails, the transaction rolls back and the training and all its related data remain intact.
+- Remove the linked import's optimized image after commit; if filesystem cleanup fails, the image-storage recovery process removes the orphan.
 - Lock the training row while checking authorization and deleting, preventing concurrent training edits from leaving partial records.
 
 ## 9. Out of Scope
 
 - Deleting training groups, athletes, accounts, or other training sessions.
 - Modifying historical test results or athlete records outside this training session.
-- Deleting or modifying OCR import records.
+- Deleting unrelated OCR import records.
 - Undo, restore, or reactivation.
 
 ## 10. Acceptance Criteria
@@ -86,7 +89,7 @@ Deletion is irreversible. It removes the training session, its definitions and s
 3. Coaches assigned to the same group have identical deletion permissions.
 4. Planned and completed sessions can be deleted.
 5. Deletion permanently removes the session and every definition, segment, participation, and execution owned by it.
-6. No associated training group, athlete, or unrelated data is deleted or modified.
+6. No associated training group, athlete, or unrelated data is deleted or modified; a linked accepted import and its owned data are deleted as specified above.
 7. Deleted sessions no longer appear in planned-only or include-completed lists and cannot be retrieved by UC-504.
 8. Sessions with recorded execution data can be deleted.
 9. Inaccessible and nonexistent sessions produce the same not-found response.

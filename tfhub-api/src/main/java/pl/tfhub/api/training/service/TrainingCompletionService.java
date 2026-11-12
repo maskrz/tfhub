@@ -66,6 +66,21 @@ public class TrainingCompletionService {
 
     @Transactional
     public UpdateTrainingResponse completeTraining(long trainingId, CompleteTrainingRequest request) {
+        applyTrainingChanges(trainingId, request, true);
+        return new UpdateTrainingResponse(trainingId);
+    }
+
+    @Transactional
+    public void addImportedParticipations(
+            long trainingId, List<AddTrainingParticipationRequest> additions) {
+        applyTrainingChanges(
+                trainingId,
+                new CompleteTrainingRequest(additions, List.of(), List.of()),
+                false);
+    }
+
+    private void applyTrainingChanges(
+            long trainingId, CompleteTrainingRequest request, boolean markCompleted) {
         accessScopeService.requireCoachOrAdmin();
         if (trainingId <= 0) {
             throw new InvalidTrainingIdException();
@@ -105,8 +120,9 @@ public class TrainingCompletionService {
                 request, definitionsById, segments, segmentsById, participationsById, executionsById, executions,
                 training.getTrainingGroup().getId());
         applyPlan(training, plan, participationsById);
-        training.markCompleted();
-        return new UpdateTrainingResponse(trainingId);
+        if (markCompleted) {
+            training.markCompleted();
+        }
     }
 
     private CompletionPlan validateAndPlan(

@@ -9,6 +9,8 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockMultipartHttpServletRequestBuilder;
 import org.springframework.mock.web.MockMultipartFile;
 import pl.tfhub.api.trainingimport.dto.response.TrainingImportUploadResponse;
+import pl.tfhub.api.trainingimport.dto.response.TrainingImportAcceptanceResponse;
+import pl.tfhub.api.trainingimport.dto.response.TrainingImportRejectionResponse;
 import pl.tfhub.api.trainingimport.dto.response.TrainingImportAthleteCandidateResponse;
 import pl.tfhub.api.trainingimport.dto.response.TrainingImportDraftResponse;
 import pl.tfhub.api.trainingimport.dto.response.TrainingImportStatusResponse;
@@ -18,6 +20,7 @@ import pl.tfhub.api.trainingimport.service.TrainingImportDraftService;
 import pl.tfhub.api.trainingimport.service.TrainingImportProcessingService;
 import pl.tfhub.api.trainingimport.service.TrainingImportSourceImageService;
 import pl.tfhub.api.trainingimport.service.TrainingImportUploadService;
+import pl.tfhub.api.trainingimport.service.TrainingImportFinalizationService;
 import pl.tfhub.api.traininggroup.dto.response.TrainingGroupResponse;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -45,6 +48,9 @@ class TrainingImportControllerTests {
 
 	@MockitoBean
 	private TrainingImportProcessingService processingService;
+
+	@MockitoBean
+	private TrainingImportFinalizationService finalizationService;
 
 	@Test
 	void acceptsExactlyOneImageAndReturnsUploadDetails() throws Exception {
@@ -229,6 +235,25 @@ class TrainingImportControllerTests {
 
 		verify(processingService).getStatus(42L);
 		verify(processingService).retry(42L);
+	}
+
+	@Test
+	void acceptsAndRejectsReviewedImports() throws Exception {
+		when(finalizationService.accept(42L))
+				.thenReturn(new TrainingImportAcceptanceResponse(42, TrainingImportStatus.ACCEPTED, 91));
+		when(finalizationService.reject(43L))
+				.thenReturn(new TrainingImportRejectionResponse(43, TrainingImportStatus.REJECTED));
+
+		mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+						.post("/api/training-imports/42/accept"))
+				.andExpect(status().isOk())
+				.andExpect(content().json(
+						"{\"importId\":42,\"status\":\"ACCEPTED\",\"trainingId\":91}", true));
+		mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+						.post("/api/training-imports/43/reject"))
+				.andExpect(status().isOk())
+				.andExpect(content().json(
+						"{\"importId\":43,\"status\":\"REJECTED\"}", true));
 	}
 
 	private MockMultipartHttpServletRequestBuilder uploadRequest() {

@@ -42,6 +42,8 @@ import pl.tfhub.api.athlete.repository.AthleteRepository;
 import pl.tfhub.api.training.entity.Training;
 import pl.tfhub.api.training.enums.TrainingExecutionStatus;
 import pl.tfhub.api.training.repository.TrainingRepository;
+import pl.tfhub.api.training.service.TrainingDeletionService;
+import pl.tfhub.api.training.service.TrainingDetailsService;
 import pl.tfhub.api.traininggroup.repository.TrainingGroupRepository;
 import pl.tfhub.api.traininggroup.service.TrainingGroupService;
 import pl.tfhub.api.trainingimport.entity.TrainingImport;
@@ -72,6 +74,7 @@ import pl.tfhub.api.trainingimport.repository.TrainingImportDraftSegmentReposito
 import pl.tfhub.api.trainingimport.repository.TrainingImportRepository;
 import pl.tfhub.api.trainingimport.repository.TrainingImportSourceImageRepository;
 import pl.tfhub.api.trainingimport.service.TrainingImportDraftService;
+import pl.tfhub.api.trainingimport.service.TrainingImportFinalizationService;
 import pl.tfhub.api.trainingimport.service.GeminiTrainingRecognitionClient;
 import pl.tfhub.api.trainingimport.service.TrainingImportImageProcessor;
 import pl.tfhub.api.trainingimport.service.TrainingImportImageStorage;
@@ -158,6 +161,12 @@ class TrainingImportDomainIntegrationTests {
 	private TrainingRepository trainingRepository;
 
 	@Autowired
+	private TrainingDetailsService trainingDetailsService;
+
+	@Autowired
+	private TrainingDeletionService trainingDeletionService;
+
+	@Autowired
 	private TrainingImportUploadService uploadService;
 
 	@Autowired
@@ -174,6 +183,9 @@ class TrainingImportDomainIntegrationTests {
 
 	@Autowired
 	private TrainingImportDraftService draftService;
+
+	@Autowired
+	private TrainingImportFinalizationService finalizationService;
 
 	@Autowired
 	private TrainingImportSourceImageService sourceImageService;
@@ -460,6 +472,164 @@ class TrainingImportDomainIntegrationTests {
 	}
 
 	@Test
+	void acceptsReviewedDraftAtomicallyAndCreatesPlannedTrainingWithExecutionData() {
+		TrainingImport trainingImport = saveReviewDraft(1, "accept.jpg");
+		TrainingImportDraftResponse initial = draftService.getDraft(trainingImport.getId());
+		TrainingImportDraftResponse reviewed = draftService.updateDraft(
+				trainingImport.getId(), updateRequest(initial, 1, false));
+
+		var accepted = finalizationService.accept(trainingImport.getId());
+
+		assertEquals(trainingImport.getId(), accepted.importId());
+		assertEquals(TrainingImportStatus.ACCEPTED, accepted.status());
+		assertNotNull(accepted.trainingId());
+		assertTrue(reviewed.validation().readyForAcceptance());
+		TrainingImport persistedImport = trainingImportRepository.findById(trainingImport.getId()).orElseThrow();
+		assertEquals(TrainingImportStatus.ACCEPTED, persistedImport.getStatus());
+		assertEquals(accepted.trainingId(), persistedImport.getAcceptedTrainingSessionId());
+		assertEquals(1L, count("training_import_source_images"));
+
+		var training = trainingDetailsService.getTraining(accepted.trainingId());
+		assertEquals("Corrected intervals", training.name());
+		assertEquals(java.time.LocalDate.parse("2026-11-11"), training.trainingDate());
+		assertEquals(pl.tfhub.api.training.enums.TrainingStatus.PLANNED, training.status());
+		assertEquals(1, training.definitions().size());
+		assertEquals(2, training.definitions().getFirst().segments().size());
+		assertEquals(1, training.definitions().getFirst().participations().size());
+		var participation = training.definitions().getFirst().participations().getFirst();
+		assertEquals(1L, participation.athleteId());
+		assertEquals(2, participation.executions().size());
+		var recordedExecution = participation.executions().stream()
+				.filter(execution -> execution.status() == TrainingExecutionStatus.RECORDED)
+				.findFirst()
+				.orElseThrow();
+		assertEquals(new BigDecimal("12.340"), recordedExecution.measuredResult());
+		assertTrue(recordedExecution.usesSpikes());
+		assertEquals(1L, count("training_sessions"));
+		assertThrows(TrainingImportNotReviewableException.class,
+				() -> finalizationService.accept(trainingImport.getId()));
+	}
+
+	@Test
+	void skippedRowsAreOmittedAndFailedAcceptanceLeavesNoPartialTraining() {
+		TrainingImport skippedImport = saveReviewDraft(1, "accept-skip.jpg");
+		TrainingImportDraftResponse skippedDraft = draftService.getDraft(skippedImport.getId());
+		draftService.updateDraft(skippedImport.getId(), updateRequest(skippedDraft, 1, true));
+
+		var accepted = finalizationService.accept(skippedImport.getId());
+
+		assertEquals(0L, jdbcTemplate.queryForObject(
+				"SELECT COUNT(*) FROM training_athlete_participations WHERE training_session_id = ?",
+				Long.class, accepted.trainingId()));
+		assertEquals(0L, jdbcTemplate.queryForObject(
+				"SELECT COUNT(*) FROM training_segment_executions WHERE training_definition_id IN "
+						+ "(SELECT id FROM training_definitions WHERE training_session_id = ?)",
+				Long.class, accepted.trainingId()));
+
+		TrainingImport invalidImport = saveReviewDraft(1, "accept-group-change.jpg");
+		TrainingImportDraftResponse initial = draftService.getDraft(invalidImport.getId());
+		draftService.updateDraft(invalidImport.getId(), updateRequest(initial, 1, false));
+		jdbcTemplate.update("UPDATE athletes SET training_group_id = 2 WHERE id = 1");
+
+		assertThrows(InvalidTrainingImportDraftException.class,
+				() -> finalizationService.accept(invalidImport.getId()));
+		assertEquals(TrainingImportStatus.REVIEW_REQUIRED,
+				trainingImportRepository.findById(invalidImport.getId()).orElseThrow().getStatus());
+		assertEquals(1L, count("training_sessions"));
+	}
+
+	@Test
+	void rejectionPreservesDraftAndAttemptsAndCannotBeFinalizedAgain() {
+		TrainingImport trainingImport = saveReviewDraft(1, "reject.jpg");
+
+		var rejected = finalizationService.reject(trainingImport.getId());
+
+		assertEquals(trainingImport.getId(), rejected.importId());
+		assertEquals(TrainingImportStatus.REJECTED, rejected.status());
+		assertEquals(TrainingImportStatus.REJECTED, draftService.getDraft(trainingImport.getId()).status());
+		assertEquals(1L, count("training_imports"));
+		assertEquals(1L, count("training_import_attempts"));
+		assertEquals(1L, count("training_import_drafts"));
+		assertEquals(1L, count("training_import_source_images"));
+		assertEquals(0L, count("training_sessions"));
+		assertThrows(TrainingImportNotReviewableException.class,
+				() -> finalizationService.accept(trainingImport.getId()));
+	}
+
+	@Test
+	void acceptanceRejectsUnreviewedDraftWithoutCreatingTraining() {
+		TrainingImport trainingImport = saveReviewDraft(1, "accept-unreviewed.jpg");
+
+		assertThrows(InvalidTrainingImportDraftException.class,
+				() -> finalizationService.accept(trainingImport.getId()));
+
+		assertEquals(TrainingImportStatus.REVIEW_REQUIRED,
+				trainingImportRepository.findById(trainingImport.getId()).orElseThrow().getStatus());
+		assertEquals(0L, count("training_sessions"));
+	}
+
+	@Test
+	void persistenceFailureRollsBackTrainingAndLeavesImportReviewable() {
+		TrainingImport trainingImport = saveReviewDraft(1, "accept-rollback.jpg");
+		TrainingImportDraftResponse initial = draftService.getDraft(trainingImport.getId());
+		draftService.updateDraft(trainingImport.getId(), updateRequest(initial, 1, false));
+		jdbcTemplate.execute("""
+				CREATE FUNCTION test_fail_training_execution_insert() RETURNS trigger AS $$
+				BEGIN
+				    RAISE EXCEPTION 'injected execution persistence failure';
+				END;
+				$$ LANGUAGE plpgsql
+				""");
+		jdbcTemplate.execute("""
+				CREATE TRIGGER test_fail_training_execution_insert
+				BEFORE INSERT ON training_segment_executions
+				FOR EACH ROW EXECUTE FUNCTION test_fail_training_execution_insert()
+				""");
+		try {
+			assertThrows(RuntimeException.class,
+					() -> finalizationService.accept(trainingImport.getId()));
+		} finally {
+			jdbcTemplate.execute("DROP TRIGGER test_fail_training_execution_insert ON training_segment_executions");
+			jdbcTemplate.execute("DROP FUNCTION test_fail_training_execution_insert()");
+		}
+
+		assertEquals(0L, count("training_sessions"));
+		assertEquals(TrainingImportStatus.REVIEW_REQUIRED,
+				trainingImportRepository.findById(trainingImport.getId()).orElseThrow().getStatus());
+	}
+
+	@Test
+	void coachesCannotFinalizeImportsFromUnassignedGroups() {
+		TrainingImport trainingImport = saveReviewDraft(2, "coach-inaccessible.jpg");
+		setAuthenticatedUser(2, UserRole.COACH);
+
+		assertThrows(TrainingImportNotFoundException.class,
+				() -> finalizationService.reject(trainingImport.getId()));
+		assertEquals(TrainingImportStatus.REVIEW_REQUIRED,
+				trainingImportRepository.findById(trainingImport.getId()).orElseThrow().getStatus());
+	}
+
+	@Test
+	void deletingImportedTrainingAlsoDeletesItsImportAndStoredImage() throws IOException {
+		TrainingImport trainingImport = saveReviewDraftWithStoredImage(
+				1, "delete-after-accept.jpg", new byte[] {1, 2, 3});
+		String storageKey = sourceImageRepository.findById(trainingImport.getId())
+				.orElseThrow().getStorageKey();
+		TrainingImportDraftResponse initial = draftService.getDraft(trainingImport.getId());
+		draftService.updateDraft(trainingImport.getId(), updateRequest(initial, 1, false));
+		var accepted = finalizationService.accept(trainingImport.getId());
+		assertTrue(Files.exists(IMAGE_DIRECTORY.resolve(storageKey)));
+
+		trainingDeletionService.deleteTraining(accepted.trainingId());
+
+		assertEquals(0L, count("training_sessions"));
+		assertEquals(0L, count("training_imports"));
+		assertEquals(0L, count("training_import_attempts"));
+		assertEquals(0L, count("training_import_drafts"));
+		assertFalse(Files.exists(IMAGE_DIRECTORY.resolve(storageKey)));
+	}
+
+	@Test
 	void databaseRejectsMatchingTheSameAthleteTwiceWithinOneDraft() {
 		TrainingImport trainingImport = saveReviewDraft(1, "review-duplicate.jpg");
 		TrainingImportDraft draft = draftRepository.findByTrainingImport_Id(trainingImport.getId()).orElseThrow();
@@ -686,7 +856,16 @@ class TrainingImportDomainIntegrationTests {
 	}
 
 	private TrainingImport saveReviewDraft(long groupId, String filename) {
-		TrainingImport trainingImport = saveImportWithImage(groupId, filename, "b".repeat(64));
+		return persistReviewDraft(saveImportWithImage(groupId, filename, "b".repeat(64)));
+	}
+
+	private TrainingImport saveReviewDraftWithStoredImage(
+			long groupId, String filename, byte[] contents) {
+		return persistReviewDraft(saveImportWithStoredImage(
+				groupId, filename, "d".repeat(64), contents));
+	}
+
+	private TrainingImport persistReviewDraft(TrainingImport trainingImport) {
 		trainingImport.changeStatus(TrainingImportStatus.REVIEW_REQUIRED);
 		trainingImportRepository.saveAndFlush(trainingImport);
 
@@ -717,7 +896,8 @@ class TrainingImportDomainIntegrationTests {
 						Map.of("uncertain", true, "originalText", "400?", "manuallyReviewed", false)));
 		TrainingImportDraftSegment secondSegment = segmentRepository.saveAndFlush(
 				new TrainingImportDraftSegment(draft, definition, 2, 200, null, Map.of()));
-		Athlete athlete = athleteRepository.findById(groupId == 1 ? 1L : 2L).orElseThrow();
+		Athlete athlete = athleteRepository.findById(
+				trainingImport.getTrainingGroup().getId() == 1 ? 1L : 2L).orElseThrow();
 		TrainingImportDraftAthleteRow row = athleteRowRepository.saveAndFlush(
 				new TrainingImportDraftAthleteRow(
 						draft,

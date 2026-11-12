@@ -27,6 +27,7 @@ public class TrainingDeletionService {
     private final AthleteTrainingParticipationRepository participationRepository;
     private final TrainingSegmentExecutionRepository executionRepository;
     private final AccessScopeService accessScopeService;
+    private final AcceptedTrainingImportCleanup acceptedTrainingImportCleanup;
 
     public TrainingDeletionService(
             TrainingRepository trainingRepository,
@@ -34,13 +35,15 @@ public class TrainingDeletionService {
             TrainingSegmentRepository segmentRepository,
             AthleteTrainingParticipationRepository participationRepository,
             TrainingSegmentExecutionRepository executionRepository,
-            AccessScopeService accessScopeService) {
+            AccessScopeService accessScopeService,
+            AcceptedTrainingImportCleanup acceptedTrainingImportCleanup) {
         this.trainingRepository = trainingRepository;
         this.definitionRepository = definitionRepository;
         this.segmentRepository = segmentRepository;
         this.participationRepository = participationRepository;
         this.executionRepository = executionRepository;
         this.accessScopeService = accessScopeService;
+        this.acceptedTrainingImportCleanup = acceptedTrainingImportCleanup;
     }
 
     @Transactional
@@ -82,6 +85,7 @@ public class TrainingDeletionService {
         segmentRepository.flush();
         definitionRepository.deleteAll(definitions);
         definitionRepository.flush();
+        acceptedTrainingImportCleanup.deleteForTraining(trainingId);
         trainingRepository.delete(training);
         trainingRepository.flush();
     }

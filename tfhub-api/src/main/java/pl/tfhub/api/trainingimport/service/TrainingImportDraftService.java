@@ -65,14 +65,14 @@ public class TrainingImportDraftService {
 
 	@Transactional(readOnly = true)
 	public TrainingImportDraftResponse getDraft(long importId) {
-		TrainingImport trainingImport = getReviewableImport(importId);
+		TrainingImport trainingImport = getReadableImport(importId);
 		TrainingImportDraft draft = findDraft(importId);
 		return toResponse(draft, loadDraftData(draft), trainingImport);
 	}
 
 	@Transactional
 	public TrainingImportDraftResponse updateDraft(long importId, TrainingImportDraftUpdateRequest request) {
-		TrainingImport trainingImport = getReviewableImport(importId);
+		TrainingImport trainingImport = getReviewableImportForUpdate(importId);
 		TrainingImportDraft draft = findDraft(importId);
 		DraftData existing = loadDraftData(draft);
 		Map<Long, Athlete> matchedAthletes = validateUpdate(request, existing);
@@ -229,6 +229,24 @@ public class TrainingImportDraftService {
 	private TrainingImport getReviewableImport(long importId) {
 		TrainingImport trainingImport = accessService.getAccessibleImport(importId);
 		if (trainingImport.getStatus() != TrainingImportStatus.REVIEW_REQUIRED) {
+			throw new TrainingImportNotReviewableException();
+		}
+		return trainingImport;
+	}
+
+	private TrainingImport getReviewableImportForUpdate(long importId) {
+		TrainingImport trainingImport = accessService.getAccessibleImportForUpdate(importId);
+		if (trainingImport.getStatus() != TrainingImportStatus.REVIEW_REQUIRED) {
+			throw new TrainingImportNotReviewableException();
+		}
+		return trainingImport;
+	}
+
+	private TrainingImport getReadableImport(long importId) {
+		TrainingImport trainingImport = accessService.getAccessibleImport(importId);
+		if (trainingImport.getStatus() != TrainingImportStatus.REVIEW_REQUIRED
+				&& trainingImport.getStatus() != TrainingImportStatus.ACCEPTED
+				&& trainingImport.getStatus() != TrainingImportStatus.REJECTED) {
 			throw new TrainingImportNotReviewableException();
 		}
 		return trainingImport;

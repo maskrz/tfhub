@@ -97,6 +97,7 @@ Rejection must preserve the import, its current draft, processing attempts and o
 - The optimized JPEG must be retained after rejection.
 - Acceptance or rejection must not modify or delete the source image.
 - The source image must remain associated with the import for future inspection.
+- If the accepted training is later permanently deleted under UC-505, the linked import and its source image are also deleted.
 
 ## 5. Authorization Rules
 
@@ -185,7 +186,7 @@ Use `POST /api/training-imports/{importId}/reject`.
 - Modifying accepted training sessions.
 - Reactivating rejected imports.
 - Reopening accepted or rejected imports.
-- Deleting source images or import history.
+- Directly deleting source images or import history; deleting an accepted training under UC-505 also deletes its linked import.
 - Automatic acceptance based on AI confidence.
 - Training statistics and athlete training history.
 
@@ -208,7 +209,7 @@ Use `POST /api/training-imports/{importId}/reject`.
 15. Rejection changes the import status to REJECTED.
 16. Rejection does not create a training session or execution records.
 17. Rejected imports retain their current draft, optimized JPEG and processing-attempt history; individual draft-edit history is not retained.
-18. Accepted imports retain their optimized JPEG.
+18. Accepted imports retain their optimized JPEG unless the linked training is later permanently deleted under UC-505.
 19. ACCEPTED and REJECTED imports cannot be finalized again.
 20. Concurrent requests cannot create duplicate training sessions.
 21. Unauthorized users cannot accept or reject training imports.

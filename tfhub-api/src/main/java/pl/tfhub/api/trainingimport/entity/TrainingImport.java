@@ -49,6 +49,9 @@ public class TrainingImport {
 	@Column(name = "next_retry_at")
 	private OffsetDateTime nextRetryAt;
 
+	@Column(name = "accepted_training_session_id")
+	private Long acceptedTrainingSessionId;
+
 	@OneToOne(mappedBy = "trainingImport", fetch = FetchType.LAZY, optional = false)
 	private TrainingImportSourceImage sourceImage;
 
@@ -99,12 +102,34 @@ public class TrainingImport {
 		return nextRetryAt;
 	}
 
+	public Long getAcceptedTrainingSessionId() {
+		return acceptedTrainingSessionId;
+	}
+
 	public TrainingImportSourceImage getSourceImage() {
 		return sourceImage;
 	}
 
 	public void changeStatus(TrainingImportStatus status) {
+		if (status == TrainingImportStatus.ACCEPTED || status == TrainingImportStatus.REJECTED) {
+			throw new IllegalArgumentException("Use an explicit finalization transition for terminal import states");
+		}
 		this.status = status;
+	}
+
+	public void accept(long trainingId) {
+		if (status != TrainingImportStatus.REVIEW_REQUIRED || trainingId <= 0) {
+			throw new IllegalStateException("Only a reviewed import can be accepted with a training session");
+		}
+		this.status = TrainingImportStatus.ACCEPTED;
+		this.acceptedTrainingSessionId = trainingId;
+	}
+
+	public void reject() {
+		if (status != TrainingImportStatus.REVIEW_REQUIRED) {
+			throw new IllegalStateException("Only a reviewed import can be rejected");
+		}
+		this.status = TrainingImportStatus.REJECTED;
 	}
 
 	public void scheduleAutomaticRetry(OffsetDateTime nextRetryAt) {

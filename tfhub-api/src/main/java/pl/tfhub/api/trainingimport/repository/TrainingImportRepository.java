@@ -17,6 +17,14 @@ public interface TrainingImportRepository extends JpaRepository<TrainingImport, 
 	@Query("SELECT trainingImport FROM TrainingImport trainingImport WHERE trainingImport.id = :id")
 	Optional<TrainingImport> findByIdForUpdate(@Param("id") long id);
 
+	@Lock(LockModeType.PESSIMISTIC_WRITE)
+	@Query("""
+			SELECT trainingImport FROM TrainingImport trainingImport
+			WHERE trainingImport.acceptedTrainingSessionId = :trainingId
+			""")
+	Optional<TrainingImport> findByAcceptedTrainingSessionIdForUpdate(
+			@Param("trainingId") long trainingId);
+
 	@Query("""
 			SELECT trainingImport.id
 			FROM TrainingImport trainingImport
