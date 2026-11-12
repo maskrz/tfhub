@@ -58,6 +58,14 @@ public class TrainingImportImageStorage {
 		}
 	}
 
+	public byte[] load(String storageKey) {
+		try {
+			return Files.readAllBytes(resolveStorageKey(storageKey));
+		} catch (IOException exception) {
+			throw new TrainingImportImageStorageException(exception);
+		}
+	}
+
 	public int removeOrphanFiles(Set<String> referencedStorageKeys) {
 		if (Files.notExists(storageRoot)) {
 			return 0;

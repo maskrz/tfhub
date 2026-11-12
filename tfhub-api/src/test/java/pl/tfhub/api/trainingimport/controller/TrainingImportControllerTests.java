@@ -9,8 +9,13 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockMultipartHttpServletRequestBuilder;
 import org.springframework.mock.web.MockMultipartFile;
 import pl.tfhub.api.trainingimport.dto.response.TrainingImportUploadResponse;
+import pl.tfhub.api.trainingimport.dto.response.TrainingImportAthleteCandidateResponse;
+import pl.tfhub.api.trainingimport.dto.response.TrainingImportDraftResponse;
 import pl.tfhub.api.trainingimport.enums.TrainingImportStatus;
+import pl.tfhub.api.trainingimport.service.TrainingImportDraftService;
+import pl.tfhub.api.trainingimport.service.TrainingImportSourceImageService;
 import pl.tfhub.api.trainingimport.service.TrainingImportUploadService;
+import pl.tfhub.api.traininggroup.dto.response.TrainingGroupResponse;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -28,6 +33,12 @@ class TrainingImportControllerTests {
 
 	@MockitoBean
 	private TrainingImportUploadService uploadService;
+
+	@MockitoBean
+	private TrainingImportDraftService draftService;
+
+	@MockitoBean
+	private TrainingImportSourceImageService sourceImageService;
 
 	@Test
 	void acceptsExactlyOneImageAndReturnsUploadDetails() throws Exception {
@@ -59,6 +70,100 @@ class TrainingImportControllerTests {
 		mockMvc.perform(uploadRequest()
 						.file(new MockMultipartFile("other", "photo.png", MediaType.IMAGE_PNG_VALUE, new byte[] {1})))
 				.andExpect(status().isBadRequest());
+	}
+
+	@Test
+	void retrievesDraftAndValidationState() throws Exception {
+		when(draftService.getDraft(42L)).thenReturn(new TrainingImportDraftResponse(
+				42,
+				TrainingImportStatus.REVIEW_REQUIRED,
+				new TrainingGroupResponse(7, "Group A"),
+				"Intervals",
+				java.time.LocalDate.parse("2026-11-10"),
+				java.util.Map.of(),
+				true,
+				java.util.List.of(),
+				new TrainingImportDraftResponse.Validation(true, java.util.List.of())));
+
+		mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+						.get("/api/training-imports/42/draft"))
+				.andExpect(status().isOk())
+				.andExpect(content().json("""
+						{
+						  "importId": 42,
+						  "status": "REVIEW_REQUIRED",
+						  "trainingGroup": {"id": 7, "name": "Group A"},
+						  "name": "Intervals",
+						  "trainingDate": "2026-11-10",
+						  "recognitionMetadata": {},
+						  "recognitionReviewed": true,
+						  "definitions": [],
+						  "validation": {"readyForAcceptance": true, "issues": []}
+						}
+						""", true));
+	}
+
+	@Test
+	void savesCompleteDraftAndSearchesCandidatesWithinImport() throws Exception {
+		when(draftService.updateDraft(eq(42L), any())).thenReturn(new TrainingImportDraftResponse(
+				42,
+				TrainingImportStatus.REVIEW_REQUIRED,
+				new TrainingGroupResponse(7, "Group A"),
+				"Intervals",
+				java.time.LocalDate.parse("2026-11-10"),
+				java.util.Map.of(),
+				true,
+				java.util.List.of(),
+				new TrainingImportDraftResponse.Validation(true, java.util.List.of())));
+		when(draftService.findAthleteCandidates(42L, "Ada")).thenReturn(java.util.List.of(
+				new TrainingImportAthleteCandidateResponse(
+						11, "Ada", "Lovelace", 1990, pl.tfhub.api.athlete.enums.Gender.FEMALE, true)));
+
+		mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+						.put("/api/training-imports/42/draft")
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("""
+								{
+								  "name": "Intervals",
+								  "trainingDate": "2026-11-10",
+								  "recognitionReviewed": true,
+								  "definitions": [{
+								    "name": "Main set",
+								    "sequenceNumber": 1,
+								    "segments": [{
+								      "sequenceNumber": 1,
+								      "distanceM": 400,
+								      "recognitionReviewed": true
+								    }],
+								    "athleteRows": []
+								  }]
+								}
+								"""))
+				.andExpect(status().isOk())
+				.andExpect(content().json("{\"status\":\"REVIEW_REQUIRED\"}"));
+
+		mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+						.get("/api/training-imports/42/athlete-candidates")
+						.param("query", "Ada"))
+				.andExpect(status().isOk())
+				.andExpect(content().json("""
+						[{"id":11,"firstName":"Ada","lastName":"Lovelace","birthYear":1990,
+						  "gender":"FEMALE","active":true}]
+						"""));
+
+		verify(draftService).updateDraft(eq(42L), any());
+		verify(draftService).findAthleteCandidates(42L, "Ada");
+	}
+
+	@Test
+	void returnsOptimizedSourceImageAsJpeg() throws Exception {
+		when(sourceImageService.getSourceImage(42L)).thenReturn(new byte[] {(byte) 0xff, (byte) 0xd8});
+
+		mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+						.get("/api/training-imports/42/source-image"))
+				.andExpect(status().isOk())
+				.andExpect(content().contentType(MediaType.IMAGE_JPEG))
+				.andExpect(content().bytes(new byte[] {(byte) 0xff, (byte) 0xd8}));
 	}
 
 	private MockMultipartHttpServletRequestBuilder uploadRequest() {

@@ -37,7 +37,12 @@ import pl.tfhub.api.training.exception.InvalidTrainingRequestException;
 import pl.tfhub.api.training.exception.InvalidTrainingIdException;
 import pl.tfhub.api.training.exception.TrainingNotFoundException;
 import pl.tfhub.api.trainingimport.exception.InvalidTrainingImportUploadException;
+import pl.tfhub.api.trainingimport.exception.InvalidTrainingImportDraftException;
+import pl.tfhub.api.trainingimport.exception.InvalidTrainingImportIdException;
+import pl.tfhub.api.trainingimport.exception.TrainingImportDraftNotFoundException;
 import pl.tfhub.api.trainingimport.exception.TrainingImportImageStorageException;
+import pl.tfhub.api.trainingimport.exception.TrainingImportNotFoundException;
+import pl.tfhub.api.trainingimport.exception.TrainingImportNotReviewableException;
 import pl.tfhub.api.user.exception.IncorrectCurrentPasswordException;
 import pl.tfhub.api.backup.BackupAlreadyRunningException;
 import pl.tfhub.api.backup.BackupExecutionException;
@@ -209,6 +214,34 @@ public class ApiExceptionHandler {
 		return problem;
 	}
 
+	@ExceptionHandler(InvalidTrainingImportDraftException.class)
+	public ProblemDetail handleInvalidTrainingImportDraft(InvalidTrainingImportDraftException exception) {
+		ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, exception.getMessage());
+		problem.setTitle("Invalid training import draft");
+		return problem;
+	}
+
+	@ExceptionHandler(InvalidTrainingImportIdException.class)
+	public ProblemDetail handleInvalidTrainingImportId(InvalidTrainingImportIdException exception) {
+		ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, exception.getMessage());
+		problem.setTitle("Invalid training import ID");
+		return problem;
+	}
+
+	@ExceptionHandler({TrainingImportNotFoundException.class, TrainingImportDraftNotFoundException.class})
+	public ProblemDetail handleTrainingImportNotFound(RuntimeException exception) {
+		ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, exception.getMessage());
+		problem.setTitle("Training import not found");
+		return problem;
+	}
+
+	@ExceptionHandler(TrainingImportNotReviewableException.class)
+	public ProblemDetail handleTrainingImportNotReviewable(TrainingImportNotReviewableException exception) {
+		ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, exception.getMessage());
+		problem.setTitle("Training import is not reviewable");
+		return problem;
+	}
+
 	@ExceptionHandler(MaxUploadSizeExceededException.class)
 	public ProblemDetail handleMaxUploadSizeExceeded() {
 		ProblemDetail problem = ProblemDetail.forStatusAndDetail(
@@ -264,6 +297,9 @@ public class ApiExceptionHandler {
 
 	@ExceptionHandler(MethodArgumentTypeMismatchException.class)
 	public ProblemDetail handleTypeMismatch(MethodArgumentTypeMismatchException exception) {
+		if ("importId".equals(exception.getName())) {
+			return handleInvalidTrainingImportId(new InvalidTrainingImportIdException());
+		}
 		if ("trainingId".equals(exception.getName())) {
 			return handleInvalidTrainingId();
 		}
