@@ -12,6 +12,7 @@ import { TestsApiService } from '../tests/tests-api.service';
 import { ResultFormModalComponent } from '../results/result-form-modal.component';
 import { ResultResponse } from '../results/result.model';
 import { AuthService } from '../../core/auth/auth.service';
+import { AthleteTrainingHistoryComponent } from './athlete-training-history.component';
 
 interface MatrixCell {
   result: AthleteProfileResult;
@@ -71,7 +72,7 @@ interface ProfileChart {
 const chartColors = ['#2585d8', '#159c68', '#db8a2f', '#8558c7', '#d55252', '#259da5', '#b64f9a', '#777f31'];
 
 @Component({
-  imports: [AthleteFormModalComponent, ResultFormModalComponent],
+  imports: [AthleteFormModalComponent, ResultFormModalComponent, AthleteTrainingHistoryComponent],
   selector: 'app-athlete-profile-page',
   styleUrl: './athlete-profile.page.scss',
   templateUrl: './athlete-profile.page.html',

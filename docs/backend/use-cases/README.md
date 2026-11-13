@@ -27,6 +27,7 @@ Manages athlete records and their active status.
 | UC-003 | Search Athletes | Retrieve athletes with optional status filtering and name search. | Implemented |
 | UC-004 | Update Athlete | Update an athlete's personal information. | Implemented |
 | UC-005 | Change Athlete Status | Activate or deactivate an athlete. | Implemented |
+| UC-006 | Athlete Profile Data | Retrieve athlete test-result profile data. | Implemented |
 
 Detailed specifications:
 - [UC-001 Add Athlete](UC-001-add-athlete.md)
@@ -34,6 +35,10 @@ Detailed specifications:
 - [UC-003 Search Athletes](UC-003-search-athlete.md)
 - [UC-004 Update Athlete](UC-004-update-athlete.md)
 - [UC-005 Change Athlete Status](UC-005-change-athlete-status.md)
+- [UC-006 Athlete Profile Data](UC-006-athlete-profile.md)
+
+Running training history for an athlete is specified separately in
+[UC-511 Athlete Running Training History](UC-511-TRN-athlete-training-history.md).
 
 ## 2. Test Module
 

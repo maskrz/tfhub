@@ -28,10 +28,37 @@ The page consists of the following sections, in this order:
 2. Results filters.
 3. Results matrix.
 4. Progress chart.
+5. Running training history.
 
 Follow the existing TFHUB application layout, shared header, footer, typography, colors, spacing, and component guidelines.
 
 All UI text must be in Polish.
+
+## Running training history
+
+Display a separate history section backed by UC-511. Initially both dates are
+empty and no history is requested. Date changes, quick ranges for the last
+1, 3, 6 or 12 calendar months, and clearing dates do not fetch; the user selects
+**Pobierz dane**. Quick ranges end on the current local date, include both
+boundaries and clamp the start to the last day of the target month. Reject a
+reversed range.
+
+After a successful request, display a distance multi-select derived from all
+returned segments, initially selecting all distances. Selecting or clearing
+distances filters only the displayed segment cells; all session dates remain
+visible and segment sequence numbers and total counts never change. Reset the
+selection after each successful request, not after a failed request.
+
+Show sessions newest first and their ordered segments with distance,
+sequence/total, time and `K` when spikes were used. Show `X` for completed
+without a result, `–` for not completed and a visually empty time with an
+accessible pending label. Show at least two decimal places and preserve a
+meaningful third decimal. Do not display rests, charts or statistics for this
+history. Use a responsive layout and accessible status legend.
+
+Dates link to the existing training details only when UC-511 reports access;
+athletes cannot open training details. Show loading, empty and error states;
+keep previous successful data on a failed refresh.
 
 ## 1. Athlete information
 

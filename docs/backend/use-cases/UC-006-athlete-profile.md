@@ -4,6 +4,10 @@
 
 Provide the backend data required by the athlete profile view.
 
+Running training execution history is a separate athlete-scoped read operation,
+specified in [UC-511](UC-511-TRN-athlete-training-history.md); it does not alter
+the test-result operations described below.
+
 The functionality extends the existing `athlete` and `result` modules. No new backend module should be introduced.
 
 The backend must support:

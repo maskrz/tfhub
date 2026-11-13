@@ -15,3 +15,24 @@ export interface AthleteResultHistoryFilters {
   fromDate?: string;
   toDate?: string;
 }
+export interface AthleteTrainingHistorySegment {
+  segmentId: number;
+  sequenceNumber: number;
+  distanceM: number;
+  status: 'PENDING' | 'RECORDED' | 'COMPLETED_WITHOUT_RESULT' | 'NOT_COMPLETED';
+  measuredResult: number | null;
+  usesSpikes: boolean;
+}
+
+export interface AthleteTrainingHistory {
+  trainingId: number;
+  trainingDate: string;
+  canViewDetails: boolean;
+  totalSegments: number;
+  segments: AthleteTrainingHistorySegment[];
+}
+
+export interface AthleteTrainingHistoryFilters {
+  fromDate?: string;
+  toDate?: string;
+}

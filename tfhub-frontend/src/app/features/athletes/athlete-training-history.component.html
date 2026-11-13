@@ -1,0 +1,97 @@
+<section class="training-history" aria-labelledby="training-history-heading">
+  <h2 id="training-history-heading">Historia treningów biegowych</h2>
+  <div class="date-filters">
+    <label class="filter-field">
+      <span>Data od</span>
+      <input class="field-control" type="date" [value]="fromDate()" (input)="setDate($event, 'from')" />
+    </label>
+    <label class="filter-field">
+      <span>Data do</span>
+      <input class="field-control" type="date" [value]="toDate()" (input)="setDate($event, 'to')" />
+    </label>
+  </div>
+  <div class="actions" role="group" aria-label="Szybki wybór zakresu dat">
+    @for (months of [1, 3, 6, 12]; track months) {
+      <button class="button button--secondary" type="button" (click)="setQuickRange(months)">
+        {{ months === 1 ? 'Ostatni miesiąc' : 'Ostatnie ' + months + ' mies.' }}
+      </button>
+    }
+    <button class="button button--secondary" type="button" (click)="clearDates()">Wyczyść filtry</button>
+    <button class="button button--primary" type="button" [disabled]="loading()" (click)="load()">
+      {{ loading() ? 'Pobieranie danych…' : 'Pobierz dane' }}
+    </button>
+  </div>
+  @if (filterError(); as message) {
+    <p class="feedback error" role="alert">{{ message }}</p>
+  }
+  @if (loaded()) {
+    <fieldset class="distance-picker">
+      <legend>Dystanse</legend>
+      @if (distances().length === 0) {
+        <p>Brak dystansów w pobranych danych.</p>
+      } @else {
+        <div class="distance-options">
+          @for (distance of distances(); track distance) {
+            <label>
+              <input type="checkbox" [checked]="selectedDistances().includes(distance)"
+                (change)="toggleDistance(distance, $event)" />
+              {{ distance }} m
+            </label>
+          }
+        </div>
+        <button class="button button--secondary" type="button" (click)="toggleAll()">
+          {{ allSelected() ? 'Odznacz wszystkie' : 'Zaznacz wszystkie' }}
+        </button>
+      }
+    </fieldset>
+  }
+  @if (loading()) {
+    <p class="feedback" role="status">Pobieranie historii treningów…</p>
+  }
+  @if (error(); as message) {
+    <div class="feedback error" role="alert">
+      <p>{{ message }}</p>
+      <button class="button button--secondary" type="button" [disabled]="loading()" (click)="retry()">Spróbuj ponownie</button>
+    </div>
+  }
+  @if (!loaded() && !loading() && !error()) {
+    <p class="feedback">Wybierz zakres dat i pobierz dane.</p>
+  }
+  @if (loaded()) {
+    @if (history().length === 0) {
+      <p class="feedback" role="status">Brak treningów dla wybranego zakresu dat.</p>
+    } @else {
+      <p class="legend">X – ukończono bez wyniku, – – nie ukończono, K – kolce. Puste pole czasu oznacza oczekiwanie na uzupełnienie.</p>
+      <div class="history-table">
+        <table>
+          <thead><tr><th scope="col">Data</th><th scope="col">Odcinki</th></tr></thead>
+          <tbody>
+            @for (training of history(); track training.trainingId) {
+              <tr>
+                <th scope="row">
+                  @if (training.canViewDetails && (auth.currentUser()?.role === 'ADMIN' || auth.currentUser()?.role === 'COACH')) {
+                    <a [routerLink]="['/trainings', training.trainingId]">{{ formatDate(training.trainingDate) }}</a>
+                  } @else {
+                    {{ formatDate(training.trainingDate) }}
+                  }
+                </th>
+                <td>
+                  <div class="segments">
+                    @for (segment of visibleSegments(training); track segment.segmentId) {
+                      <div class="segment" role="group" [attr.aria-label]="'Odcinek ' + segment.sequenceNumber + ' z ' + training.totalSegments + ', ' + segment.distanceM + ' metrów, ' + statusLabel(segment) + (segment.measuredResult !== null ? ', czas ' + resultLabel(segment) : '') + (segment.usesSpikes ? ', kolce' : '')">
+                        <span class="segment-distance">{{ segment.distanceM }} m</span>
+                        <span class="segment-number">{{ segment.sequenceNumber }}/{{ training.totalSegments }}</span>
+                        <span class="segment-result">{{ resultLabel(segment) }}</span>
+                        <span class="segment-spikes">{{ segment.usesSpikes ? 'K' : '' }}</span>
+                      </div>
+                    }
+                  </div>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+  }
+</section>

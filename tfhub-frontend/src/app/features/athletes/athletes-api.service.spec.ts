@@ -124,4 +124,19 @@ describe('AthletesApiService', () => {
     expect(request.request.params.has('toDate')).toBe(false);
     request.flush([]);
   });
+
+  it('requests training history with only the selected date bounds', () => {
+    service.getTrainingHistory(8, { fromDate: '2026-01-01', toDate: '2026-11-11' }).subscribe();
+    const request = httpTesting.expectOne((req) => req.url === '/api/athletes/8/training-history');
+    expect(request.request.method).toBe('GET');
+    expect(request.request.params.keys()).toEqual(['fromDate', 'toDate']);
+    expect(request.request.params.get('fromDate')).toBe('2026-01-01');
+    expect(request.request.params.get('toDate')).toBe('2026-11-11');
+    request.flush([]);
+
+    service.getTrainingHistory(8, {}).subscribe();
+    const unfiltered = httpTesting.expectOne('/api/athletes/8/training-history');
+    expect(unfiltered.request.params.keys()).toEqual([]);
+    unfiltered.flush([]);
+  });
 });

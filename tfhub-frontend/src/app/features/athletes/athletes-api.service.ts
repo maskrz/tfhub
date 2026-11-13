@@ -7,7 +7,9 @@ import {
   CreateAthleteRequest,
   UpdateAthleteRequest,
 } from './athlete.model';
-import { AthleteProfileResult, AthleteResultHistoryFilters } from './athlete-profile.model';
+import {
+  AthleteProfileResult, AthleteResultHistoryFilters, AthleteTrainingHistory, AthleteTrainingHistoryFilters,
+} from './athlete-profile.model';
 import { TestResponse } from '../tests/test.model';
 
 @Injectable({ providedIn: 'root' })
@@ -31,9 +33,17 @@ export class AthletesApiService {
     for (const testId of filters.testIds) {
       params = params.append('testIds', testId);
     }
+
     if (filters.fromDate) params = params.set('fromDate', filters.fromDate);
     if (filters.toDate) params = params.set('toDate', filters.toDate);
     return this.http.get<AthleteProfileResult[]>(`/api/athletes/${id}/results`, { params });
+  }
+
+  getTrainingHistory(id: number, filters: AthleteTrainingHistoryFilters): Observable<AthleteTrainingHistory[]> {
+    let params = new HttpParams();
+    if (filters.fromDate) params = params.set('fromDate', filters.fromDate);
+    if (filters.toDate) params = params.set('toDate', filters.toDate);
+    return this.http.get<AthleteTrainingHistory[]>(`/api/athletes/${id}/training-history`, { params });
   }
 
   createAthlete(request: CreateAthleteRequest): Observable<AthleteResponse> {

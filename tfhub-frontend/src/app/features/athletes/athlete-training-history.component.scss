@@ -1,0 +1,122 @@
+:host {
+  display: block;
+}
+
+.training-history {
+  background: #fff;
+  border: 1px solid #dfe4e1;
+  border-radius: 0.75rem;
+  margin-top: 1.5rem;
+  padding: 1.25rem;
+}
+
+.date-filters, .actions, .distance-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.date-filters {
+  margin-bottom: 0.75rem;
+}
+
+.actions {
+  align-items: end;
+}
+
+.distance-picker {
+  border: 1px solid #dfe4e1;
+  border-radius: 0.5rem;
+  margin: 1rem 0;
+  padding: 0.75rem;
+}
+
+.distance-options {
+  margin-bottom: 0.75rem;
+}
+
+.distance-options label {
+  white-space: nowrap;
+}
+
+.legend {
+  font-size: 0.875rem;
+}
+
+.history-table {
+  max-width: 100%;
+}
+
+table {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+th, td {
+  border-bottom: 1px solid #dfe4e1;
+  padding: 0.75rem 0.5rem;
+  text-align: left;
+  vertical-align: top;
+}
+
+th:first-child {
+  white-space: nowrap;
+}
+
+.segments {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.segment {
+  border: 1px solid #bfcac3;
+  border-radius: 0.35rem;
+  display: grid;
+  grid-template-columns: minmax(4.5rem, 2fr) minmax(2.5rem, 1fr);
+  overflow: hidden;
+}
+
+.segment span {
+  min-height: 1.5rem;
+  padding: 0.2rem 0.4rem;
+}
+
+.segment-number, .segment-spikes {
+  border-left: 1px solid #dfe4e1;
+  text-align: right;
+}
+
+.segment-result, .segment-spikes {
+  border-top: 1px solid #dfe4e1;
+}
+
+@media (max-width: 600px) {
+  .training-history {
+    padding: 1rem;
+  }
+
+  .date-filters {
+    flex-direction: column;
+  }
+
+  thead {
+    display: none;
+  }
+
+  tbody, tr, th, td {
+    display: block;
+  }
+
+  th, td {
+    border: 0;
+  }
+
+  tr {
+    border-bottom: 1px solid #dfe4e1;
+  }
+
+  td {
+    padding-top: 0;
+  }
+}

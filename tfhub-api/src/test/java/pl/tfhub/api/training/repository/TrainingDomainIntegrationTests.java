@@ -7,16 +7,22 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.InvalidDataAccessApiUsageException;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.mock.web.MockHttpSession;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
+import org.springframework.test.web.servlet.MockMvc;
+import jakarta.servlet.http.Cookie;
 import pl.tfhub.api.athlete.entity.Athlete;
 import pl.tfhub.api.athlete.enums.Gender;
 import pl.tfhub.api.athlete.exception.AthleteNotFoundException;
@@ -49,6 +55,7 @@ import pl.tfhub.api.training.service.TrainingCompletionService;
 import pl.tfhub.api.training.service.TrainingDetailsService;
 import pl.tfhub.api.training.service.TrainingQueryService;
 import pl.tfhub.api.training.service.TrainingUpdateService;
+import pl.tfhub.api.training.service.AthleteTrainingHistoryService;
 import pl.tfhub.api.traininggroup.entity.TrainingGroup;
 import pl.tfhub.api.traininggroup.exception.TrainingGroupNotFoundException;
 import pl.tfhub.api.traininggroup.repository.TrainingGroupRepository;
@@ -60,8 +67,13 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @SpringBootTest
+@AutoConfigureMockMvc
 @Testcontainers
 class TrainingDomainIntegrationTests {
 
@@ -116,6 +128,15 @@ class TrainingDomainIntegrationTests {
 
     @Autowired
     private TrainingDeletionService trainingDeletionService;
+
+    @Autowired
+    private AthleteTrainingHistoryService athleteTrainingHistoryService;
+
+    @Autowired
+    private MockMvc mockMvc;
+
+    @Autowired
+    private PasswordEncoder passwordEncoder;
 
     @BeforeEach
     void resetDatabase() {
@@ -1033,6 +1054,179 @@ class TrainingDomainIntegrationTests {
         authenticate(1, UserRole.ATHLETE, "athlete-deactivate");
         assertThrows(AccessDeniedException.class, () ->
                 trainingDeletionService.deleteTraining(1));
+    }
+
+    @Test
+    void athleteHistoryPreservesDefinitionSegmentsStatusesAndInclusiveDates() {
+        LocalDate date = LocalDate.parse("2026-11-11");
+        long training = insertTraining("Intervals", 1, date);
+        long definition = insertDefinition(training, "Main", 1);
+        long first = insertSegment(definition, 1);
+        long second = insertSegment(definition, 2);
+        long third = insertSegment(definition, 3);
+        long fourth = insertSegment(definition, 4);
+        long participant = insertParticipation(training, definition, 1);
+        jdbcTemplate.update("""
+                INSERT INTO training_segment_executions
+                    (participation_id, training_segment_id, training_definition_id, status, measured_result, uses_spikes)
+                VALUES (?, ?, ?, 'RECORDED', 33.125, TRUE)
+                """, participant, first, definition);
+        insertExecution(participant, second, definition, "COMPLETED_WITHOUT_RESULT");
+        insertExecution(participant, third, definition, "NOT_COMPLETED");
+        insertExecution(participant, fourth, definition, "PENDING");
+        long otherDefinition = insertDefinition(training, "Other", 2);
+        long otherSegment = insertSegment(otherDefinition, 1);
+        long otherParticipant = insertParticipation(training, otherDefinition, 2);
+        insertExecution(otherParticipant, otherSegment, otherDefinition, "COMPLETED_WITHOUT_RESULT");
+        long pendingTraining = insertTraining("Pending", 1, date.plusDays(1));
+        long pendingDefinition = insertDefinition(pendingTraining, "Pending", 1);
+        long pendingSegment = insertSegment(pendingDefinition, 1);
+        long pendingParticipant = insertParticipation(pendingTraining, pendingDefinition, 1);
+        insertExecution(pendingParticipant, pendingSegment, pendingDefinition, "PENDING");
+
+        var history = athleteTrainingHistoryService.getHistory(1, date, date);
+        assertEquals(1, history.size());
+        assertEquals(training, history.getFirst().trainingId());
+        assertTrue(history.getFirst().canViewDetails());
+        assertEquals(4, history.getFirst().totalSegments());
+        assertEquals(List.of(first, second, third, fourth), history.getFirst().segments().stream()
+                .map(segment -> segment.segmentId()).toList());
+        assertEquals(List.of(1, 2, 3, 4), history.getFirst().segments().stream()
+                .map(segment -> segment.sequenceNumber()).toList());
+        assertEquals(List.of(TrainingExecutionStatus.RECORDED, TrainingExecutionStatus.COMPLETED_WITHOUT_RESULT,
+                        TrainingExecutionStatus.NOT_COMPLETED, TrainingExecutionStatus.PENDING),
+                history.getFirst().segments().stream().map(segment -> segment.status()).toList());
+        assertEquals(new BigDecimal("33.125"), history.getFirst().segments().getFirst().measuredResult());
+        assertTrue(history.getFirst().segments().getFirst().usesSpikes());
+        assertTrue(athleteTrainingHistoryService.getHistory(1, date.plusDays(1), null).isEmpty());
+        assertTrue(athleteTrainingHistoryService.getHistory(3, null, null).isEmpty());
+        assertThrows(InvalidTrainingRequestException.class,
+                () -> athleteTrainingHistoryService.getHistory(1, date.plusDays(1), date));
+    }
+
+    @Test
+    void athleteHistoryUsesCurrentAthleteGroupButHistoricalGroupForDetails() {
+        long oldGroupTraining = insertTraining("Old", 1, LocalDate.parse("2026-01-01"));
+        long definition = insertDefinition(oldGroupTraining, "Plan", 1);
+        long segment = insertSegment(definition, 1);
+        long participant = insertParticipation(oldGroupTraining, definition, 1);
+        insertExecution(participant, segment, definition, "NOT_COMPLETED");
+        long newGroup = insertGroup("New group");
+        jdbcTemplate.update("UPDATE athletes SET training_group_id = ? WHERE id = 1", newGroup);
+        long currentTraining = insertTraining("New", newGroup, LocalDate.parse("2026-02-01"));
+        long newDefinition = insertDefinition(currentTraining, "Plan", 1);
+        long newSegment = insertSegment(newDefinition, 1);
+        long newParticipant = insertParticipation(currentTraining, newDefinition, 1);
+        insertExecution(newParticipant, newSegment, newDefinition, "COMPLETED_WITHOUT_RESULT");
+        jdbcTemplate.update("INSERT INTO users (username, password_hash, role) VALUES ('history-coach', 'hash', 'COACH')");
+        jdbcTemplate.update("INSERT INTO user_training_group (user_id, training_group_id) VALUES (1, ?)", newGroup);
+        authenticate(1, UserRole.COACH, "history-coach");
+
+        var history = athleteTrainingHistoryService.getHistory(1, null, null);
+        assertEquals(List.of(currentTraining, oldGroupTraining), history.stream().map(item -> item.trainingId()).toList());
+        assertEquals(List.of(true, false), history.stream().map(item -> item.canViewDetails()).toList());
+        assertThrows(TrainingNotFoundException.class, () -> trainingDetailsService.getTraining(oldGroupTraining));
+        assertThrows(AthleteNotFoundException.class, () -> athleteTrainingHistoryService.getHistory(2, null, null));
+        jdbcTemplate.update("DELETE FROM user_training_group WHERE user_id = 1");
+        assertThrows(AthleteNotFoundException.class, () -> athleteTrainingHistoryService.getHistory(1, null, null));
+
+        jdbcTemplate.update("INSERT INTO user_athlete_access (user_id, athlete_id) VALUES (1, 1)");
+        authenticate(1, UserRole.ATHLETE, "athlete");
+        assertEquals(List.of(false, false), athleteTrainingHistoryService.getHistory(1, null, null).stream()
+                .map(item -> item.canViewDetails()).toList());
+        assertThrows(AthleteNotFoundException.class, () -> athleteTrainingHistoryService.getHistory(2, null, null));
+        assertThrows(AccessDeniedException.class, () -> trainingDetailsService.getTraining(currentTraining));
+    }
+
+    @Test
+    void athleteHistorySortsSameDaySessionsAndRetainsPersistedSequenceNumbers() {
+        LocalDate date = LocalDate.parse("2026-03-05");
+        long older = insertTraining("Older", 1, date.minusDays(1));
+        long first = insertTraining("First", 1, date);
+        long second = insertTraining("Second", 1, date);
+        for (long training : List.of(older, first, second)) {
+            long definition = insertDefinition(training, "Plan", 1);
+            long segment = insertSegment(definition, 3);
+            long participant = insertParticipation(training, definition, 1);
+            jdbcTemplate.update("""
+                    INSERT INTO training_segment_executions
+                        (participation_id, training_segment_id, training_definition_id, status, measured_result)
+                    VALUES (?, ?, ?, 'RECORDED', 0)
+                    """, participant, segment, definition);
+            if (training == second) {
+                long another = insertSegment(definition, 7);
+                insertExecution(participant, another, definition, "PENDING");
+            }
+        }
+        var history = athleteTrainingHistoryService.getHistory(1, null, date);
+        assertEquals(List.of(second, first, older), history.stream().map(item -> item.trainingId()).toList());
+        assertEquals(List.of(2, 1, 1), history.stream().map(item -> item.totalSegments()).toList());
+        assertEquals(List.of(3, 7), history.getFirst().segments().stream()
+                .map(item -> item.sequenceNumber()).toList());
+        assertEquals(new BigDecimal("0.000"), history.getFirst().segments().getFirst().measuredResult());
+        assertEquals(List.of(second, first), athleteTrainingHistoryService.getHistory(1, date, date).stream()
+                .map(item -> item.trainingId()).toList());
+    }
+
+    @Test
+    void athleteHistoryFailsWhenAnIncludedSegmentHasNoExecution() {
+        var rows = insertTrainingRows();
+        insertExecution(rows.participationId(), rows.segmentId(), rows.definitionId(), "NOT_COMPLETED");
+        insertSegment(rows.definitionId(), 2);
+        assertThrows(InvalidDataAccessApiUsageException.class,
+                () -> athleteTrainingHistoryService.getHistory(1, null, null));
+    }
+
+    @Test
+    void historyHttpEndpointEnforcesAuthenticationAndRoleScope() throws Exception {
+        var rows = insertTrainingRows();
+        insertExecution(rows.participationId(), rows.segmentId(), rows.definitionId(), "NOT_COMPLETED");
+        String password = "history-test-password";
+        for (String role : List.of("ADMIN", "COACH", "ATHLETE")) {
+            jdbcTemplate.update("INSERT INTO users (username, password_hash, role) VALUES (?, ?, ?)",
+                    role.toLowerCase(), passwordEncoder.encode(password), role);
+        }
+        jdbcTemplate.update("INSERT INTO user_training_group (user_id, training_group_id) VALUES (2, 1)");
+        jdbcTemplate.update("INSERT INTO user_athlete_access (user_id, athlete_id) VALUES (3, 1)");
+        SecurityContextHolder.clearContext();
+
+        mockMvc.perform(get("/api/athletes/1/training-history")).andExpect(status().isUnauthorized());
+        MockHttpSession admin = loginForHistory("admin", password);
+        MockHttpSession coach = loginForHistory("coach", password);
+        MockHttpSession athlete = loginForHistory("athlete", password);
+        mockMvc.perform(get("/api/athletes/1/training-history").session(admin))
+                .andExpect(status().isOk()).andExpect(jsonPath("$[0].canViewDetails").value(true));
+        mockMvc.perform(get("/api/athletes/1/training-history").session(coach))
+                .andExpect(status().isOk()).andExpect(jsonPath("$[0].canViewDetails").value(true));
+        mockMvc.perform(get("/api/athletes/1/training-history").session(athlete))
+                .andExpect(status().isOk()).andExpect(jsonPath("$[0].canViewDetails").value(false));
+        mockMvc.perform(get("/api/athletes/1/training-history").session(athlete)
+                        .queryParam("fromDate", "2026-03-02").queryParam("toDate", "2026-03-01"))
+                .andExpect(status().isBadRequest());
+        mockMvc.perform(get("/api/athletes/1/training-history").session(athlete)
+                        .queryParam("fromDate", "not-a-date"))
+                .andExpect(status().isBadRequest());
+        mockMvc.perform(get("/api/athletes/0/training-history").session(athlete))
+                .andExpect(status().isBadRequest());
+        mockMvc.perform(get("/api/athletes/2/training-history").session(athlete))
+                .andExpect(status().isNotFound());
+        mockMvc.perform(get("/api/trainings/" + rows.trainingId()).session(athlete))
+                .andExpect(status().isForbidden());
+        jdbcTemplate.update("DELETE FROM user_training_group WHERE user_id = 2");
+        mockMvc.perform(get("/api/athletes/1/training-history").session(coach))
+                .andExpect(status().isNotFound());
+    }
+
+    private MockHttpSession loginForHistory(String username, String password) throws Exception {
+        var csrfResult = mockMvc.perform(get("/api/csrf")).andExpect(status().isOk()).andReturn();
+        Cookie csrf = csrfResult.getResponse().getCookie("XSRF-TOKEN");
+        var result = mockMvc.perform(post("/api/auth/login").cookie(csrf)
+                        .header("X-XSRF-TOKEN", csrf.getValue()).contentType("application/json")
+                        .content("""
+                                {"username":"%s","password":"%s"}
+                                """.formatted(username, password)))
+                .andExpect(status().isOk()).andReturn();
+        return (MockHttpSession) result.getRequest().getSession(false);
     }
 
     private TrainingRows insertTrainingRows() {
