@@ -16,6 +16,7 @@
         <div class="athlete-details">
           <h2>{{ currentAthlete.firstName }} {{ currentAthlete.lastName }}</h2>
           <p>Rocznik {{ currentAthlete.birthYear }} · {{ genderLabel(currentAthlete.gender) }}</p>
+          <p>Aliasy: {{ currentAthlete.aliases?.length ? currentAthlete.aliases?.join(', ') : 'brak' }}</p>
           <span class="status-badge" [class.status-badge--inactive]="!currentAthlete.active">
             {{ currentAthlete.active ? 'Aktywny' : 'Nieaktywny' }}
           </span>

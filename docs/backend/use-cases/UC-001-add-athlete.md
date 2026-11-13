@@ -22,7 +22,7 @@ After successful creation, the athlete is stored in the database and becomes ava
 
 ## 4. Input Data
 
-The user provides exactly four fields:
+The user provides the personal fields, an optional training group, and an optional list of aliases:
 
 | Field | Type | Required |
 |---|---|---|
@@ -30,6 +30,8 @@ The user provides exactly four fields:
 | lastName | String | Yes |
 | birthYear | Integer | Yes |
 | gender | Gender enum | Yes |
+| trainingGroupId | Long | Required for a coach |
+| aliases | List of strings | No |
 
 Allowed `gender` values:
 - `MALE`
@@ -38,8 +40,8 @@ Allowed `gender` values:
 ## 5. Main Flow
 
 1. The coach starts the athlete creation process.
-2. The system provides a form with four required fields.
-3. The coach enters the first name, last name, birth year, and gender.
+2. The system provides a form with the required personal fields and an optional alias list.
+3. The coach enters the first name, last name, birth year, gender, assigned group and any aliases.
 4. The system trims leading and trailing whitespace from the first name and last name.
 5. The system validates the input data.
 6. The system checks whether an athlete with the same first name, last name, and birth year already exists.
@@ -69,6 +71,7 @@ Allowed `gender` values:
 - An athlete with the same first name, last name, and birth year cannot be created more than once.
 - Duplicate detection is performed after trimming the input values.
 - The database UNIQUE constraint provides the final protection against duplicates.
+- Each alias contains 1–255 characters and must be unique after normalization within the athlete and among active athletes in the selected group. See the athlete rules in `data-model.md`. An alias conflict returns HTTP 409 and rolls back creation.
 
 ## 7. Automatically Assigned Values
 
@@ -131,6 +134,7 @@ Example response:
 Expected error status codes:
 - HTTP `400 Bad Request` – invalid input data.
 - HTTP `409 Conflict` – an athlete with the provided identifying data already exists.
+- HTTP `409 Conflict` – an alias conflicts with another alias for the athlete or an active athlete in the group.
 
 Errors must follow the application's standardized error response format.
 

@@ -4,6 +4,7 @@ import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
+import java.util.List;
 import pl.tfhub.api.athlete.dto.request.ValidBirthYear;
 import pl.tfhub.api.athlete.enums.Gender;
 import tools.jackson.databind.annotation.JsonDeserialize;
@@ -14,7 +15,8 @@ public record UpdateAthleteRequest(
 		@NotNull @Min(1900) @ValidBirthYear
 		@JsonDeserialize(using = StrictIntegerDeserializer.class) Integer birthYear,
 		@NotNull Gender gender,
-		Long trainingGroupId) {
+		Long trainingGroupId,
+		List<@NotBlank @Size(max = 255) String> aliases) {
 
 	public UpdateAthleteRequest {
 		firstName = trim(firstName);
@@ -22,7 +24,11 @@ public record UpdateAthleteRequest(
 	}
 
 	public UpdateAthleteRequest(String firstName, String lastName, Integer birthYear, Gender gender) {
-		this(firstName, lastName, birthYear, gender, null);
+		this(firstName, lastName, birthYear, gender, null, null);
+	}
+
+	public UpdateAthleteRequest(String firstName, String lastName, Integer birthYear, Gender gender, Long trainingGroupId) {
+		this(firstName, lastName, birthYear, gender, trainingGroupId, null);
 	}
 
 	private static String trim(String value) {

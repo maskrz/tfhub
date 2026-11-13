@@ -17,6 +17,7 @@ The user clicks the **"Dodaj zawodnika"** button on the Athletes view.
     - Last name
     - Birth year
     - Gender
+    - Training group (required for coaches) and optional aliases
 3. The user enters the athlete's data.
 4. The user clicks **"Zapisz"**.
 5. The frontend validates the form.
@@ -33,6 +34,7 @@ The user clicks the **"Dodaj zawodnika"** button on the Athletes view.
 - The unique athlete constraint is based on first name, last name, and birth year, as defined by the backend.
 - Gender must use the existing backend enum values.
 - Backend validation remains authoritative.
+- Aliases can be added, edited and removed before saving; each contains at most 255 characters. Alias conflicts are shown in Polish without losing entered data.
 - The form provides immediate usability validation for trimmed required names, the 100-character name limit, integer birth year from 1900 through the current year, and required gender.
 - The backend is authoritative for all validation and duplicate detection.
 - The `active` value is not sent by the client; the API response marks a newly created athlete active.
@@ -74,7 +76,7 @@ Request body (`CreateAthleteRequest`):
 }
 ```
 
-The request uses only `firstName`, `lastName`, `birthYear`, and `gender`. Success is HTTP `201 Created` with an `AthleteResponse` containing `id`, the four submitted values (names trimmed by the backend), and `active: true`. A duplicate returns HTTP `409 Conflict` with Problem Details title `Athlete already exists`.
+The request also supports `trainingGroupId` and `aliases`. Success is HTTP `201 Created` with the athlete DTO and `active: true`. A duplicate athlete or alias returns HTTP `409 Conflict` with the corresponding Problem Details title.
 
 ## Out of scope
 - Athlete profile or details view.

@@ -2,14 +2,14 @@ package pl.tfhub.api.trainingimport.service;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.text.Normalizer;
 import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Locale;
+import java.util.IdentityHashMap;
 import java.util.Map;
 import java.util.Set;
 import tools.jackson.core.JacksonException;
@@ -17,30 +17,49 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ObjectNode;
 import org.springframework.stereotype.Component;
-import pl.tfhub.api.athlete.entity.Athlete;
-import pl.tfhub.api.athlete.repository.AthleteRepository;
+import pl.tfhub.api.athlete.service.AthleteService;
+import pl.tfhub.api.athlete.service.AthleteService.ImportCandidate;
 import pl.tfhub.api.training.enums.TrainingExecutionStatus;
 import pl.tfhub.api.trainingimport.enums.TrainingImportAthleteMatchStatus;
 
 @Component
 public class TrainingImportRecognitionMapper {
 
+	private static final DateTimeFormatter DEFAULT_NAME_DATE_FORMAT = DateTimeFormatter.ofPattern("dd.MM.uuuu");
+
 	private final ObjectMapper objectMapper;
-	private final AthleteRepository athleteRepository;
+	private final AthleteService athleteService;
+	private final TrainingImportAthleteMatcher athleteMatcher;
 
 	public TrainingImportRecognitionMapper(
 			ObjectMapper objectMapper,
-			AthleteRepository athleteRepository) {
+			AthleteService athleteService,
+			TrainingImportAthleteMatcher athleteMatcher) {
 		this.objectMapper = objectMapper;
-		this.athleteRepository = athleteRepository;
+		this.athleteService = athleteService;
+		this.athleteMatcher = athleteMatcher;
 	}
 
 	public TrainingImportRecognizedDraft validateAndMap(String candidateText, long trainingGroupId) {
 		TrainingImportRecognitionData recognized = parse(candidateText);
 		validateHeader(recognized);
-		List<Athlete> groupAthletes =
-				athleteRepository.findByTrainingGroup_IdOrderByLastNameAscFirstNameAscIdAsc(trainingGroupId);
-		Set<Long> matchedAthleteIds = new HashSet<>();
+		LocalDate trainingDate = LocalDate.parse(recognized.trainingDate().value());
+		List<ImportCandidate> groupAthletes = athleteService.findImportCandidates(trainingGroupId);
+		Map<TrainingImportRecognitionData.AthleteRow, TrainingImportAthleteMatcher.Match> matches =
+				new IdentityHashMap<>();
+		Map<Long, Integer> claims = new HashMap<>();
+		Set<Integer> validatedSequences = new HashSet<>();
+		for (TrainingImportRecognitionData.Definition definition : recognized.definitions()) {
+			validateDefinition(definition, validatedSequences);
+			for (TrainingImportRecognitionData.AthleteRow row : definition.athleteRows()) {
+				validateAthleteRow(row);
+				TrainingImportAthleteMatcher.Match match = athleteMatcher.match(row, groupAthletes);
+				matches.put(row, match);
+				if (match.athleteId() != null) {
+					claims.merge(match.athleteId(), 1, Integer::sum);
+				}
+			}
+		}
 		List<TrainingImportRecognizedDraft.Definition> definitions = new ArrayList<>();
 		Set<Integer> definitionSequences = new HashSet<>();
 		List<Map<String, Object>> definitionRecognition = new ArrayList<>();
@@ -57,17 +76,27 @@ public class TrainingImportRecognitionMapper {
 			List<TrainingImportRecognizedDraft.Segment> segments = new ArrayList<>();
 			for (TrainingImportRecognitionData.Segment segment : definition.segments()) {
 				validateSegment(segment, segmentSequences);
+			}
+			int lastSequence = segmentSequences.stream().mapToInt(Integer::intValue).max().orElseThrow();
+			for (TrainingImportRecognitionData.Segment segment : definition.segments()) {
 				Integer distanceM = parseRecognizedDistance(segment.distanceM());
-				Integer restAfterSeconds = parseOptionalNonNegativeInteger(
-						segment.restAfterSeconds().value(), "segment rest");
+				Integer restAfterSeconds = parseRecognizedRest(segment.restAfterSeconds());
+				boolean defaultFinalRest = segment.sequenceNumber() == lastSequence
+						&& restAfterSeconds == null && isMissingRest(segment.restAfterSeconds());
+				if (defaultFinalRest) {
+					restAfterSeconds = 0;
+				}
 				Map<String, Object> metadata = new LinkedHashMap<>();
 				boolean segmentUncertain = distanceM == null || distanceUncertain(segment.distanceM())
-						|| isUncertain(segment.restAfterSeconds());
+						|| (!defaultFinalRest
+								&& (restAfterSeconds == null || isUncertain(segment.restAfterSeconds())));
 				metadata.put("uncertain", segmentUncertain);
 				metadata.put("manuallyReviewed", false);
 				Map<String, Object> fields = new LinkedHashMap<>();
 				fields.put("distanceM", distanceMetadata(segment.distanceM(), distanceM));
-				fields.put("restAfterSeconds", fieldMetadata(segment.restAfterSeconds()));
+				fields.put("restAfterSeconds", defaultFinalRest
+						? Map.of("uncertain", false, "manuallyReviewed", false)
+						: restMetadata(segment.restAfterSeconds(), restAfterSeconds));
 				metadata.put("fields", fields);
 				segments.add(new TrainingImportRecognizedDraft.Segment(
 						segment.sequenceNumber(), distanceM, restAfterSeconds, Map.copyOf(metadata)));
@@ -77,7 +106,12 @@ public class TrainingImportRecognitionMapper {
 			Set<Integer> executionSequences;
 			for (TrainingImportRecognitionData.AthleteRow row : definition.athleteRows()) {
 				validateAthleteRow(row);
-				MatchedAthlete matched = matchAthlete(row, groupAthletes, matchedAthleteIds);
+				TrainingImportAthleteMatcher.Match match = matches.get(row);
+				boolean duplicate = match.athleteId() != null && claims.get(match.athleteId()) > 1;
+				MatchedAthlete matched = duplicate
+						? MatchedAthlete.unresolved("The athlete was recognized in more than one row")
+						: match.athleteId() == null ? MatchedAthlete.unresolved(match.reason())
+						: new MatchedAthlete(match.athleteId(), TrainingImportAthleteMatchStatus.MATCHED, null);
 				Map<String, Object> athleteMetadata = new LinkedHashMap<>();
 				athleteMetadata.put("uncertain", Boolean.TRUE.equals(row.uncertain()) || matched.reason() != null);
 				athleteMetadata.put("manuallyReviewed", false);
@@ -86,6 +120,9 @@ public class TrainingImportRecognitionMapper {
 				putIfPresent(athleteMetadata, "recognizedLastName", row.lastName());
 				putIfPresent(athleteMetadata, "uncertaintyReason", row.uncertaintyReason());
 				putIfPresent(athleteMetadata, "matchingReason", matched.reason());
+				if (!match.suggestionIds().isEmpty()) {
+					athleteMetadata.put("suggestedAthleteIds", match.suggestionIds());
+				}
 
 				executionSequences = new HashSet<>();
 				List<TrainingImportRecognizedDraft.Execution> executions = new ArrayList<>();
@@ -118,7 +155,7 @@ public class TrainingImportRecognitionMapper {
 			}
 
 			definitions.add(new TrainingImportRecognizedDraft.Definition(
-					definition.name().value().strip(),
+					nameOrDefault(definition.name(), "Cała grupa"),
 					definition.sequenceNumber(),
 					List.copyOf(segments),
 					List.copyOf(athleteRows)));
@@ -135,8 +172,8 @@ public class TrainingImportRecognitionMapper {
 		putIfPresent(rootMetadata, "recognizedGroupName", recognized.recognizedGroupName());
 
 		return new TrainingImportRecognizedDraft(
-				recognized.name().value().strip(),
-				LocalDate.parse(recognized.trainingDate().value()),
+				nameOrDefault(recognized.name(), "Trening " + trainingDate.format(DEFAULT_NAME_DATE_FORMAT)),
+				trainingDate,
 				Map.copyOf(rootMetadata),
 				List.copyOf(definitions));
 	}
@@ -147,14 +184,14 @@ public class TrainingImportRecognitionMapper {
 		}
 		try {
 			JsonNode root = objectMapper.readTree(candidateText);
-			normalizeDistanceFields(root);
+			normalizeSegmentFields(root);
 			return objectMapper.treeToValue(root, TrainingImportRecognitionData.class);
 		} catch (JacksonException | IllegalArgumentException exception) {
 			throw invalid("The model response did not match the expected training data structure");
 		}
 	}
 
-	private void normalizeDistanceFields(JsonNode root) {
+	private void normalizeSegmentFields(JsonNode root) {
 		JsonNode definitions = root.path("definitions");
 		if (!definitions.isArray()) {
 			return;
@@ -168,38 +205,40 @@ public class TrainingImportRecognitionMapper {
 				if (!(segment instanceof ObjectNode segmentObject)) {
 					continue;
 				}
-				JsonNode field = segment.get("distanceM");
-				if (field != null && !field.isNull() && !(field instanceof ObjectNode)) {
-					String original = field.isTextual() ? field.textValue() : field.toString();
-					ObjectNode replacement = segmentObject.putObject("distanceM");
-					replacement.putNull("value");
-					replacement.put("originalText", original);
-					replacement.put("uncertain", true);
-				} else if (field instanceof ObjectNode fieldObject) {
-					JsonNode value = field.get("value");
-					if (value != null && (value.isArray() || value.isObject())) {
-						if (!field.hasNonNull("originalText")) {
-							fieldObject.put("originalText", value.toString());
-						}
-						fieldObject.putNull("value");
-					} else if (value != null && !value.isNull() && !value.isTextual()) {
-						fieldObject.put("value", value.toString());
-					}
+				normalizeSegmentField(segmentObject, "distanceM");
+				normalizeSegmentField(segmentObject, "restAfterSeconds");
+			}
+		}
+	}
+
+	private void normalizeSegmentField(ObjectNode segmentObject, String fieldName) {
+		JsonNode field = segmentObject.get(fieldName);
+		if (field != null && !field.isNull() && !(field instanceof ObjectNode)) {
+			String original = field.isTextual() ? field.textValue() : field.toString();
+			ObjectNode replacement = segmentObject.putObject(fieldName);
+			replacement.putNull("value");
+			replacement.put("originalText", original);
+			replacement.put("uncertain", true);
+		} else if (field instanceof ObjectNode fieldObject) {
+			JsonNode value = field.get("value");
+			if (value != null && (value.isArray() || value.isObject())) {
+				if (!field.hasNonNull("originalText")) {
+					fieldObject.put("originalText", value.toString());
 				}
+				fieldObject.putNull("value");
+			} else if (value != null && !value.isNull() && !value.isTextual()) {
+				fieldObject.put("value", value.toString());
 			}
 		}
 	}
 
 	private void validateHeader(TrainingImportRecognitionData recognized) {
-		if (recognized == null || recognized.name() == null || recognized.trainingDate() == null
+		if (recognized == null || recognized.trainingDate() == null
 				|| recognized.definitions() == null || recognized.definitions().isEmpty()) {
 			throw invalid("The model response is missing required training information");
 		}
-		requireField(recognized.name(), "training name");
+		validateName(recognized.name(), "training name");
 		requireField(recognized.trainingDate(), "training date");
-		if (recognized.name().value().isBlank() || recognized.name().value().length() > 255) {
-			throw invalid("The recognized training name is invalid");
-		}
 		try {
 			LocalDate.parse(recognized.trainingDate().value());
 		} catch (RuntimeException exception) {
@@ -211,13 +250,26 @@ public class TrainingImportRecognitionMapper {
 			TrainingImportRecognitionData.Definition definition,
 			Set<Integer> sequences) {
 		if (definition == null || definition.sequenceNumber() == null || definition.sequenceNumber() <= 0
-				|| !sequences.add(definition.sequenceNumber()) || definition.name() == null
-				|| definition.name().value() == null || definition.name().value().isBlank()
-				|| definition.name().value().length() > 255 || definition.name().uncertain() == null
+				|| !sequences.add(definition.sequenceNumber())
 				|| definition.segments() == null || definition.segments().isEmpty()
 				|| definition.athleteRows() == null) {
 			throw invalid("A recognized training definition is invalid");
 		}
+		validateName(definition.name(), "definition name");
+	}
+
+	private void validateName(TrainingImportRecognitionData.RecognizedField field, String fieldName) {
+		if (field != null && field.value() != null && !field.value().isBlank()) {
+			requireField(field, fieldName);
+			if (field.value().length() > 255) {
+				throw invalid("The recognized " + fieldName + " is invalid");
+			}
+		}
+	}
+
+	private String nameOrDefault(TrainingImportRecognitionData.RecognizedField field, String fallback) {
+		return field == null || field.value() == null || field.value().isBlank()
+				? fallback : field.value().strip();
 	}
 
 	private void validateSegment(TrainingImportRecognitionData.Segment segment, Set<Integer> sequences) {
@@ -225,7 +277,6 @@ public class TrainingImportRecognitionMapper {
 				|| !sequences.add(segment.sequenceNumber())) {
 			throw invalid("Training segment ordering is invalid");
 		}
-		requireField(segment.restAfterSeconds(), "segment rest");
 	}
 
 	private void validateAthleteRow(TrainingImportRecognitionData.AthleteRow row) {
@@ -245,110 +296,6 @@ public class TrainingImportRecognitionMapper {
 				|| execution.status() == null || execution.uncertain() == null) {
 			throw invalid("Recognized execution data contains an invalid segment reference");
 		}
-	}
-
-	private MatchedAthlete matchAthlete(
-			TrainingImportRecognitionData.AthleteRow row,
-			List<Athlete> candidates,
-			Set<Long> alreadyMatched) {
-		if (row.firstName() == null || row.lastName() == null
-				|| row.firstName().isBlank() || row.lastName().isBlank()) {
-			return MatchedAthlete.unresolved("Athlete name is incomplete");
-		}
-		List<Athlete> matches = candidates.stream()
-				.filter(candidate -> normalize(candidate.getFirstName()).equals(normalize(row.firstName()))
-						&& normalize(candidate.getLastName()).equals(normalize(row.lastName())))
-				.toList();
-		if (matches.size() == 1) {
-			return useMatchedAthlete(
-					matches.getFirst(),
-					alreadyMatched,
-					Boolean.TRUE.equals(row.uncertain()) ? "The recognized athlete name is uncertain" : null);
-		}
-		if (!matches.isEmpty()) {
-			return MatchedAthlete.unresolved("The recognized name is ambiguous");
-		}
-
-		String recognizedSurname = normalizeNameForDistance(row.lastName());
-		int maximumDistance = recognizedSurname.length() <= 7 ? 1 : 2;
-		List<AthleteSurnameMatch> surnameMatches = candidates.stream()
-				.map(candidate -> new AthleteSurnameMatch(
-						candidate, normalizeNameForDistance(candidate.getLastName())))
-				.filter(candidate -> levenshteinDistance(recognizedSurname, candidate.normalizedSurname())
-						<= maximumDistance)
-				.toList();
-		Set<String> matchingSurnames = surnameMatches.stream()
-				.map(AthleteSurnameMatch::normalizedSurname)
-				.collect(java.util.stream.Collectors.toSet());
-		if (matchingSurnames.size() != 1) {
-			return MatchedAthlete.unresolved(
-					matchingSurnames.isEmpty()
-							? "No athlete matched the recognized name"
-							: "The recognized surname matches multiple athletes");
-		}
-
-		List<Athlete> sameSurname = surnameMatches.stream()
-				.map(AthleteSurnameMatch::athlete)
-				.toList();
-		if (sameSurname.size() == 1) {
-			return useMatchedAthlete(
-					sameSurname.getFirst(), alreadyMatched, "Surname matched approximately; confirm athlete");
-		}
-		String recognizedInitial = firstLetter(row.firstName());
-		List<Athlete> initialMatches = sameSurname.stream()
-				.filter(candidate -> firstLetter(candidate.getFirstName()).equals(recognizedInitial))
-				.toList();
-		if (initialMatches.size() == 1) {
-			return useMatchedAthlete(
-					initialMatches.getFirst(), alreadyMatched,
-					"Surname matched approximately and first-name initial was used; confirm athlete");
-		}
-		return MatchedAthlete.unresolved("The recognized surname is shared and the first-name initial is ambiguous");
-	}
-
-	private MatchedAthlete useMatchedAthlete(
-			Athlete athlete,
-			Set<Long> alreadyMatched,
-			String uncertaintyReason) {
-		if (!alreadyMatched.add(athlete.getId())) {
-			return MatchedAthlete.unresolved("The athlete was recognized in more than one row");
-		}
-		return new MatchedAthlete(athlete.getId(), TrainingImportAthleteMatchStatus.MATCHED, uncertaintyReason);
-	}
-
-	private String normalize(String value) {
-		return Normalizer.normalize(value, Normalizer.Form.NFKC)
-				.strip()
-				.replaceAll("\\s+", " ")
-				.toLowerCase(Locale.ROOT);
-	}
-
-	private String normalizeNameForDistance(String value) {
-		return normalize(value).replaceAll("[^\\p{L}]", "");
-	}
-
-	private String firstLetter(String value) {
-		String normalized = normalizeNameForDistance(value);
-		return normalized.isEmpty() ? "" : normalized.substring(0, 1);
-	}
-
-	private int levenshteinDistance(String left, String right) {
-		int[] previous = new int[right.length() + 1];
-		for (int column = 0; column <= right.length(); column++) {
-			previous[column] = column;
-		}
-		for (int row = 1; row <= left.length(); row++) {
-			int[] current = new int[right.length() + 1];
-			current[0] = row;
-			for (int column = 1; column <= right.length(); column++) {
-				int substitutionCost = left.charAt(row - 1) == right.charAt(column - 1) ? 0 : 1;
-				current[column] = Math.min(
-						Math.min(current[column - 1] + 1, previous[column] + 1),
-						previous[column - 1] + substitutionCost);
-			}
-			previous = current;
-		}
-		return previous[right.length()];
 	}
 
 	private TrainingExecutionStatus parseStatus(String value) {
@@ -463,23 +410,36 @@ public class TrainingImportRecognitionMapper {
 		return field == null || !Boolean.FALSE.equals(field.uncertain());
 	}
 
-	private Integer parseOptionalNonNegativeInteger(String value, String fieldName) {
-		if (value == null) {
+	private Integer parseRecognizedRest(TrainingImportRecognitionData.RecognizedField field) {
+		if (field == null || field.value() == null) {
 			return null;
 		}
-		int parsed = parseInteger(value, fieldName);
-		if (parsed < 0) {
-			throw invalid("The recognized " + fieldName + " cannot be negative");
+		try {
+			int value = Integer.parseInt(field.value().strip());
+			return value >= 0 ? value : null;
+		} catch (NumberFormatException exception) {
+			return null;
 		}
-		return parsed;
 	}
 
-	private int parseInteger(String value, String fieldName) {
-		try {
-			return Integer.parseInt(value.strip());
-		} catch (NumberFormatException | NullPointerException exception) {
-			throw invalid("The recognized " + fieldName + " is invalid");
+	private boolean isMissingRest(TrainingImportRecognitionData.RecognizedField field) {
+		return field == null
+				|| ((field.value() == null || field.value().isBlank())
+						&& (field.originalText() == null || field.originalText().isBlank()));
+	}
+
+	private Map<String, Object> restMetadata(
+			TrainingImportRecognitionData.RecognizedField field, Integer rest) {
+		Map<String, Object> metadata = new LinkedHashMap<>(fieldMetadata(field));
+		if (rest == null) {
+			metadata.put("uncertain", true);
+			if (field != null) {
+				putIfPresent(metadata, "originalText",
+						field.originalText() != null ? field.originalText() : field.value());
+			}
+			metadata.putIfAbsent("uncertaintyReason", "Segment rest requires confirmation");
 		}
+		return Map.copyOf(metadata);
 	}
 
 	private void requireField(TrainingImportRecognitionData.RecognizedField field, String fieldName) {
@@ -489,15 +449,17 @@ public class TrainingImportRecognitionMapper {
 	}
 
 	private boolean isUncertain(TrainingImportRecognitionData.RecognizedField field) {
-		return field == null || Boolean.TRUE.equals(field.uncertain());
+		return field == null || field.uncertain() == null || Boolean.TRUE.equals(field.uncertain());
 	}
 
 	private Map<String, Object> fieldMetadata(TrainingImportRecognitionData.RecognizedField field) {
 		Map<String, Object> metadata = new LinkedHashMap<>();
-		metadata.put("uncertain", Boolean.TRUE.equals(field.uncertain()));
+		metadata.put("uncertain", isUncertain(field));
 		metadata.put("manuallyReviewed", false);
-		putIfPresent(metadata, "originalText", field.originalText());
-		putIfPresent(metadata, "uncertaintyReason", field.uncertaintyReason());
+		if (field != null) {
+			putIfPresent(metadata, "originalText", field.originalText());
+			putIfPresent(metadata, "uncertaintyReason", field.uncertaintyReason());
+		}
 		return Map.copyOf(metadata);
 	}
 
@@ -521,6 +483,4 @@ public class TrainingImportRecognitionMapper {
 		}
 	}
 
-	private record AthleteSurnameMatch(Athlete athlete, String normalizedSurname) {
-	}
 }

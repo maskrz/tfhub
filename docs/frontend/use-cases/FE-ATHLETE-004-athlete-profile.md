@@ -40,6 +40,7 @@ Display:
 - Birth year.
 - Gender.
 - Active/inactive status.
+- Aliases, or a clear empty state if none are configured.
 
 Actions:
 - **Edytuj zawodnika** — open the existing athlete form in edit mode.

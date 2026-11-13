@@ -280,6 +280,9 @@ public class TrainingImportDraftService {
 			TrainingImportDraft draft,
 			DraftData data,
 			TrainingImport trainingImport) {
+		Set<Long> eligibleSuggestionIds = athleteRepository
+				.findByTrainingGroup_IdOrderByLastNameAscFirstNameAscIdAsc(trainingImport.getTrainingGroup().getId())
+				.stream().filter(Athlete::isActive).map(Athlete::getId).collect(java.util.stream.Collectors.toSet());
 		Map<Long, List<TrainingImportDraftSegment>> segmentsByDefinition = new HashMap<>();
 		for (TrainingImportDraftSegment segment : data.segments()) {
 			segmentsByDefinition.computeIfAbsent(segment.getDefinition().getId(), ignored -> new ArrayList<>())
@@ -338,7 +341,7 @@ public class TrainingImportDraftService {
 												row.getAthlete() == null
 														? null
 														: TrainingImportAthleteCandidateResponse.from(row.getAthlete()),
-												row.getRecognitionMetadata(),
+												filterSuggestions(row.getRecognitionMetadata(), eligibleSuggestionIds),
 												executionResponses);
 									})
 									.toList();
@@ -365,6 +368,20 @@ public class TrainingImportDraftService {
 				TrainingImportRecognitionMetadata.isReviewed(draft.getRecognitionMetadata()),
 				definitionResponses,
 				new TrainingImportDraftResponse.Validation(issues.isEmpty(), issues));
+	}
+
+	private Map<String, Object> filterSuggestions(Map<String, Object> metadata, Set<Long> eligibleIds) {
+		if (!(metadata.get("suggestedAthleteIds") instanceof List<?> suggestions)) {
+			return metadata;
+		}
+		Map<String, Object> filtered = new HashMap<>(metadata);
+		filtered.put("suggestedAthleteIds", suggestions.stream()
+				.filter(Number.class::isInstance)
+				.map(Number.class::cast)
+				.map(Number::longValue)
+				.filter(eligibleIds::contains)
+				.toList());
+		return java.util.Collections.unmodifiableMap(filtered);
 	}
 
 	private List<TrainingImportDraftResponse.ValidationIssue> validateReadiness(

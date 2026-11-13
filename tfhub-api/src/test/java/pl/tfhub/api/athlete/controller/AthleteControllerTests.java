@@ -18,6 +18,7 @@ import pl.tfhub.api.athlete.dto.response.AthleteResponse;
 import pl.tfhub.api.athlete.entity.Athlete;
 import pl.tfhub.api.athlete.enums.Gender;
 import pl.tfhub.api.athlete.exception.AthleteAlreadyExistsException;
+import pl.tfhub.api.athlete.exception.AthleteAliasConflictException;
 import pl.tfhub.api.athlete.exception.AthleteNotFoundException;
 import pl.tfhub.api.athlete.service.AthleteService;
 import pl.tfhub.api.result.dto.response.AthleteResultHistoryResponse;
@@ -142,7 +143,7 @@ class AthleteControllerTests {
 				.andExpect(status().isOk())
 				.andExpect(content().json("""
 						{"id":42,"firstName":"Janusz","lastName":"Nowak","birthYear":2011,
-						"gender":"FEMALE","active":true,"trainingGroupId":null}
+						"gender":"FEMALE","active":true,"trainingGroupId":null,"aliases":[]}
 						""", true));
 
 		verify(athleteService).updateAthlete(42L,
@@ -286,7 +287,7 @@ class AthleteControllerTests {
 				.andExpect(status().isOk())
 				.andExpect(content().json("""
 						{"id":42,"firstName":"Jan","lastName":"Kowalski","birthYear":2010,
-						"gender":"MALE","active":false,"trainingGroupId":null}
+						"gender":"MALE","active":false,"trainingGroupId":null,"aliases":[]}
 						""", true));
 
 		verify(athleteService).changeAthleteStatus(42L, request);
@@ -362,9 +363,9 @@ class AthleteControllerTests {
 				.andExpect(content().json("""
 						[
 						  {"id":1,"firstName":"Jan","lastName":"Kowalski","birthYear":2010,
-						   "gender":"MALE","active":true,"trainingGroupId":null},
+						   "gender":"MALE","active":true,"trainingGroupId":null,"aliases":[]},
 						  {"id":2,"firstName":"Anna","lastName":"Nowak","birthYear":2008,
-						   "gender":"FEMALE","active":false,"trainingGroupId":null}
+						   "gender":"FEMALE","active":false,"trainingGroupId":null,"aliases":[]}
 						]
 						""", true));
 
@@ -637,7 +638,7 @@ class AthleteControllerTests {
 				.andExpect(jsonPath("$.active").value(true))
 				.andExpect(content().json("""
 						{"id":42,"firstName":"Jan","lastName":"Kowalski","birthYear":2010,
-						"gender":"MALE","active":true,"trainingGroupId":null}
+						"gender":"MALE","active":true,"trainingGroupId":null,"aliases":[]}
 						""", true));
 
 		verify(athleteService).getAthlete(42L);
@@ -710,6 +711,29 @@ class AthleteControllerTests {
 		assertBadRequest("""
 				{"firstName":"John","lastName":"Smith","birthYear":2010}
 				""");
+	}
+
+	@Test
+	void validatesAliasesAndReturnsConflictWithoutExposingInternalDetails() throws Exception {
+		assertBadRequest("""
+				{"firstName":"John","lastName":"Smith","birthYear":2010,"gender":"MALE","aliases":[" "]}
+				""");
+		assertBadRequest("""
+				{"firstName":"John","lastName":"Smith","birthYear":2010,"gender":"MALE","aliases":[null]}
+				""");
+		assertBadRequest("""
+				{"firstName":"John","lastName":"Smith","birthYear":2010,"gender":"MALE","aliases":["%s"]}
+				""".formatted("x".repeat(256)));
+		when(athleteService.createAthlete(any(CreateAthleteRequest.class)))
+				.thenThrow(new AthleteAliasConflictException());
+		mockMvc.perform(post("/api/athletes")
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("""
+								{"firstName":"John","lastName":"Smith","birthYear":2010,"gender":"MALE",
+								 "aliases":["John"]}
+								"""))
+				.andExpect(status().isConflict())
+				.andExpect(jsonPath("$.title").value("Athlete alias conflict"));
 	}
 
 	@Test

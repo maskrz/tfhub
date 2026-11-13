@@ -39,6 +39,10 @@ import javax.imageio.ImageIO;
 import pl.tfhub.api.common.authorization.AccessScopeService;
 import pl.tfhub.api.athlete.entity.Athlete;
 import pl.tfhub.api.athlete.repository.AthleteRepository;
+import pl.tfhub.api.athlete.service.AthleteService;
+import pl.tfhub.api.athlete.dto.request.UpdateAthleteRequest;
+import pl.tfhub.api.athlete.enums.Gender;
+import pl.tfhub.api.athlete.exception.AthleteNotFoundException;
 import pl.tfhub.api.training.entity.Training;
 import pl.tfhub.api.training.enums.TrainingExecutionStatus;
 import pl.tfhub.api.training.repository.TrainingRepository;
@@ -80,6 +84,7 @@ import pl.tfhub.api.trainingimport.service.TrainingImportImageProcessor;
 import pl.tfhub.api.trainingimport.service.TrainingImportImageStorage;
 import pl.tfhub.api.trainingimport.service.TrainingImportProcessingService;
 import pl.tfhub.api.trainingimport.service.TrainingImportProcessingStateService;
+import pl.tfhub.api.trainingimport.service.TrainingImportRecognitionMapper;
 import pl.tfhub.api.trainingimport.service.TrainingImportSourceImageService;
 import pl.tfhub.api.trainingimport.service.TrainingImportUploadService;
 import pl.tfhub.api.trainingimport.service.TrainingImportListService;
@@ -153,6 +158,9 @@ class TrainingImportDomainIntegrationTests {
 	private AthleteRepository athleteRepository;
 
 	@Autowired
+	private AthleteService athleteService;
+
+	@Autowired
 	private TrainingGroupRepository trainingGroupRepository;
 
 	@Autowired
@@ -187,6 +195,9 @@ class TrainingImportDomainIntegrationTests {
 
 	@Autowired
 	private TrainingImportDraftService draftService;
+
+	@Autowired
+	private TrainingImportRecognitionMapper recognitionMapper;
 
 	@Autowired
 	private TrainingImportFinalizationService finalizationService;
@@ -466,6 +477,52 @@ class TrainingImportDomainIntegrationTests {
 				() -> draftService.getDraft(groupOneImport.getId()));
 		assertThrows(TrainingImportNotFoundException.class,
 				() -> draftService.findAthleteCandidates(groupOneImport.getId(), "ada"));
+	}
+
+	@Test
+	void athleteAliasesFollowExistingCoachAccessScope() {
+		jdbcTemplate.update("INSERT INTO athlete_aliases(athlete_id, alias) VALUES (1, 'Ada'), (2, 'Bea')");
+		setAuthenticatedUser(2, UserRole.COACH);
+		assertEquals(List.of("Ada"), athleteService.getAthlete(1L).aliases());
+		assertThrows(AthleteNotFoundException.class, () -> athleteService.getAthlete(2L));
+		assertThrows(AthleteNotFoundException.class, () -> athleteService.updateAthlete(2L,
+				new UpdateAthleteRequest("Bea", "Example", 1991, Gender.FEMALE, 2L, List.of("new"))));
+		assertEquals("Bea", jdbcTemplate.queryForObject(
+				"SELECT alias FROM athlete_aliases WHERE athlete_id = 2", String.class));
+	}
+
+	@Test
+	void suggestionsExcludeAthletesWhoAreInactiveOrOutsideTheImportGroup() {
+		TrainingImport trainingImport = saveReviewDraft(1, "stale-suggestions.jpg");
+		jdbcTemplate.update("""
+				UPDATE training_import_draft_athlete_rows
+				SET athlete_id = NULL, match_status = 'UNRESOLVED',
+				    recognition_metadata = '{"uncertain":true,"suggestedAthleteIds":[1,2]}'::jsonb
+				WHERE draft_id = (SELECT id FROM training_import_drafts WHERE import_id = ?)
+				""", trainingImport.getId());
+		var row = draftService.getDraft(trainingImport.getId()).definitions().getFirst().athleteRows().getFirst();
+		assertNull(row.athlete());
+		assertEquals(List.of(1L), row.recognitionMetadata().get("suggestedAthleteIds"));
+		jdbcTemplate.update("UPDATE athletes SET active = false WHERE id = 1");
+		row = draftService.getDraft(trainingImport.getId()).definitions().getFirst().athleteRows().getFirst();
+		assertEquals(List.of(), row.recognitionMetadata().get("suggestedAthleteIds"));
+		assertEquals(1, draftService.findAthleteCandidates(trainingImport.getId(), null).size());
+	}
+
+	@Test
+	void unresolvedRowCanBeManuallyAssignedWithoutChangingOtherRecognizedData() {
+		TrainingImport trainingImport = saveReviewDraft(1, "manual-match.jpg");
+		jdbcTemplate.update("""
+				UPDATE training_import_draft_athlete_rows SET athlete_id = NULL, match_status = 'UNRESOLVED'
+				WHERE draft_id = (SELECT id FROM training_import_drafts WHERE import_id = ?)
+				""", trainingImport.getId());
+		var original = draftService.getDraft(trainingImport.getId());
+		assertNull(original.definitions().getFirst().athleteRows().getFirst().athlete());
+		var updated = draftService.updateDraft(trainingImport.getId(), updateRequest(original, 1, false));
+		var row = updated.definitions().getFirst().athleteRows().getFirst();
+		assertEquals(TrainingImportAthleteMatchStatus.MATCHED, row.matchStatus());
+		assertEquals(1L, row.athlete().id());
+		assertEquals("Ada Lovelace", row.recognizedName());
 	}
 
 	@Test
@@ -812,6 +869,120 @@ class TrainingImportDomainIntegrationTests {
 	}
 
 	@Test
+	void processingMatchesExplicitAliasAndPreservesExecutionData() {
+		jdbcTemplate.update("INSERT INTO athlete_aliases(athlete_id, alias) VALUES (1, 'Ada L.')");
+		TrainingImport trainingImport = saveImportWithStoredImage(
+				1, "alias-match.jpg", "c".repeat(64), new byte[] {(byte) 0xff, (byte) 0xd8, 1, 2});
+		String response = validRecognition("Recognized session").replace(
+				"\"recognizedName\":\"Ada Lovelace\",\"firstName\":\"Ada\",\"lastName\":\"Lovelace\"",
+				"\"recognizedName\":\" ADA L \",\"firstName\":\"Ada\",\"lastName\":null");
+		when(geminiClient.recognize(any())).thenReturn(
+				new GeminiTrainingRecognitionClient.GeminiRecognitionResponse("raw", response));
+		processingService.processClaimedAttempt(processingStateService.claimPending(trainingImport.getId()));
+
+		var draft = draftService.getDraft(trainingImport.getId());
+		var row = draft.definitions().getFirst().athleteRows().getFirst();
+		assertEquals(TrainingImportAthleteMatchStatus.MATCHED, row.matchStatus());
+		assertEquals(1L, row.athlete().id());
+		assertEquals(" ADA L ", row.recognizedName());
+		assertEquals(TrainingExecutionStatus.RECORDED, row.executions().getFirst().status());
+		assertEquals(new BigDecimal("12.300"), row.executions().getFirst().measuredResult());
+	}
+
+	@Test
+	void conflictingAliasAndFullNameRemainUnresolvedForManualReview() {
+		jdbcTemplate.update("""
+				INSERT INTO athletes(first_name, last_name, birth_year, gender, training_group_id)
+				VALUES ('Other', 'Runner', 1992, 'FEMALE', 1)
+				""");
+		jdbcTemplate.update("INSERT INTO athlete_aliases(athlete_id, alias) VALUES (3, 'Ada Lovelace')");
+		TrainingImport trainingImport = saveImportWithStoredImage(
+				1, "ambiguous.jpg", "d".repeat(64), new byte[] {(byte) 0xff, (byte) 0xd8, 1, 2});
+		when(geminiClient.recognize(any())).thenReturn(
+				new GeminiTrainingRecognitionClient.GeminiRecognitionResponse("raw", validRecognition("Session")));
+		processingService.processClaimedAttempt(processingStateService.claimPending(trainingImport.getId()));
+
+		var row = draftService.getDraft(trainingImport.getId()).definitions().getFirst().athleteRows().getFirst();
+		assertEquals(TrainingImportAthleteMatchStatus.UNRESOLVED, row.matchStatus());
+		assertNull(row.athlete());
+		assertEquals(Boolean.TRUE, row.recognitionMetadata().get("uncertain"));
+		assertEquals(2, draftService.findAthleteCandidates(trainingImport.getId(), null).size());
+	}
+
+	@Test
+	void removedAliasIsRecheckedBeforeTheDraftIsPersisted() {
+		jdbcTemplate.update("INSERT INTO athlete_aliases(athlete_id, alias) VALUES (1, 'Ada L.')");
+		TrainingImport trainingImport = saveImportWithImage(1, "stale-alias.jpg", "f".repeat(64));
+		Long attemptId = processingStateService.claimPending(trainingImport.getId());
+		String response = validRecognition("Session").replace(
+				"\"recognizedName\":\"Ada Lovelace\",\"firstName\":\"Ada\",\"lastName\":\"Lovelace\"",
+				"\"recognizedName\":\"Ada L.\",\"firstName\":\"Ada\",\"lastName\":null");
+		var recognizedDraft = recognitionMapper.validateAndMap(response, 1L);
+		jdbcTemplate.update("DELETE FROM athlete_aliases WHERE athlete_id = 1");
+		processingStateService.complete(attemptId, "raw", recognizedDraft);
+		var row = draftService.getDraft(trainingImport.getId()).definitions().getFirst().athleteRows().getFirst();
+		assertEquals(TrainingImportAthleteMatchStatus.UNRESOLVED, row.matchStatus());
+		assertNull(row.athlete());
+		assertEquals(Boolean.TRUE, row.recognitionMetadata().get("uncertain"));
+	}
+
+	@Test
+	void blankRecognizedNamesBecomeEditableDraftDefaultsAndPersistOnAcceptance() {
+		TrainingImport trainingImport = saveImportWithStoredImage(
+				1, "blank-names.jpg", "e".repeat(64), new byte[] {(byte) 0xff, (byte) 0xd8, 1, 2});
+		String response = validRecognition("")
+				.replace("\"value\":\"Main set\"", "\"value\":null");
+		when(geminiClient.recognize(any())).thenReturn(
+				new GeminiTrainingRecognitionClient.GeminiRecognitionResponse("raw", response));
+		Long attemptId = processingStateService.claimPending(trainingImport.getId());
+
+		processingService.processClaimedAttempt(attemptId);
+
+		assertEquals(TrainingImportAttemptStatus.SUCCEEDED, attemptRepository.findById(attemptId).orElseThrow().getStatus());
+		var draft = draftService.getDraft(trainingImport.getId());
+		assertEquals(TrainingImportStatus.REVIEW_REQUIRED, draft.status());
+		assertEquals("Trening 10.11.2026", draft.name());
+		assertEquals("Cała grupa", draft.definitions().getFirst().name());
+		assertEquals(400, draft.definitions().getFirst().segments().getFirst().distanceM());
+		assertEquals(new BigDecimal("12.300"),
+				draft.definitions().getFirst().athleteRows().getFirst().executions().getFirst().measuredResult());
+		assertTrue(draft.validation().readyForAcceptance());
+		var accepted = finalizationService.accept(trainingImport.getId());
+		var training = trainingDetailsService.getTraining(accepted.trainingId());
+		assertEquals("Trening 10.11.2026", training.name());
+		assertEquals("Cała grupa", training.definitions().getFirst().name());
+	}
+
+	@Test
+	void missingFinalRestDefaultsToZeroWithoutConfirmation() {
+		TrainingImport trainingImport = saveImportWithStoredImage(
+				1, "missing-rest.jpg", "c".repeat(64), new byte[] {(byte) 0xff, (byte) 0xd8, 1, 2});
+		String response = validRecognition("Recognized session").replace(
+				"\"restAfterSeconds\":{\"value\":\"60\",\"originalText\":\"60 s\",\"uncertain\":false,\"uncertaintyReason\":null}",
+				"\"restAfterSeconds\":null");
+		when(geminiClient.recognize(any())).thenReturn(
+				new GeminiTrainingRecognitionClient.GeminiRecognitionResponse("raw", response));
+		Long attemptId = processingStateService.claimPending(trainingImport.getId());
+		processingService.processClaimedAttempt(attemptId);
+
+		assertEquals(TrainingImportAttemptStatus.SUCCEEDED, attemptRepository.findById(attemptId).orElseThrow().getStatus());
+		var draft = draftService.getDraft(trainingImport.getId());
+		assertEquals(TrainingImportStatus.REVIEW_REQUIRED, draft.status());
+		var definition = draft.definitions().getFirst();
+		var segment = definition.segments().getFirst();
+		var row = definition.athleteRows().getFirst();
+		var execution = row.executions().getFirst();
+		assertEquals(0, segment.restAfterSeconds());
+		assertEquals(400, segment.distanceM());
+		assertEquals(Boolean.FALSE, segment.recognitionMetadata().get("uncertain"));
+		assertEquals(new BigDecimal("12.300"), execution.measuredResult());
+		assertTrue(draft.validation().readyForAcceptance());
+		var accepted = finalizationService.accept(trainingImport.getId());
+		var training = trainingDetailsService.getTraining(accepted.trainingId());
+		assertEquals(0, training.definitions().getFirst().segments().getFirst().restAfterSeconds());
+	}
+
+	@Test
 	void unresolvedDistanceSurvivesProcessingAndCanBeCorrectedBeforeAcceptance() {
 		TrainingImport trainingImport = saveImportWithStoredImage(
 				1, "unresolved-distance.jpg", "c".repeat(64), new byte[] {(byte) 0xff, (byte) 0xd8, 1, 2});
@@ -975,6 +1146,32 @@ class TrainingImportDomainIntegrationTests {
 				attemptRepository.findById(successfulAttemptId).orElseThrow().getRawModelResponse());
 		assertEquals(0L, count("training_sessions"));
 		verify(geminiClient, times(2)).recognize(any());
+	}
+
+	@Test
+	void retryDoesNotReplaceManuallyReviewedAthleteAssignments() {
+		TrainingImport trainingImport = saveReviewDraft(1, "reviewed-retry.jpg");
+		String storageKey = imageStorage.store(new byte[] {(byte) 0xff, (byte) 0xd8, 1, 2});
+		jdbcTemplate.update("UPDATE training_import_source_images SET storage_key = ? WHERE import_id = ?",
+				storageKey, trainingImport.getId());
+		jdbcTemplate.update("""
+				UPDATE training_import_draft_athlete_rows
+				SET recognition_metadata = recognition_metadata || '{"manuallyReviewed":true}'::jsonb
+				WHERE draft_id = (SELECT id FROM training_import_drafts WHERE import_id = ?)
+				""", trainingImport.getId());
+		var before = draftService.getDraft(trainingImport.getId());
+		trainingImport.changeStatus(TrainingImportStatus.FAILED);
+		trainingImportRepository.saveAndFlush(trainingImport);
+		when(geminiClient.recognize(any())).thenReturn(
+				new GeminiTrainingRecognitionClient.GeminiRecognitionResponse("raw", validRecognition("Replacement")));
+		Long attemptId = processingStateService.claimRetry(trainingImport.getId());
+		processingService.processClaimedAttempt(attemptId);
+		assertEquals(TrainingImportAttemptStatus.FAILED, attemptRepository.findById(attemptId).orElseThrow().getStatus());
+		assertEquals("DRAFT_ALREADY_REVIEWED", attemptRepository.findById(attemptId).orElseThrow().getFailureCode());
+		assertEquals(before.name(), draftRepository.findByTrainingImport_Id(trainingImport.getId()).orElseThrow().getName());
+		assertEquals(1L, jdbcTemplate.queryForObject(
+				"SELECT athlete_id FROM training_import_draft_athlete_rows WHERE draft_id = "
+						+ "(SELECT id FROM training_import_drafts WHERE import_id = ?)", Long.class, trainingImport.getId()));
 	}
 
 	@Test

@@ -287,6 +287,10 @@ export class AthletesPage implements OnInit {
   }
 
   private getStatusErrorMessage(error: unknown): string {
+    if (error instanceof HttpErrorResponse && error.status === 409
+        && error.error?.title === 'Athlete alias conflict') {
+      return 'Nie można aktywować zawodnika: jego alias jest używany w tej grupie.';
+    }
     if (error instanceof HttpErrorResponse && error.status === 401) {
       return 'Sesja wygasła lub użytkownik nie jest zalogowany.';
     }

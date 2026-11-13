@@ -12,6 +12,8 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import pl.tfhub.api.athlete.entity.Athlete;
 import pl.tfhub.api.athlete.exception.AthleteAlreadyExistsException;
+import pl.tfhub.api.athlete.exception.AthleteAliasConflictException;
+import pl.tfhub.api.athlete.exception.InvalidAthleteAliasException;
 import pl.tfhub.api.athlete.exception.AthleteNotFoundException;
 import pl.tfhub.api.athlete.exception.InvalidAthleteIdException;
 import pl.tfhub.api.athlete.exception.InvalidAthleteGroupException;
@@ -90,6 +92,20 @@ public class ApiExceptionHandler {
 	public ProblemDetail handleDuplicateAthlete(AthleteAlreadyExistsException exception) {
 		ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, exception.getMessage());
 		problem.setTitle("Athlete already exists");
+		return problem;
+	}
+
+	@ExceptionHandler(AthleteAliasConflictException.class)
+	public ProblemDetail handleAliasConflict(AthleteAliasConflictException exception) {
+		ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, exception.getMessage());
+		problem.setTitle("Athlete alias conflict");
+		return problem;
+	}
+
+	@ExceptionHandler(InvalidAthleteAliasException.class)
+	public ProblemDetail handleInvalidAlias(InvalidAthleteAliasException exception) {
+		ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, exception.getMessage());
+		problem.setTitle("Invalid athlete alias");
 		return problem;
 	}
 

@@ -80,12 +80,13 @@ Example:
 - The endpoint must not modify any athlete data.
 - The response must use an Athlete Response DTO, not the JPA entity.
 - The endpoint returns exactly one athlete.
+- The response includes the athlete's current training group ID and aliases. Existing athlete access rules apply to the entire response.
 
 ## 8. Acceptance Criteria
 
 - [ ] An existing active athlete can be retrieved by ID.
 - [ ] An existing inactive athlete can also be retrieved by ID.
-- [ ] The response contains all athlete fields: `id`, `firstName`, `lastName`, `birthYear`, `gender` and `active`.
+- [ ] The response contains `id`, `firstName`, `lastName`, `birthYear`, `gender`, `active`, `trainingGroupId` and `aliases`.
 - [ ] A successful request returns HTTP `200 OK`.
 - [ ] A request for a non-existing athlete returns HTTP `404 Not Found`.
 - [ ] A request with an invalid ID returns HTTP `400 Bad Request`.

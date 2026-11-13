@@ -1,6 +1,6 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component, EventEmitter, Input, Output, inject, signal } from '@angular/core';
-import { FormControl, FormGroup, ReactiveFormsModule, ValidatorFn, Validators } from '@angular/forms';
+import { FormArray, FormControl, FormGroup, ReactiveFormsModule, ValidatorFn, Validators } from '@angular/forms';
 import { EMPTY, catchError, finalize, take } from 'rxjs';
 import {
   AthleteFormMode,
@@ -66,6 +66,7 @@ export class AthleteFormComponent {
       validators: [Validators.required],
     }),
     trainingGroupId: new FormControl<number | null>(null),
+    aliases: new FormArray<FormControl<string>>([]),
   });
 
   private readonly api = inject(AthletesApiService);
@@ -93,14 +94,29 @@ export class AthleteFormComponent {
       }
     });
     if (this.mode === 'EDIT' && this.athlete) {
+      for (const alias of this.athlete.aliases ?? []) {
+        this.addAlias(alias);
+      }
       this.form.setValue({
         firstName: this.athlete.firstName,
         lastName: this.athlete.lastName,
         birthYear: this.athlete.birthYear,
         gender: this.athlete.gender,
         trainingGroupId: this.athlete.trainingGroupId ?? null,
+        aliases: this.athlete.aliases ?? [],
       });
     }
+  }
+
+  addAlias(value = ''): void {
+    this.form.controls.aliases.push(new FormControl(value, {
+      nonNullable: true,
+      validators: [trimmedRequired, Validators.maxLength(255)],
+    }));
+  }
+
+  removeAlias(index: number): void {
+    this.form.controls.aliases.removeAt(index);
   }
 
   fieldError(field: 'firstName' | 'lastName' | 'birthYear' | 'gender' | 'trainingGroupId'): string | null {
@@ -147,6 +163,13 @@ export class AthleteFormComponent {
       return;
     }
 
+    const aliases = this.form.controls.aliases.getRawValue();
+    const trimmedAliases = aliases.map((alias) => alias.trim());
+    if (new Set(trimmedAliases).size !== trimmedAliases.length) {
+      this.errorMessage.set('Ten sam alias występuje na liście więcej niż raz.');
+      return;
+    }
+
     if (this.mode === 'EDIT' && !this.athlete) {
       this.errorMessage.set('Nie można określić edytowanego zawodnika.');
       return;
@@ -157,6 +180,7 @@ export class AthleteFormComponent {
       lastName: this.form.controls.lastName.value.trim(),
       birthYear,
       gender,
+      aliases,
       ...(this.form.controls.trainingGroupId.value !== null
         ? { trainingGroupId: this.form.controls.trainingGroupId.value }
         : {}),
@@ -218,6 +242,8 @@ export class AthleteFormComponent {
       );
     } else if (error.status === 409 && body?.title === 'Athlete already exists') {
       this.errorMessage.set('Zawodnik o tym imieniu, nazwisku i roku urodzenia już istnieje.');
+    } else if (error.status === 409 && body?.title === 'Athlete alias conflict') {
+      this.errorMessage.set('Alias jest już używany przez aktywnego zawodnika w tej grupie lub powtarza się na liście.');
     } else if (error.status === 400) {
       this.errorMessage.set('Sprawdź poprawność danych i spróbuj ponownie.');
     } else if (error.status === 404 && this.mode === 'EDIT') {

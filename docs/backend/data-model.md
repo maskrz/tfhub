@@ -149,6 +149,9 @@ Allowed Java enum values:
 
 ### 4.4 Business rules
 
+- Athletes may have any number of aliases, each at most 255 characters. `athlete_aliases` stores the display text and a database-generated canonical key. Canonicalization uses Unicode NFC, case-insensitive comparison, collapsed Unicode whitespace, and ignores a period after a single-letter initial; all other punctuation and Polish diacritics remain significant.
+- Canonical aliases are unique per athlete. Among active athletes with a group, they are also unique within that group. Inactive and ungrouped athletes retain their aliases; activating or assigning an active athlete to a group must fail if a conflict would result. Database constraints and scope-maintenance triggers enforce these rules under concurrent writes.
+- Case conversion uses the PostgreSQL database collation and the same database function for stored keys and import comparisons. A collation change requires checking and rebuilding canonical keys and indexes to avoid inconsistent comparisons.
 - Athlete information can be edited.
 - Athletes should not be physically deleted.
 - An athlete can be deactivated by setting `active = false`.
@@ -365,7 +368,7 @@ The migration creates:
 - `tests`
 - `test_results`
 
-The authentication and training-group tables were introduced through `V3__add_users_and_training_groups.sql`; the migration adds a nullable athlete group reference and preserves existing athlete and result rows. The training-session hierarchy was introduced through `V4__create_training_domain_schema.sql`; `V5__replace_training_active_flag_with_status.sql` introduced the training workflow status. Training deletion (UC-505) permanently removes the session-owned definitions, segments, participations, and executions in one transaction; its foreign keys remain restrictive, so the service deletes children in dependency order. Do not alter an already-applied migration. All future database modifications must be introduced through new Flyway migrations.
+The authentication and training-group tables were introduced through `V3__add_users_and_training_groups.sql`; the migration adds a nullable athlete group reference and preserves existing athlete and result rows. The training-session hierarchy was introduced through `V4__create_training_domain_schema.sql`; `V5__replace_training_active_flag_with_status.sql` introduced the training workflow status. Athlete aliases are introduced in `V12__create_athlete_aliases.sql` without modifying existing athletes. Training deletion (UC-505) permanently removes the session-owned definitions, segments, participations, and executions in one transaction; its foreign keys remain restrictive, so the service deletes children in dependency order. Do not alter an already-applied migration. All future database modifications must be introduced through new Flyway migrations.
 
 Existing applied migrations must not be modified.
 

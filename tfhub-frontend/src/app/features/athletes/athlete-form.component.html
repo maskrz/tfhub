@@ -97,4 +97,21 @@
       }
     </div>
   }
+  <fieldset class="field" formArrayName="aliases">
+    <legend>Aliasy</legend>
+    @for (control of form.controls.aliases.controls; track control; let index = $index) {
+      <div>
+        <label [for]="'athlete-alias-' + index">Alias {{ index + 1 }}</label>
+        <input [id]="'athlete-alias-' + index" class="field-control" type="text"
+          [formControlName]="index" [attr.aria-invalid]="control.invalid && control.touched ? 'true' : null" />
+        <button type="button" class="button button--secondary" (click)="removeAlias(index)">
+          Usuń alias
+        </button>
+        @if (control.invalid && control.touched) {
+          <span class="field-error">Wpisz od 1 do 255 znaków.</span>
+        }
+      </div>
+    }
+    <button type="button" class="button button--secondary" (click)="addAlias()">Dodaj alias</button>
+  </fieldset>
 </form>

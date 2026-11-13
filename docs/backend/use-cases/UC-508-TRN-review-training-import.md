@@ -72,6 +72,7 @@ The corrected draft must satisfy the plan rules defined in UC-502 and the athlet
 - A recognized athlete may be matched to an existing athlete belonging to that group.
 - The backend must provide import-scoped athlete candidates using the import's group, including for ADMIN users; a client-supplied group identifier must not broaden or change the search scope.
 - An ambiguous or unmatched athlete must remain unresolved until explicitly handled.
+- Approximate surname suggestions are unconfirmed, are scoped to active current members of the selected group, and require explicit selection. The existing manual selector continues to include inactive group members.
 - The authorized user must be able to:
     - Match an unresolved row to an existing athlete from the selected group.
     - Change an existing athlete assignment to another eligible athlete from the selected group.

@@ -15,7 +15,7 @@ The user clicks **Edytuj** in an athlete's row on the Athletes view.
 ## Main flow
 
 1. The Athletes view opens the shared Athlete Form modal in EDIT mode and passes the selected athlete from its loaded collection.
-2. The form is initialized with the selected athlete's first name, last name, birth year, and gender. No athlete-details GET request is made.
+2. The form is initialized with the selected athlete's personal data, group and aliases. No athlete-details GET request is made.
 3. The user changes the desired values and selects **Zapisz**.
 4. The shared form validates the values using the same rules as CREATE mode.
 5. The frontend sends `PUT /api/athletes/{id}` with an `UpdateAthleteRequest`.
@@ -27,20 +27,22 @@ The user clicks **Edytuj** in an athlete's row on the Athletes view.
 
 ## Fields and business rules
 
-The form contains exactly:
+The form contains:
 
 - First name
 - Last name
 - Birth year
 - Gender
+- Training group and aliases
 
-There is no active/inactive field. The request sends only `firstName`, `lastName`, `birthYear`, and `gender`; the backend preserves the current active status. Existing backend validation and duplicate detection remain authoritative.
+There is no active/inactive field. The request sends the edited aliases along with personal and group data; the backend preserves the current active status and validates group alias conflicts atomically.
 
 ## Validation and errors
 
 - Required, trimmed names, maximum name length, integer birth year within the backend-supported range, and required gender are validated for usability using the existing shared form validators.
 - HTTP `400` displays server field errors when provided and a form-level message.
 - HTTP `409` displays a clear Polish duplicate-athlete message.
+- An alias conflict on edit, group reassignment or activation displays a clear Polish message and preserves the existing state.
 - HTTP `404` reports that the athlete could not be found.
 - Other API failures keep the modal open and preserve entered values.
 - A request in progress disables submission and cancel actions to prevent duplicate operations or accidental dismissal.
@@ -54,7 +56,7 @@ There is no active/inactive field. The request sends only `firstName`, `lastName
 |---|---|---|
 | Initial values | Empty | Selected athlete's current values |
 | API call | `POST /api/athletes` | `PUT /api/athletes/{id}` |
-| Request fields | `firstName`, `lastName`, `birthYear`, `gender` | `firstName`, `lastName`, `birthYear`, `gender` |
+| Request fields | Personal data, group, aliases | Personal data, group, aliases |
 | Modal title | Dodaj zawodnika | Edytuj zawodnika |
 
 Validation, fields, layout, error presentation, and submitting state are shared. `AthleteFormModalComponent` owns dialog presentation and actions; `AthletesPage` owns local collection updates and notifications.

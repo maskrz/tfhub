@@ -30,6 +30,7 @@ The user may:
 - Add, rename, reorder and remove definitions.
 - Add, edit, reorder and remove segments, including distance and rest.
 - Add an existing eligible athlete to a definition, match an unresolved or incorrectly matched row, or explicitly skip it.
+- Review approximate surname suggestions, if any, and explicitly select one; suggestions are never preselected.
 - Correct each execution status, measured result and spike usage independently.
 
 The group selected at upload is read-only. Athlete candidate results and assignments must be restricted to that group for both ADMIN and COACH users. The user cannot create athletes or change their group assignments.

@@ -101,7 +101,7 @@ Example:
 ## 7. Business Rules
 
 - Only existing athletes can be updated.
-- The following fields can be modified: `firstName`, `lastName`, `birthYear`, `gender`.
+- The following fields can be modified: `firstName`, `lastName`, `birthYear`, `gender`, `trainingGroupId` and `aliases`.
 - The `active` field must not be modified by this operation.
 - First and last names must be trimmed before saving.
 - Duplicate detection uses `(firstName, lastName, birthYear)`.
@@ -110,6 +110,8 @@ Example:
 - Both active and inactive athletes can be updated.
 - The response must use an Athlete Response DTO, never a JPA entity.
 - The operation must be transactional.
+- Optional `aliases` replaces the alias list atomically with the personal and group update; an omitted or null list leaves aliases unchanged, and an empty list removes them. Normalized duplicates and conflicts in the final active group return HTTP 409 without applying any changes.
+- Changing an active athlete's training group checks all retained or submitted aliases against active athletes in the destination group. Existing source and destination group authorization applies.
 
 ## 8. Acceptance Criteria
 

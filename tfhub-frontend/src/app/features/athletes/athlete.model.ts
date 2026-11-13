@@ -8,6 +8,7 @@ export interface AthleteResponse {
   gender: Gender;
   active: boolean;
   trainingGroupId?: number | null;
+  aliases?: string[];
 }
 
 export interface ChangeAthleteStatusRequest {
@@ -20,6 +21,7 @@ export interface CreateAthleteRequest {
   birthYear: number;
   gender: Gender;
   trainingGroupId?: number | null;
+  aliases?: string[];
 }
 
 export interface UpdateAthleteRequest {
@@ -28,6 +30,7 @@ export interface UpdateAthleteRequest {
   birthYear: number;
   gender: Gender;
   trainingGroupId?: number | null;
+  aliases?: string[];
 }
 
 export type AthleteFormMode = 'CREATE' | 'EDIT';

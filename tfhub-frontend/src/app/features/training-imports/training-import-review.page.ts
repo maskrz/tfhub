@@ -203,6 +203,18 @@ export class TrainingImportReviewPage implements OnInit {
     }));
   }
 
+  suggestedCandidates(row: RowForm): ImportCandidate[] {
+    const ids = row.controls.metadata.value['suggestedAthleteIds'];
+    if (!Array.isArray(ids) || row.controls.matchStatus.value !== 'UNRESOLVED') return [];
+    return this.candidates().filter((candidate) => candidate.active && ids.includes(candidate.id));
+  }
+
+  selectSuggestion(row: RowForm, candidate: ImportCandidate): void {
+    row.controls.athleteSelection.setValue(String(candidate.id));
+    this.selectAthlete(row, String(candidate.id));
+    this.form.markAsDirty();
+  }
+
   selectAthlete(row: RowForm, value: string): void {
     row.controls.athleteId.setValue(value ? Number(value) : null);
     row.controls.matchStatus.setValue(value ? 'MATCHED' : 'UNRESOLVED');

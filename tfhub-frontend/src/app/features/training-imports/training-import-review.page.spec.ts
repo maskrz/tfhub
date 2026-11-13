@@ -96,6 +96,27 @@ describe('TrainingImportReviewPage', () => {
     expect(request.definitions[0].athleteRows[0].athleteId).toBe(4);
   });
 
+  it('highlights missing rest until the coach confirms it and saves the empty value', async () => {
+    const missingRest = structuredClone(draft);
+    missingRest.definitions[0].segments[0].distanceM = 400;
+    missingRest.definitions[0].segments[0].recognitionMetadata = {};
+    missingRest.definitions[0].segments[1].recognitionMetadata = {
+      uncertain: true, fields: { restAfterSeconds: { uncertain: true } },
+    };
+    await createPage(missingRest);
+    const host = fixture.nativeElement as HTMLElement;
+    const row = host.querySelectorAll('.segments-table tbody tr')[1] as HTMLElement;
+    expect(row.classList.contains('needs-review')).toBe(true);
+    expect((row.querySelector('input[formControlName=restAfterSeconds]') as HTMLInputElement).value).toBe('');
+    (row.querySelector('input[formControlName=recognitionReviewed]') as HTMLInputElement).click();
+    fixture.detectChanges();
+    expect(row.classList.contains('needs-review')).toBe(false);
+    host.querySelector('form')?.dispatchEvent(new Event('submit'));
+    expect(api.updateDraft.mock.calls[0][1].definitions[0].segments[1]).toEqual({
+      id: 12, sequenceNumber: 2, distanceM: 200, restAfterSeconds: null, recognitionReviewed: true,
+    });
+  });
+
   it('shows editable segment and athlete results tables with review highlights', async () => {
     const unresolved = structuredClone(draft);
     unresolved.recognitionMetadata = { uncertain: true, fields: { name: { uncertain: true } } };
@@ -168,6 +189,25 @@ describe('TrainingImportReviewPage', () => {
     expect(fixture.componentInstance.rows(0).at(0).controls.matchStatus.value).toBe('MATCHED');
     expect(fixture.componentInstance.rows(0).at(0).controls.athleteId.value).toBe(4);
     expect(host.querySelector('.executions-table tbody th')?.classList.contains('needs-review')).toBe(false);
+  });
+
+  it('requires explicit selection of an approximate suggestion', async () => {
+    const unmatched = structuredClone(draft);
+    const row = unmatched.definitions[0].athleteRows[0];
+    row.matchStatus = 'UNRESOLVED';
+    row.athlete = null;
+    row.recognitionMetadata = { uncertain: true, suggestedAthleteIds: [4] };
+    await createPage(unmatched);
+    const formRow = fixture.componentInstance.rows(0).at(0);
+    expect(formRow.controls.athleteId.value).toBeNull();
+    expect(formRow.controls.matchStatus.value).toBe('UNRESOLVED');
+    const button = Array.from(fixture.nativeElement.querySelectorAll('button') as NodeListOf<HTMLButtonElement>)
+      .find((item) => item.textContent?.includes('Sugestia do sprawdzenia'));
+    expect(button?.textContent).toContain('Ada Kowalska');
+    button?.click();
+    fixture.detectChanges();
+    expect(formRow.controls.athleteId.value).toBe(4);
+    expect(formRow.controls.matchStatus.value).toBe('MATCHED');
   });
 
   it('resets loaded values and retains reset baselines after saving with new draft IDs', async () => {

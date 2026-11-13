@@ -17,6 +17,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import pl.tfhub.api.athlete.entity.Athlete;
 import pl.tfhub.api.athlete.repository.AthleteRepository;
+import pl.tfhub.api.athlete.service.AthleteService;
 import pl.tfhub.api.trainingimport.dto.response.TrainingImportStatusResponse;
 import pl.tfhub.api.trainingimport.entity.TrainingImport;
 import pl.tfhub.api.trainingimport.entity.TrainingImportAttempt;
@@ -62,6 +63,8 @@ public class TrainingImportProcessingStateService {
 	private final TrainingImportDraftAthleteRowRepository athleteRowRepository;
 	private final TrainingImportDraftExecutionRepository executionRepository;
 	private final AthleteRepository athleteRepository;
+	private final AthleteService athleteService;
+	private final TrainingImportAthleteMatcher athleteMatcher;
 	private final AccountManagementService accountManagementService;
 	private final AccessScopeService accessScopeService;
 	private final TrainingImportImageStorage imageStorage;
@@ -81,6 +84,8 @@ public class TrainingImportProcessingStateService {
 			TrainingImportDraftAthleteRowRepository athleteRowRepository,
 			TrainingImportDraftExecutionRepository executionRepository,
 			AthleteRepository athleteRepository,
+			AthleteService athleteService,
+			TrainingImportAthleteMatcher athleteMatcher,
 			AccountManagementService accountManagementService,
 			AccessScopeService accessScopeService,
 			TrainingImportImageStorage imageStorage,
@@ -95,6 +100,8 @@ public class TrainingImportProcessingStateService {
 		this.athleteRowRepository = athleteRowRepository;
 		this.executionRepository = executionRepository;
 		this.athleteRepository = athleteRepository;
+		this.athleteService = athleteService;
+		this.athleteMatcher = athleteMatcher;
 		this.accountManagementService = accountManagementService;
 		this.accessScopeService = accessScopeService;
 		this.imageStorage = imageStorage;
@@ -205,6 +212,11 @@ public class TrainingImportProcessingStateService {
 					recognizedDraft.recognitionMetadata());
 			draft = draftRepository.saveAndFlush(draft);
 		} else {
+			if (athleteRowRepository.findByDraft_IdOrderByIdAsc(draft.getId()).stream()
+					.anyMatch(row -> TrainingImportRecognitionMetadata.isReviewed(row.getRecognitionMetadata()))) {
+				throw new TrainingImportProcessingException(
+						"DRAFT_ALREADY_REVIEWED", "An import draft with reviewed athlete assignments cannot be replaced");
+			}
 			deleteDraftChildren(draft);
 			draft.replaceGeneratedContent(
 					attempt,
@@ -414,6 +426,8 @@ public class TrainingImportProcessingStateService {
 		List<TrainingImportDraftAthleteRow> rows = new ArrayList<>();
 		Map<DefinitionRowKey, TrainingImportDraftAthleteRow> rowsByKey = new HashMap<>();
 		Set<Long> matchedAthleteIds = new HashSet<>();
+		List<AthleteService.ImportCandidate> currentCandidates =
+				athleteService.findImportCandidates(trainingImport.getTrainingGroup().getId());
 		for (TrainingImportRecognizedDraft.Definition definitionData : recognizedDraft.definitions()) {
 			TrainingImportDraftDefinition definition = definitionsBySequence.get(definitionData.sequenceNumber());
 			for (int rowIndex = 0; rowIndex < definitionData.athleteRows().size(); rowIndex++) {
@@ -422,14 +436,22 @@ public class TrainingImportProcessingStateService {
 				TrainingImportAthleteMatchStatus matchStatus = rowData.matchStatus();
 				Map<String, Object> metadata = new LinkedHashMap<>(rowData.recognitionMetadata());
 				if (matchStatus == TrainingImportAthleteMatchStatus.MATCHED) {
+					var currentMatch = athleteMatcher.match(new TrainingImportRecognitionData.AthleteRow(
+							rowData.recognizedName(),
+							(String) metadata.get("recognizedFirstName"),
+							(String) metadata.get("recognizedLastName"),
+							Boolean.TRUE.equals(metadata.get("uncertain")),
+							null, List.of()), currentCandidates);
 					athlete = athleteRepository.findByIdAndTrainingGroup_Id(
 									rowData.athleteId(), trainingImport.getTrainingGroup().getId())
 							.orElse(null);
-					if (athlete == null || !matchedAthleteIds.add(athlete.getId())) {
+					if (athlete == null || !athlete.isActive()
+							|| !java.util.Objects.equals(currentMatch.athleteId(), rowData.athleteId())
+							|| !matchedAthleteIds.add(athlete.getId())) {
 						athlete = null;
 						matchStatus = TrainingImportAthleteMatchStatus.UNRESOLVED;
 						metadata.put("uncertain", true);
-						metadata.put("matchingReason", "Athlete no longer belongs to the selected group");
+						metadata.put("matchingReason", "Athlete match is no longer unambiguous in the selected group");
 					}
 				}
 				TrainingImportDraftAthleteRow row = new TrainingImportDraftAthleteRow(

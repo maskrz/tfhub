@@ -97,18 +97,10 @@ Additional recognition rules:
 
 ### 4.6 Athlete Matching
 
-- Recognized athlete names must be matched against existing athletes in the selected training group.
-- Matching must use available identifying information, including first name and last name.
-- The system must not assume that a name match is unambiguous if multiple candidates exist.
-- A confidently matched athlete may be associated with the corresponding draft participant.
-- If an exact first-name and last-name match is unavailable, the system may use a conservative
-  Levenshtein-distance comparison of the recognized surname against surnames in the selected group.
-- The maximum surname distance is one for surnames of up to seven letters and two for longer
-  surnames. If different surnames are within the threshold, the athlete remains unresolved.
-- A unique approximate surname match may be associated with the athlete, but must be marked
-  uncertain for manual confirmation. If the matching surname is shared by multiple athletes, the
-  recognized first-name initial may disambiguate only when exactly one athlete has that initial;
-  otherwise the row remains unresolved.
+- Automatic matching uses only active athletes in the selected group and the canonical alias normalization described in the data model.
+- Compare the actual recognized name against explicit aliases and complete first-plus-last names. An automatic assignment requires one unambiguous athlete across both forms of evidence. A first name alone is not sufficient unless explicitly configured as an alias. Uncertain OCR, conflicting candidates and duplicate athlete claims remain unresolved.
+- Approximate surname comparison may provide active group members as suggestions for explicit manual selection only. It never assigns an athlete or resolves an ambiguity. The maximum distance is one for surnames of up to seven letters and two for longer surnames.
+- Gemini receives the existing image and static instructions only; athlete rosters and aliases are not added to the request.
 - An ambiguous or unmatched athlete must remain unresolved.
 - An athlete who cannot be matched must not be assigned to another group automatically.
 - Unresolved athletes must be explicitly identified in the draft.
@@ -121,7 +113,10 @@ Additional recognition rules:
 - The draft must contain recognized training information, definitions, segments, participants and execution data.
 - The draft must preserve the association between each athlete, definition, segment and recognized execution.
 - The draft must include recognition uncertainty and unresolved athlete matching information.
+- If the recognized training name is missing or blank, use `Trening DD.MM.YYYY` with the recognized training date. If a definition name is missing or blank, use `Cała grupa`. These names remain editable during review.
+- A valid recognized training date is still required; no date is invented. Existing uncertainty indicators remain available for review.
 - A missing, empty, unparseable or non-positive segment distance is stored as null, flagged uncertain, and retained with its segment and other recognized data for review.
+- A missing or empty rest after the final segment defaults to zero without requiring confirmation. A missing or empty rest on other segments, or an unparseable or negative rest on any segment, is stored as null and flagged uncertain for review.
 - The draft must retain original recognized text where applicable.
 - The draft must be editable through UC-508.
 - Processing must not create persisted training session, definition, segment, participation or execution records.
@@ -235,7 +230,7 @@ When processing succeeds, the import must expose sufficient information to retri
 15. Successful processing changes the import state to REVIEW_REQUIRED.
 16. Failed processing changes the import state to FAILED.
 17. A failed import can be retried using the same optimized JPEG.
-18. Retry replaces the current draft only after successful processing and validation, without creating a new import record.
+18. Retry replaces an unreviewed current draft only after successful processing and validation, without creating a new import record. A draft containing manually reviewed athlete assignments is not overwritten.
 19. Concurrent processing attempts for the same import are prevented.
 20. The optimized JPEG remains available after processing and retry; the unoptimized upload is not retained.
 21. Processing never creates or modifies persisted training session or execution records.
@@ -246,4 +241,4 @@ When processing succeeds, the import must expose sufficient information to retri
 26. Temporary failures are retried automatically after 30 seconds, 2 minutes and 5 minutes, with no more than three automatic retries per processing cycle.
 27. The import remains FAILED while waiting for an automatic retry, and its status response includes the scheduled `nextRetryAt`.
 28. Explicit retry starts a fresh automatic-retry allowance.
-29. Approximate surname matches are restricted to the selected group and are marked uncertain for manual confirmation.
+29. Approximate surname suggestions are restricted to active athletes in the selected group and require explicit manual selection; they never assign an athlete automatically.

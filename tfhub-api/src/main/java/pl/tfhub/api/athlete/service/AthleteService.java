@@ -4,6 +4,11 @@ import jakarta.persistence.criteria.Predicate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.Set;
+import java.util.stream.Collectors;
 import org.hibernate.exception.ConstraintViolationException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -17,8 +22,12 @@ import pl.tfhub.api.athlete.dto.request.SearchAthletesRequest;
 import pl.tfhub.api.athlete.dto.request.UpdateAthleteRequest;
 import pl.tfhub.api.athlete.dto.response.AthleteResponse;
 import pl.tfhub.api.athlete.entity.Athlete;
+import pl.tfhub.api.athlete.entity.AthleteAlias;
 import pl.tfhub.api.athlete.exception.AthleteAlreadyExistsException;
+import pl.tfhub.api.athlete.exception.AthleteAliasConflictException;
 import pl.tfhub.api.athlete.exception.AthleteNotFoundException;
+import pl.tfhub.api.athlete.exception.InvalidAthleteAliasException;
+import pl.tfhub.api.athlete.repository.AthleteAliasRepository;
 import pl.tfhub.api.athlete.repository.AthleteRepository;
 import pl.tfhub.api.common.authorization.AccessScopeService;
 import pl.tfhub.api.traininggroup.entity.TrainingGroup;
@@ -33,15 +42,18 @@ public class AthleteService {
 	private final AthleteRepository athleteRepository;
 	private final TrainingGroupRepository trainingGroupRepository;
 	private final AccessScopeService accessScopeService;
+	private final AthleteAliasRepository athleteAliasRepository;
 
 	@Autowired
 	public AthleteService(
 			AthleteRepository athleteRepository,
 			TrainingGroupRepository trainingGroupRepository,
-			AccessScopeService accessScopeService) {
+			AccessScopeService accessScopeService,
+			AthleteAliasRepository athleteAliasRepository) {
 		this.athleteRepository = athleteRepository;
 		this.trainingGroupRepository = trainingGroupRepository;
 		this.accessScopeService = accessScopeService;
+		this.athleteAliasRepository = athleteAliasRepository;
 	}
 
 	@Transactional
@@ -67,12 +79,12 @@ public class AthleteService {
 				trainingGroup);
 
 		try {
-			return AthleteResponse.from(athleteRepository.saveAndFlush(athlete));
+			List<String> aliases = validateAliases(request.aliases());
+			Athlete saved = athleteRepository.saveAndFlush(athlete);
+			replaceAliases(saved, aliases);
+			return AthleteResponse.from(saved, aliases);
 		} catch (DataIntegrityViolationException exception) {
-			if (isDuplicateAthleteConstraint(exception)) {
-				throw new AthleteAlreadyExistsException();
-			}
-			throw exception;
+			throw translateConstraint(exception);
 		}
 	}
 
@@ -81,7 +93,7 @@ public class AthleteService {
 		accessScopeService.requireAthleteAccess(id);
 		Athlete athlete = athleteRepository.findById(id)
 				.orElseThrow(() -> new AthleteNotFoundException(id));
-		return AthleteResponse.from(athlete);
+		return AthleteResponse.from(athlete, aliasesFor(List.of(athlete)).getOrDefault(id, List.of()));
 	}
 
 	@Transactional
@@ -103,22 +115,26 @@ public class AthleteService {
 					.orElseThrow(() -> new TrainingGroupNotFoundException(request.trainingGroupId()));
 		}
 
-		athlete.updatePersonalInformation(
-				request.firstName(),
-				request.lastName(),
-				request.birthYear(),
-				request.gender());
-		if (newGroup != null) {
-			athlete.changeTrainingGroup(newGroup);
-		}
-
 		try {
-			return AthleteResponse.from(athleteRepository.saveAndFlush(athlete));
-		} catch (DataIntegrityViolationException exception) {
-			if (isDuplicateAthleteConstraint(exception)) {
-				throw new AthleteAlreadyExistsException();
+			List<String> aliases = request.aliases() == null ? null : validateAliases(request.aliases());
+			if (aliases != null) {
+				athleteAliasRepository.deleteByAthleteId(id);
+				athleteAliasRepository.flush();
 			}
-			throw exception;
+			athlete.updatePersonalInformation(
+					request.firstName(), request.lastName(), request.birthYear(), request.gender());
+			if (newGroup != null) {
+				athlete.changeTrainingGroup(newGroup);
+			}
+			Athlete saved = athleteRepository.saveAndFlush(athlete);
+			if (aliases != null) {
+				replaceAliases(saved, aliases);
+			} else {
+				aliases = aliasesFor(List.of(saved)).getOrDefault(id, List.of());
+			}
+			return AthleteResponse.from(saved, aliases);
+		} catch (DataIntegrityViolationException exception) {
+			throw translateConstraint(exception);
 		}
 	}
 
@@ -129,7 +145,12 @@ public class AthleteService {
 		Athlete athlete = athleteRepository.findById(id)
 				.orElseThrow(() -> new AthleteNotFoundException(id));
 		athlete.changeStatus(request.active());
-		return AthleteResponse.from(athleteRepository.saveAndFlush(athlete));
+		try {
+			Athlete saved = athleteRepository.saveAndFlush(athlete);
+			return AthleteResponse.from(saved, aliasesFor(List.of(saved)).getOrDefault(id, List.of()));
+		} catch (DataIntegrityViolationException exception) {
+			throw translateConstraint(exception);
+		}
 	}
 
 	@Transactional(readOnly = true)
@@ -167,21 +188,85 @@ public class AthleteService {
 				Sort.Order.asc("lastName").ignoreCase(),
 				Sort.Order.asc("firstName").ignoreCase(),
 				Sort.Order.asc("id"));
-		return athleteRepository.findAll(specification, sort)
-				.stream()
-				.map(AthleteResponse::from)
+		List<Athlete> athletes = athleteRepository.findAll(specification, sort);
+		Map<Long, List<String>> aliases = aliasesFor(athletes);
+		return athletes.stream()
+				.map(athlete -> AthleteResponse.from(athlete, aliases.getOrDefault(athlete.getId(), List.of())))
 				.toList();
 	}
 
-	private boolean isDuplicateAthleteConstraint(Throwable exception) {
+	private Map<Long, List<String>> aliasesFor(List<Athlete> athletes) {
+		List<Long> ids = athletes.stream().map(Athlete::getId).filter(java.util.Objects::nonNull).toList();
+		if (ids.isEmpty()) {
+			return Map.of();
+		}
+		return athleteAliasRepository.findByAthleteIdInOrderByIdAsc(ids).stream()
+				.collect(Collectors.groupingBy(alias -> alias.getAthlete().getId(),
+						Collectors.mapping(AthleteAlias::getAlias, Collectors.toList())));
+	}
+
+	@Transactional(readOnly = true)
+	public List<ImportCandidate> findImportCandidates(long groupId) {
+		Map<Long, ImportCandidate> candidates = new LinkedHashMap<>();
+		for (AthleteRepository.ImportCandidateRow row : athleteRepository.findImportCandidateRows(groupId)) {
+			ImportCandidate candidate = candidates.computeIfAbsent(row.getId(), id -> new ImportCandidate(
+					id, row.getFirstName(), row.getLastName(), row.getNormalizedFullName(), new ArrayList<>()));
+			if (row.getNormalizedAlias() != null) {
+				candidate.normalizedAliases().add(row.getNormalizedAlias());
+			}
+		}
+		return candidates.values().stream().map(candidate -> new ImportCandidate(
+				candidate.id(), candidate.firstName(), candidate.lastName(), candidate.normalizedFullName(),
+				List.copyOf(candidate.normalizedAliases()))).toList();
+	}
+
+	@Transactional(readOnly = true)
+	public String normalizeImportName(String name) {
+		return athleteAliasRepository.normalize(name);
+	}
+
+	public record ImportCandidate(long id, String firstName, String lastName,
+			String normalizedFullName, List<String> normalizedAliases) {
+	}
+
+	private List<String> validateAliases(List<String> aliases) {
+		if (aliases == null) {
+			return List.of();
+		}
+		Set<String> keys = new HashSet<>();
+		for (String alias : aliases) {
+			String key = athleteAliasRepository.normalize(alias);
+			if (key == null || key.isEmpty() || key.codePointCount(0, key.length()) > 255) {
+				throw new InvalidAthleteAliasException();
+			}
+			if (!keys.add(key)) {
+				throw new AthleteAliasConflictException();
+			}
+		}
+		return List.copyOf(aliases);
+	}
+
+	private void replaceAliases(Athlete athlete, List<String> aliases) {
+		if (!aliases.isEmpty()) {
+			athleteAliasRepository.saveAllAndFlush(aliases.stream()
+					.map(alias -> new AthleteAlias(athlete, alias)).toList());
+		}
+	}
+
+	private RuntimeException translateConstraint(DataIntegrityViolationException exception) {
 		Throwable cause = exception;
 		while (cause != null) {
-			if (cause instanceof ConstraintViolationException violation
-					&& UNIQUE_CONSTRAINT.equals(violation.getConstraintName())) {
-				return true;
+			if (cause instanceof ConstraintViolationException violation) {
+				String name = violation.getConstraintName();
+				if (UNIQUE_CONSTRAINT.equals(name)) {
+					return new AthleteAlreadyExistsException();
+				}
+				if ("uq_athlete_alias_active_group".equals(name) || "uq_athlete_alias_athlete".equals(name)) {
+					return new AthleteAliasConflictException();
+				}
 			}
 			cause = cause.getCause();
 		}
-		return false;
+		return exception;
 	}
 }

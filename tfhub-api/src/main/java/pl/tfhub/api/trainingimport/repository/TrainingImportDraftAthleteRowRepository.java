@@ -12,6 +12,8 @@ public interface TrainingImportDraftAthleteRowRepository
 
 	List<TrainingImportDraftAthleteRow> findByDefinition_IdOrderByIdAsc(long definitionId);
 
+	List<TrainingImportDraftAthleteRow> findByDraft_IdOrderByIdAsc(long draftId);
+
 	@Modifying
 	@Query("DELETE FROM TrainingImportDraftAthleteRow athleteRow WHERE athleteRow.draft.id = :draftId")
 	void deleteByDraftId(@Param("draftId") long draftId);

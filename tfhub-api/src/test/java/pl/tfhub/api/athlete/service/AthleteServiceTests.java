@@ -29,6 +29,7 @@ import pl.tfhub.api.athlete.enums.Gender;
 import pl.tfhub.api.athlete.exception.AthleteAlreadyExistsException;
 import pl.tfhub.api.athlete.exception.AthleteNotFoundException;
 import pl.tfhub.api.athlete.repository.AthleteRepository;
+import pl.tfhub.api.athlete.repository.AthleteAliasRepository;
 import pl.tfhub.api.common.authorization.AccessScopeService;
 import pl.tfhub.api.traininggroup.entity.TrainingGroup;
 import pl.tfhub.api.traininggroup.repository.TrainingGroupRepository;
@@ -48,6 +49,9 @@ class AthleteServiceTests {
 
 	@Mock
 	private AthleteRepository athleteRepository;
+
+	@Mock
+	private AthleteAliasRepository athleteAliasRepository;
 
 	@Mock
 	private TrainingGroupRepository trainingGroupRepository;

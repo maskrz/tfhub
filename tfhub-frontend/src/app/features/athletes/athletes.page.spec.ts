@@ -35,6 +35,7 @@ const createdAthlete: AthleteResponse = {
   lastName: 'Zielińska',
   birthYear: 2008,
   gender: 'FEMALE',
+  aliases: [],
   active: true,
 };
 
@@ -356,6 +357,20 @@ describe('AthletesPage', () => {
     expect(api.getAll).toHaveBeenCalledTimes(1);
   });
 
+  it('explains an alias conflict without activating the athlete', async () => {
+    const changeStatus = vi.fn(() => throwError(() => new HttpErrorResponse({
+      status: 409, error: { title: 'Athlete alias conflict' },
+    })));
+    await createPage(undefined, { changeStatus });
+    showInactive();
+    const toggles = Array.from(fixture.nativeElement.querySelectorAll('.status-toggle')) as HTMLButtonElement[];
+    toggles.find((toggle) => toggle.getAttribute('aria-checked') === 'false')?.click();
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('.status-error')?.textContent)
+      .toContain('Nie można aktywować zawodnika');
+    expect(toggles.find((toggle) => toggle.getAttribute('aria-checked') === 'false')).toBeTruthy();
+  });
+
   it('prevents duplicate status requests while an update is in progress', async () => {
     const pending = new Subject<AthleteResponse>();
     const changeStatus = vi.fn(() => pending);
@@ -472,11 +487,55 @@ describe('AthletesPage', () => {
       lastName: 'Zielińska',
       birthYear: 2008,
       gender: 'FEMALE',
+      aliases: [],
     });
     expect(fixture.nativeElement.querySelector('app-athlete-form-modal')).toBeNull();
     expect(fixture.nativeElement.textContent).toContain('Ala Zielińska');
     expect(fixture.nativeElement.textContent).toContain('Zawodnik został dodany.');
     expect(api.getAll).toHaveBeenCalledTimes(1);
+  });
+
+  it('saves added and edited aliases with the athlete and removes discarded aliases', async () => {
+    await createPage();
+    openCreate();
+    setTextInput('#athlete-first-name', 'Ala');
+    setTextInput('#athlete-last-name', 'Zielińska');
+    setTextInput('#athlete-birth-year', '2008');
+    setFormSelect('#athlete-gender', 'FEMALE');
+    const add = Array.from(fixture.nativeElement.querySelectorAll('button') as NodeListOf<HTMLButtonElement>)
+      .find((button) => button.textContent?.trim() === 'Dodaj alias')!;
+    add.click();
+    fixture.detectChanges();
+    setTextInput('#athlete-alias-0', 'Alka');
+    add.click();
+    fixture.detectChanges();
+    setTextInput('#athlete-alias-1', 'A.');
+    (fixture.nativeElement.querySelector('fieldset[formArrayName=aliases] div button') as HTMLButtonElement).click();
+    fixture.detectChanges();
+    submitAthleteForm();
+    expect(api.createAthlete).toHaveBeenCalledWith(expect.objectContaining({ aliases: ['A.'] }));
+  });
+
+  it('keeps entered aliases when the backend reports an alias conflict', async () => {
+    await createPage(undefined, {
+      createAthlete: vi.fn(() => throwError(() => new HttpErrorResponse({
+        status: 409, error: { title: 'Athlete alias conflict' },
+      }))),
+    });
+    openCreate();
+    setTextInput('#athlete-first-name', 'Ala');
+    setTextInput('#athlete-last-name', 'Zielińska');
+    setTextInput('#athlete-birth-year', '2008');
+    setFormSelect('#athlete-gender', 'FEMALE');
+    const add = Array.from(fixture.nativeElement.querySelectorAll('button') as NodeListOf<HTMLButtonElement>)
+      .find((button) => button.textContent?.trim() === 'Dodaj alias')!;
+    add.click();
+    fixture.detectChanges();
+    setTextInput('#athlete-alias-0', 'Alka');
+    submitAthleteForm();
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).toContain('Alias jest już używany');
+    expect((fixture.nativeElement.querySelector('#athlete-alias-0') as HTMLInputElement).value).toBe('Alka');
   });
 
   it('preserves local query and sorting state after creating an athlete', async () => {
@@ -633,11 +692,22 @@ describe('AthletesPage', () => {
       birthYear: 2012,
       gender: 'MALE',
       trainingGroupId: 1,
+      aliases: [],
     });
     expect(fixture.nativeElement.querySelector('app-athlete-form-modal')).toBeNull();
     expect(fixture.nativeElement.textContent).toContain('Janusz Nowak');
     expect(fixture.nativeElement.textContent).toContain('Zmiany zawodnika zostały zapisane.');
     expect(api.getAll).toHaveBeenCalledTimes(1);
+  });
+
+  it('edits an existing alias as part of the athlete update', async () => {
+    await createPage(() => of([{ ...activeAthlete, aliases: ['Janek'] }, inactiveAthlete]));
+    openEdit();
+    expect((fixture.nativeElement.querySelector('#athlete-alias-0') as HTMLInputElement).value).toBe('Janek');
+    setTextInput('#athlete-alias-0', 'Jan K.');
+    submitAthleteForm();
+    expect(api.updateAthlete).toHaveBeenCalledWith(activeAthlete.id,
+      expect.objectContaining({ aliases: ['Jan K.'] }));
   });
 
   it('shows local validation errors in EDIT mode without sending an update', async () => {

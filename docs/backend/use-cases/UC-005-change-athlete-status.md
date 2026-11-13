@@ -36,6 +36,7 @@ Fields:
 5. Deactivating an athlete must not delete the athlete or any associated test results.
 6. Activating an athlete must not modify any other athlete data.
 7. This use case must not modify any other athlete fields.
+8. Activating an athlete fails with HTTP 409 if any alias conflicts with an active athlete in the same group; no aliases are removed or modified.
 
 ## 5. Response
 
@@ -52,13 +53,14 @@ The response must include the updated `active` value and all other athlete field
 | Athlete successfully activated or deactivated | 200 OK |
 | Athlete does not exist | 404 Not Found |
 | Invalid or non-positive athlete ID | 400 Bad Request |
+| Conflicting alias prevents activation | 409 Conflict |
 | Missing `active` field or invalid request body | 400 Bad Request |
 | Malformed JSON | 400 Bad Request |
 
 ## 7. Persistence
 
 - Update the existing `active` field in the `athletes` table.
-- No database migration is required.
+- Alias scope is synchronized by the migration V12 triggers.
 - Do not physically delete any records.
 - Preserve all historical test results.
 

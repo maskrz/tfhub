@@ -17,6 +17,25 @@ public interface AthleteRepository extends JpaRepository<Athlete, Long>, JpaSpec
 
 	List<Athlete> findByTrainingGroup_IdOrderByLastNameAscFirstNameAscIdAsc(long trainingGroupId);
 
+	@Query(value = """
+			SELECT a.id AS id, a.first_name AS "firstName", a.last_name AS "lastName",
+			       normalize_athlete_alias(a.first_name || ' ' || a.last_name) AS "normalizedFullName",
+			       aa.normalized_alias AS "normalizedAlias"
+			FROM athletes a
+			LEFT JOIN athlete_aliases aa ON aa.athlete_id = a.id
+			WHERE a.training_group_id = :groupId AND a.active
+			ORDER BY a.id, aa.id
+			""", nativeQuery = true)
+	List<ImportCandidateRow> findImportCandidateRows(@Param("groupId") long groupId);
+
+	interface ImportCandidateRow {
+		Long getId();
+		String getFirstName();
+		String getLastName();
+		String getNormalizedFullName();
+		String getNormalizedAlias();
+	}
+
 	@Query("""
 			SELECT athlete
 			FROM Athlete athlete

@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Test;
 import tools.jackson.databind.ObjectMapper;
 import pl.tfhub.api.athlete.entity.Athlete;
 import pl.tfhub.api.athlete.repository.AthleteRepository;
+import pl.tfhub.api.athlete.service.AthleteService;
 import pl.tfhub.api.training.enums.TrainingExecutionStatus;
 import pl.tfhub.api.trainingimport.enums.TrainingImportAthleteMatchStatus;
 
@@ -16,10 +17,132 @@ import static org.mockito.Mockito.when;
 
 class TrainingImportRecognitionMapperTests {
 
+	private TrainingImportRecognitionMapper mapper(AthleteRepository repository) {
+		AthleteService service = mock(AthleteService.class);
+		when(service.normalizeImportName(org.mockito.ArgumentMatchers.anyString())).thenAnswer(invocation ->
+				java.text.Normalizer.normalize(invocation.getArgument(0), java.text.Normalizer.Form.NFC)
+						.strip().replaceAll("\\s+", " ").toLowerCase(java.util.Locale.ROOT));
+		when(service.findImportCandidates(org.mockito.ArgumentMatchers.anyLong())).thenAnswer(invocation ->
+				repository.findByTrainingGroup_IdOrderByLastNameAscFirstNameAscIdAsc(invocation.getArgument(0))
+						.stream().map(athlete -> new AthleteService.ImportCandidate(
+								athlete.getId(), athlete.getFirstName(), athlete.getLastName(),
+								(athlete.getFirstName() + " " + athlete.getLastName()).toLowerCase(java.util.Locale.ROOT),
+								List.of())).toList());
+		return new TrainingImportRecognitionMapper(new ObjectMapper(), service, new TrainingImportAthleteMatcher(service));
+	}
+
+	@Test
+	void defaultsOnlyAnAbsentFinalRestToZeroWithoutRestUncertainty() {
+		var mapper = mapper(mock(AthleteRepository.class));
+		String input = recognition("[]").replace("\"sequenceNumber\":2,\"distanceM\"", "\"sequenceNumber\":5,\"distanceM\"");
+		var definition = mapper.validateAndMap(input, 7L).definitions().getFirst();
+		var finalSegment = definition.segments().get(1);
+		assertEquals(5, finalSegment.sequenceNumber());
+		assertEquals(0, finalSegment.restAfterSeconds());
+		assertEquals(Boolean.FALSE, finalSegment.recognitionMetadata().get("uncertain"));
+		var fields = (java.util.Map<?, ?>) finalSegment.recognitionMetadata().get("fields");
+		assertEquals(Boolean.FALSE, ((java.util.Map<?, ?>) fields.get("restAfterSeconds")).get("uncertain"));
+		assertNull(definition.segments().get(2).restAfterSeconds());
+
+		String emptyRest = "\"restAfterSeconds\":{\"value\":null,\"originalText\":null,\n"
+				+ "        \"uncertain\":false,\"uncertaintyReason\":null}";
+		String invalidFinalRest = input.replaceFirst(java.util.regex.Pattern.quote(emptyRest),
+				java.util.regex.Matcher.quoteReplacement("\"restAfterSeconds\":{\"value\":\"???\",\"uncertain\":false}"));
+		assertNull(mapper.validateAndMap(invalidFinalRest, 7L).definitions().getFirst().segments().get(1).restAfterSeconds());
+		String presentFinalRest = input.replaceFirst(java.util.regex.Pattern.quote(emptyRest),
+				java.util.regex.Matcher.quoteReplacement("\"restAfterSeconds\":{\"value\":\"90\",\"uncertain\":false}"));
+		assertEquals(90, mapper.validateAndMap(presentFinalRest, 7L).definitions().getFirst().segments().get(1).restAfterSeconds());
+		var uncertainDistance = mapper.validateAndMap(input.replace("\"value\":\"200\"", "\"value\":null"), 7L)
+				.definitions().getFirst().segments().get(1);
+		assertEquals(0, uncertainDistance.restAfterSeconds());
+		assertEquals(Boolean.TRUE, uncertainDistance.recognitionMetadata().get("uncertain"));
+	}
+
+	@Test
+	void retainsMissingOrInvalidRestAsUncertainForReview() {
+		var mapper = mapper(mock(AthleteRepository.class));
+		String input = recognition("[]");
+		String rest = "\"restAfterSeconds\":{\"value\":\"60\",\"originalText\":\"60\",\n"
+				+ "        \"uncertain\":false,\"uncertaintyReason\":null}";
+		for (String replacement : List.of(
+				"\"restAfterSeconds\":null", "\"restAfterSeconds\":{}",
+				"\"restAfterSeconds\":{\"value\":null,\"uncertain\":false}",
+				"\"restAfterSeconds\":{\"value\":\"\",\"uncertain\":false}",
+				"\"restAfterSeconds\":{\"value\":\"???\",\"uncertain\":false}",
+				"\"restAfterSeconds\":{\"value\":\"-5\",\"uncertain\":false}",
+				"\"restAfterSeconds\":{\"value\":{},\"uncertain\":false}",
+				"\"restAfterSeconds\":\"???\"")) {
+			String response = input.replace(rest, replacement);
+			var segment = mapper.validateAndMap(response, 7L).definitions().getFirst().segments().getFirst();
+			assertNull(segment.restAfterSeconds(), replacement);
+			assertEquals(400, segment.distanceM());
+			assertEquals(Boolean.TRUE, segment.recognitionMetadata().get("uncertain"));
+			var fields = (java.util.Map<?, ?>) segment.recognitionMetadata().get("fields");
+			var restField = (java.util.Map<?, ?>) fields.get("restAfterSeconds");
+			assertEquals(Boolean.TRUE, restField.get("uncertain"), replacement);
+		}
+		var missing = mapper.validateAndMap(input.replace("," + rest, ""), 7L);
+		assertNull(missing.definitions().getFirst().segments().getFirst().restAfterSeconds());
+		assertEquals(Boolean.TRUE, missing.definitions().getFirst().segments().getFirst()
+				.recognitionMetadata().get("uncertain"));
+
+		var valid = mapper.validateAndMap(input.replace("\"value\":\"60\"", "\"value\":\"0\""), 7L);
+		assertEquals(0, valid.definitions().getFirst().segments().getFirst().restAfterSeconds());
+		var fields = (java.util.Map<?, ?>) valid.definitions().getFirst().segments().getFirst()
+				.recognitionMetadata().get("fields");
+		assertEquals(Boolean.FALSE, ((java.util.Map<?, ?>) fields.get("restAfterSeconds")).get("uncertain"));
+		var missingMetadata = mapper.validateAndMap(input.replace(rest,
+				"\"restAfterSeconds\":{\"value\":\"60\"}"), 7L);
+		var segment = missingMetadata.definitions().getFirst().segments().getFirst();
+		assertEquals(60, segment.restAfterSeconds());
+		var missingFields = (java.util.Map<?, ?>) segment.recognitionMetadata().get("fields");
+		assertEquals(Boolean.TRUE, ((java.util.Map<?, ?>) missingFields.get("restAfterSeconds")).get("uncertain"));
+	}
+
+	@Test
+	void suppliesDefaultNamesForBlankNullAndMissingFields() {
+		TrainingImportRecognitionMapper mapper =
+				mapper(mock(AthleteRepository.class));
+		String input = recognition("[]");
+		for (String value : List.of("\"\"", "\"   \"", "null")) {
+			String response = input.replace("\"value\":\"Recognized session\"", "\"value\":" + value)
+					.replace("\"value\":\"Main set\"", "\"value\":" + value);
+			var draft = mapper.validateAndMap(response, 7L);
+			assertEquals("Trening 10.11.2026", draft.name(), value);
+			assertEquals("Cała grupa", draft.definitions().getFirst().name(), value);
+			assertEquals(Boolean.TRUE, draft.recognitionMetadata().get("uncertain"));
+			assertEquals(400, draft.definitions().getFirst().segments().getFirst().distanceM());
+		}
+		for (String replacement : List.of("", "\"name\":null,")) {
+			String missingNames = input.replaceAll("\"name\":\\{[^}]*\\},", replacement);
+			var draft = mapper.validateAndMap(missingNames, 7L);
+			assertEquals("Trening 10.11.2026", draft.name());
+			assertEquals("Cała grupa", draft.definitions().getFirst().name());
+			assertEquals(Boolean.TRUE, draft.recognitionMetadata().get("uncertain"));
+			assertEquals(4, draft.definitions().getFirst().segments().size());
+		}
+	}
+
+	@Test
+	void retainsRecognizedNamesAndStillRejectsInvalidDatesAndOversizedNames() {
+		TrainingImportRecognitionMapper mapper =
+				mapper(mock(AthleteRepository.class));
+		String input = recognition("[]");
+		var draft = mapper.validateAndMap(input, 7L);
+		assertEquals("Recognized session", draft.name());
+		assertEquals("Main set", draft.definitions().getFirst().name());
+		assertThrows(TrainingImportProcessingException.class,
+				() -> mapper.validateAndMap(input.replace("2026-11-10", "invalid-date"), 7L));
+		assertThrows(TrainingImportProcessingException.class,
+				() -> mapper.validateAndMap(input.replace("Recognized session", "a".repeat(256)), 7L));
+		assertThrows(TrainingImportProcessingException.class,
+				() -> mapper.validateAndMap(input.replace("Main set", "a".repeat(256)), 7L));
+	}
+
 	@Test
 	void retainsUnresolvedDistancesAndOtherRecognizedData() {
 		TrainingImportRecognitionMapper mapper =
-				new TrainingImportRecognitionMapper(new ObjectMapper(), mock(AthleteRepository.class));
+				mapper(mock(AthleteRepository.class));
 		String input = recognition("""
 				[{"recognizedName":"Runner Name","firstName":"Runner","lastName":"Name",
 				  "uncertain":false,"uncertaintyReason":null,"executions":%s}]
@@ -60,7 +183,7 @@ class TrainingImportRecognitionMapperTests {
 		when(athleteRepository.findByTrainingGroup_IdOrderByLastNameAscFirstNameAscIdAsc(7L))
 				.thenReturn(List.of(ada));
 		TrainingImportRecognitionMapper mapper =
-				new TrainingImportRecognitionMapper(new ObjectMapper(), athleteRepository);
+				mapper(athleteRepository);
 
 		var draft = mapper.validateAndMap(recognition(
 				"""
@@ -75,8 +198,8 @@ class TrainingImportRecognitionMapperTests {
 				""".formatted(executions(), executions(), executions())), 7L);
 
 		var rows = draft.definitions().getFirst().athleteRows();
-		assertEquals(TrainingImportAthleteMatchStatus.MATCHED, rows.get(0).matchStatus());
-		assertEquals(41L, rows.get(0).athleteId());
+		assertEquals(TrainingImportAthleteMatchStatus.UNRESOLVED, rows.get(0).matchStatus());
+		assertNull(rows.get(0).athleteId());
 		assertEquals(TrainingImportAthleteMatchStatus.UNRESOLVED, rows.get(1).matchStatus());
 		assertEquals(TrainingImportAthleteMatchStatus.UNRESOLVED, rows.get(2).matchStatus());
 		var executions = rows.getFirst().executions();
@@ -97,7 +220,7 @@ class TrainingImportRecognitionMapperTests {
 	@Test
 	void rejectsMissingOrNegativeRecordedResultsAndResultsOnOtherStatuses() {
 		TrainingImportRecognitionMapper mapper =
-				new TrainingImportRecognitionMapper(new ObjectMapper(), mock(AthleteRepository.class));
+				mapper(mock(AthleteRepository.class));
 		for (String execution : List.of(
 				execution("RECORDED", "null"),
 				execution("RECORDED", "\"-0.1\""),
@@ -112,14 +235,14 @@ class TrainingImportRecognitionMapperTests {
 	}
 
 	@Test
-	void matchesApproximateSurnamesAndUsesFirstNameInitialWhenSurnameIsShared() {
+	void offersApproximateSurnamesOnlyAsManualSuggestions() {
 		Athlete ada = athlete(41L, "Ada", "Lovelace");
 		Athlete ann = athlete(42L, "Ben", "Lovelace");
 		AthleteRepository athleteRepository = mock(AthleteRepository.class);
 		when(athleteRepository.findByTrainingGroup_IdOrderByLastNameAscFirstNameAscIdAsc(7L))
 				.thenReturn(List.of(ada, ann));
 		TrainingImportRecognitionMapper mapper =
-				new TrainingImportRecognitionMapper(new ObjectMapper(), athleteRepository);
+				mapper(athleteRepository);
 
 		var draft = mapper.validateAndMap(recognition("""
 				[{"recognizedName":"Ada Lovelece","firstName":"Ada","lastName":"Lovelece",
@@ -127,12 +250,10 @@ class TrainingImportRecognitionMapperTests {
 				""".formatted(executions())), 7L);
 
 		var row = draft.definitions().getFirst().athleteRows().getFirst();
-		assertEquals(TrainingImportAthleteMatchStatus.MATCHED, row.matchStatus());
-		assertEquals(41L, row.athleteId());
+		assertEquals(TrainingImportAthleteMatchStatus.UNRESOLVED, row.matchStatus());
+		assertNull(row.athleteId());
 		assertEquals(Boolean.TRUE, row.recognitionMetadata().get("uncertain"));
-		assertEquals(
-				"Surname matched approximately and first-name initial was used; confirm athlete",
-				row.recognitionMetadata().get("matchingReason"));
+		assertEquals(List.of(41L, 42L), row.recognitionMetadata().get("suggestedAthleteIds"));
 	}
 
 	@Test
@@ -143,7 +264,7 @@ class TrainingImportRecognitionMapperTests {
 		when(athleteRepository.findByTrainingGroup_IdOrderByLastNameAscFirstNameAscIdAsc(7L))
 				.thenReturn(List.of(ada, alice));
 		TrainingImportRecognitionMapper mapper =
-				new TrainingImportRecognitionMapper(new ObjectMapper(), athleteRepository);
+				mapper(athleteRepository);
 
 		var draft = mapper.validateAndMap(recognition("""
 				[{"recognizedName":"A. Lovelece","firstName":"A","lastName":"Lovelece",
@@ -162,7 +283,7 @@ class TrainingImportRecognitionMapperTests {
 		when(athleteRepository.findByTrainingGroup_IdOrderByLastNameAscFirstNameAscIdAsc(7L))
 				.thenReturn(List.of(lovelace, lovelece));
 		TrainingImportRecognitionMapper mapper =
-				new TrainingImportRecognitionMapper(new ObjectMapper(), athleteRepository);
+				mapper(athleteRepository);
 
 		var draft = mapper.validateAndMap(recognition("""
 				[{"recognizedName":"Alex Lovelece","firstName":"Alex","lastName":"Lovelece",
@@ -176,7 +297,7 @@ class TrainingImportRecognitionMapperTests {
 	@Test
 	void normalizesSupportedHandwrittenTimeSeparators() {
 		TrainingImportRecognitionMapper mapper =
-				new TrainingImportRecognitionMapper(new ObjectMapper(), mock(AthleteRepository.class));
+				mapper(mock(AthleteRepository.class));
 		for (var sample : List.of(
 				new TimeSample("59", "59.00"),
 				new TimeSample("1:14", "74.00"),

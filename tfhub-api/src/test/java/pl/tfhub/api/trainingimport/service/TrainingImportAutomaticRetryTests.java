@@ -175,6 +175,8 @@ class TrainingImportAutomaticRetryTests {
 				mock(TrainingImportDraftAthleteRowRepository.class),
 				mock(TrainingImportDraftExecutionRepository.class),
 				mock(AthleteRepository.class),
+				mock(pl.tfhub.api.athlete.service.AthleteService.class),
+				mock(TrainingImportAthleteMatcher.class),
 				mock(AccountManagementService.class),
 				mock(AccessScopeService.class),
 				mock(TrainingImportImageStorage.class),

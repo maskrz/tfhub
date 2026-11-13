@@ -163,6 +163,12 @@
                                 <button type="button" class="reset-button athlete-reset" [attr.aria-label]="'Przywróć przypisanie: ' + row.controls.recognizedName.value" title="Przywróć wartość z początku weryfikacji" (click)="resetAthlete(row)">↶</button>
                               }
                             </div>
+                            @for (candidate of suggestedCandidates(row); track candidate.id) {
+                              <button type="button" class="button button--secondary"
+                                (click)="selectSuggestion(row, candidate)">
+                                Sugestia do sprawdzenia: {{ candidate.firstName }} {{ candidate.lastName }}
+                              </button>
+                            }
                             @if (hasDuplicateAthlete(row)) {
                               <span class="review-label">Zawodnik jest przypisany więcej niż raz</span>
                             } @else if (row.controls.id.value === null && needsAthleteReview(row)) {
