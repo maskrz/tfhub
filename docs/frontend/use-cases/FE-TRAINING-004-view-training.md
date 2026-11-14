@@ -22,6 +22,7 @@ Display complete training details, including the immutable training group, plan,
 
 - Display historical participants and all execution statuses regardless of athletes' current group assignments.
 - Preserve definition and segment ordering and associate executions with the correct athlete and segment.
+- Display rest in minutes and remaining seconds (for example `4m 10s`); show a dash when no rest was specified.
 - Empty collections must render normally.
 - The group is read-only.
 - Provide separate actions for plan editing and assigning/recording athlete participation. Do not combine them into one edit action.

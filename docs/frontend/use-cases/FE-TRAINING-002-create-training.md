@@ -69,6 +69,7 @@ Rules:
 - Segment order must be preserved.
 - Segments can be added, edited, removed, and reordered.
 - Rest values must follow the backend UC-502 validation rules.
+- Accept minutes (for example `4` or `1,5`), seconds (`45s`) or mixed values (`4m 10s`) and send seconds to the API.
 - The last segment may have no rest value if permitted by the backend rules.
 - Display segment order clearly.
 

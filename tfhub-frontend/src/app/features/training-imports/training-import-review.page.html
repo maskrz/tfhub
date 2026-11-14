@@ -88,7 +88,7 @@
 
             <div class="table-scroll" role="region" [attr.aria-label]="'Odcinki podgrupy ' + (d + 1)" tabindex="0">
               <table class="segments-table">
-                <thead><tr><th scope="col">Odcinek</th><th scope="col">Dystans (m)</th><th scope="col">Przerwa po odcinku (s)</th><th scope="col">Akcje</th></tr></thead>
+                <thead><tr><th scope="col">Odcinek</th><th scope="col">Dystans (m)</th><th scope="col">Przerwa po odcinku</th><th scope="col">Akcje</th></tr></thead>
                 <tbody>
                   @for (segment of segments(d).controls; track segment; let s = $index) {
                     <tr [formGroup]="segment" [class.needs-review]="needsSegmentReview(segment)">
@@ -107,9 +107,15 @@
                       </td>
                       <td>
                         <span class="input-with-reset">
-                          <input class="field-control" type="number" formControlName="restAfterSeconds" min="0" max="2147483647" step="1"
-                            [attr.aria-label]="'Przerwa po odcinku ' + (s + 1) + ', podgrupa ' + (d + 1)" />
+                          <input class="field-control" type="text" formControlName="restAfterSeconds"
+                            [attr.aria-label]="'Przerwa po odcinku ' + (s + 1) + ', podgrupa ' + (d + 1)"
+                            [attr.aria-invalid]="segment.controls.restAfterSeconds.invalid ? 'true' : null"
+                            [attr.aria-describedby]="'rest-hint-' + d + '-' + s" />
                           @if (changed(segment.controls.restAfterSeconds)) { <button type="button" class="reset-button" [attr.aria-label]="'Przywróć przerwę odcinka ' + (s + 1)" title="Przywróć wartość z początku weryfikacji" (click)="reset(segment.controls.restAfterSeconds)">↶</button> }
+                        </span>
+                        <span class="hint" [id]="'rest-hint-' + d + '-' + s">
+                          @if (segment.controls.restAfterSeconds.invalid) { Wpisz poprawną przerwę, np. 4, 45s lub 4m 10s. }
+                          @else { Minuty, np. 4; sekundy, np. 45s; lub 4m 10s. }
                         </span>
                         @if (isUncertain(segment.controls.metadata.value)) {
                           <label class="checkbox"><input type="checkbox" formControlName="recognitionReviewed" /> Potwierdzam dane odcinka</label>

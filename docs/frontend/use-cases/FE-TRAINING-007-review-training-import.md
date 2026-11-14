@@ -49,6 +49,7 @@ The group selected at upload is read-only. Athlete candidate results and assignm
 - Follow existing TFHUB forms, tables/cards, selectors, buttons, notifications and responsive patterns.
 - Use the training-details layout: a training summary, segment table and athlete-by-segment results table with editable data. Highlight fields needing input or verification with the warning background and descriptive text.
 - Use the searchable athlete selector and the training-completion time and spike controls. Reset buttons restore values loaded when the review page was opened, including after saving while the page remains open.
+- Display rest in minutes and remaining seconds. Accept minutes (for example `4` or `1,5`), seconds (`45s`) or mixed values (`4m 10s`); send seconds to the existing API and reject invalid input before saving.
 - All user-facing text must be in Polish.
 - Show loading, empty, validation and API error states.
 - Disable repeated save submissions while saving.

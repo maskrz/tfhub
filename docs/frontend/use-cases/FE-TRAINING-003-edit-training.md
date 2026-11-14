@@ -40,6 +40,7 @@ Athlete assignments, execution status, results and spike usage are not editable 
 ## 6. Validation and Submission
 
 - Validate required training name/date, non-empty definitions and segments, non-empty definition names, positive integer distances and valid rest values.
+- Accept rest as minutes (for example `4` or `1,5`), seconds (`45s`) or mixed values (`4m 10s`); send seconds to the API.
 - Do not send group, participation or execution fields in the UC-503 request.
 - Prevent duplicate submissions.
 - On failure, retain all user changes and display the server error.

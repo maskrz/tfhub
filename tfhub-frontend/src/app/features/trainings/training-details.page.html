@@ -80,7 +80,7 @@
                     <tr>
                       <th scope="row">{{ segment.sequenceNumber }}</th>
                       <td>{{ segment.distanceM }} m</td>
-                      <td>{{ segment.restAfterSeconds === null ? '—' : segment.restAfterSeconds + ' s' }}</td>
+                      <td>{{ segment.restAfterSeconds === null ? '—' : formatRestMinutes(segment.restAfterSeconds) }}</td>
                     </tr>
                   }
                 </tbody>

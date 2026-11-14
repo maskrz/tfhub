@@ -10,6 +10,7 @@ import {
 } from './training.model';
 import { TrainingsApiService } from './trainings-api.service';
 import { TrainingDeleteConfirmationComponent } from './training-delete-confirmation.component';
+import { formatRestMinutes } from './training-rest-time';
 
 @Component({
   imports: [RouterLink, TrainingDeleteConfirmationComponent],
@@ -18,6 +19,7 @@ import { TrainingDeleteConfirmationComponent } from './training-delete-confirmat
   templateUrl: './training-details.page.html',
 })
 export class TrainingDetailsPage implements OnInit {
+  readonly formatRestMinutes = formatRestMinutes;
   readonly training = signal<TrainingDetails | null>(null);
   readonly loading = signal(true);
   readonly errorMessage = signal<string | null>(null);

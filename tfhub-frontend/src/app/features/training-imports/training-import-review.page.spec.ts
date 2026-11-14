@@ -117,6 +117,64 @@ describe('TrainingImportReviewPage', () => {
     });
   });
 
+  it('displays rest in minutes and submits mixed units as seconds', async () => {
+    const data = structuredClone(draft);
+    data.definitions[0].segments[0].restAfterSeconds = 250;
+    await createPage(data);
+    const inputs = fixture.nativeElement.querySelectorAll('input[formControlName=restAfterSeconds]') as NodeListOf<HTMLInputElement>;
+    expect(inputs[0].value).toBe('4m 10s');
+    expect(inputs[1].value).toBe('');
+    inputs[0].value = '4';
+    inputs[0].dispatchEvent(new Event('input'));
+    inputs[1].value = '4m 10s';
+    inputs[1].dispatchEvent(new Event('input'));
+    fixture.componentInstance.save();
+    expect(api.updateDraft.mock.calls[0][1].definitions[0].segments.map(
+      (segment: { restAfterSeconds: number | null }) => segment.restAfterSeconds,
+    )).toEqual([240, 250]);
+  });
+
+  it('rejects invalid rest before saving and preserves the entered value', async () => {
+    await createPage();
+    const input = fixture.nativeElement.querySelector('input[formControlName=restAfterSeconds]') as HTMLInputElement;
+    input.value = '4m 60s';
+    input.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+    fixture.componentInstance.save();
+    fixture.detectChanges();
+    expect(api.updateDraft).not.toHaveBeenCalled();
+    expect(input.value).toBe('4m 60s');
+    expect(input.getAttribute('aria-invalid')).toBe('true');
+    expect(fixture.nativeElement.textContent).toContain('Wpisz poprawną przerwę');
+  });
+
+  it('preserves zero and seconds-only rest values when saving', async () => {
+    const data = structuredClone(draft);
+    data.definitions[0].segments[0].restAfterSeconds = 0;
+    data.definitions[0].segments[1].restAfterSeconds = 45;
+    await createPage(data);
+    const inputs = fixture.nativeElement.querySelectorAll('input[formControlName=restAfterSeconds]') as NodeListOf<HTMLInputElement>;
+    expect([inputs[0].value, inputs[1].value]).toEqual(['0m', '45s']);
+    fixture.componentInstance.save();
+    expect(api.updateDraft.mock.calls[0][1].definitions[0].segments.map(
+      (segment: { restAfterSeconds: number | null }) => segment.restAfterSeconds,
+    )).toEqual([0, 45]);
+  });
+
+  it('restores the original rest after editing and saving', async () => {
+    await createPage();
+    const control = fixture.componentInstance.segments(0).at(0).controls.restAfterSeconds;
+    expect(control.value).toBe('1m');
+    control.setValue('4m 10s');
+    const saved = structuredClone(draft);
+    saved.definitions[0].segments[0].restAfterSeconds = 250;
+    api.updateDraft.mockReturnValue(of(saved));
+    fixture.componentInstance.save();
+    const savedControl = fixture.componentInstance.segments(0).at(0).controls.restAfterSeconds;
+    expect(savedControl.value).toBe('4m 10s');
+    fixture.componentInstance.reset(savedControl);
+    expect(savedControl.value).toBe('1m');
+  });
   it('shows editable segment and athlete results tables with review highlights', async () => {
     const unresolved = structuredClone(draft);
     unresolved.recognitionMetadata = { uncertain: true, fields: { name: { uncertain: true } } };

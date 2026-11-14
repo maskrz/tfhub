@@ -50,6 +50,44 @@ describe('HeaderComponent', () => {
     expect(fixture.nativeElement.querySelector('[role="menu"]')).toBeNull();
   });
 
+  it('toggles mobile navigation and closes it on link selection, Escape and outside click', () => {
+    const button = fixture.nativeElement.querySelector('.navigation-toggle') as HTMLButtonElement;
+    const nav = fixture.nativeElement.querySelector('nav') as HTMLElement;
+    expect(button.getAttribute('aria-expanded')).toBe('false');
+    expect(nav.classList.contains('navigation-open')).toBe(false);
+    button.click();
+    fixture.detectChanges();
+    expect(button.getAttribute('aria-expanded')).toBe('true');
+    expect(nav.classList.contains('navigation-open')).toBe(true);
+    (nav.querySelector('a') as HTMLAnchorElement).click();
+    fixture.detectChanges();
+    expect(button.getAttribute('aria-expanded')).toBe('false');
+    button.click();
+    const focus = vi.spyOn(button, 'focus');
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+    fixture.detectChanges();
+    expect(button.getAttribute('aria-expanded')).toBe('false');
+    expect(focus).toHaveBeenCalledOnce();
+    button.click();
+    document.body.click();
+    fixture.detectChanges();
+    expect(button.getAttribute('aria-expanded')).toBe('false');
+  });
+
+  it('keeps account and navigation menus mutually exclusive', () => {
+    const navigationButton = fixture.nativeElement.querySelector('.navigation-toggle') as HTMLButtonElement;
+    const username = fixture.nativeElement.querySelector('.username') as HTMLButtonElement;
+    navigationButton.click();
+    username.click();
+    fixture.detectChanges();
+    expect(navigationButton.getAttribute('aria-expanded')).toBe('false');
+    expect(username.getAttribute('aria-expanded')).toBe('true');
+    navigationButton.click();
+    fixture.detectChanges();
+    expect(navigationButton.getAttribute('aria-expanded')).toBe('true');
+    expect(username.getAttribute('aria-expanded')).toBe('false');
+  });
+
   it('shows account management only in the user menu for administrators', () => {
     expect(fixture.nativeElement.textContent).not.toContain('Zarządzanie kontami');
 

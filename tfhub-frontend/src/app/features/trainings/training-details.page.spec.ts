@@ -95,6 +95,9 @@ describe('TrainingDetailsPage', () => {
     expect(text).toContain('Planowany');
     expect(definitionHeadings).toEqual(['1. Główna', '2. Rozgrzewka']);
     expect(segmentHeadings).toEqual(['1', '2', '1']);
+    const restCells = [...fixture.nativeElement.querySelectorAll('.segments-table tbody tr')]
+      .map((row: HTMLElement) => row.querySelectorAll('td')[1].textContent?.trim());
+    expect(restCells).toEqual(['1m 30s', '—', '—']);
     expect(text).toContain('Jan Kowalski');
     expect(text).toContain('Anna Nowak');
     expect(annaCells.map((cell: HTMLElement) => cell.textContent.trim())).toEqual(['-', '']);
@@ -117,6 +120,21 @@ describe('TrainingDetailsPage', () => {
     expect(fixture.nativeElement.querySelector('a[href="/trainings/12/complete"]')).toBeTruthy();
     expect(fixture.nativeElement.querySelector('.delete-training-button')).toBeTruthy();
     expect(text).toContain('Jan Kowalski');
+  });
+
+  it('displays rest in minutes, seconds and an empty marker', async () => {
+    await createPage(() => of({
+      ...training,
+      definitions: [{
+        ...training.definitions[0],
+        segments: [240, 250, 45, 0, null].map((restAfterSeconds, index) => ({
+          id: index + 1, sequenceNumber: index + 1, distanceM: 200, restAfterSeconds,
+        })),
+      }],
+    }));
+    const restCells = [...fixture.nativeElement.querySelectorAll('.segments-table tbody tr')]
+      .map((row: HTMLElement) => row.querySelectorAll('td')[1].textContent?.trim());
+    expect(restCells).toEqual(['4m', '4m 10s', '45s', '0m', '—']);
   });
 
   it('requires confirmation before deleting from details and returns to the list on success', async () => {

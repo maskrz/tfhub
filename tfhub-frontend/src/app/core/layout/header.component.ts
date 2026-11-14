@@ -1,5 +1,5 @@
 import { HttpErrorResponse } from '@angular/common/http';
-import { Component, ElementRef, HostListener, OnDestroy, inject, signal } from '@angular/core';
+import { Component, ElementRef, HostListener, OnDestroy, ViewChild, inject, signal } from '@angular/core';
 import { Router, RouterLink, RouterLinkActive } from '@angular/router';
 import { EMPTY, catchError, finalize, take } from 'rxjs';
 import { AuthService } from '../auth/auth.service';
@@ -13,7 +13,12 @@ import { ChangePasswordModalComponent } from '../auth/change-password-modal.comp
       <a class="brand" [routerLink]="user()?.role === 'ATHLETE' ? ['/athletes', user()?.athleteId] : '/dashboard'" aria-label="TFHUB — strona główna">
         TFHUB<span>.</span>
       </a>
-      <nav aria-label="Nawigacja główna">
+      <button #navigationButton class="navigation-toggle" type="button" aria-controls="main-navigation"
+        [attr.aria-expanded]="navigationOpen()" (click)="toggleNavigation()">
+        Menu
+      </button>
+      <nav id="main-navigation" aria-label="Nawigacja główna"
+        [class.navigation-open]="navigationOpen()" (click)="onNavigationClick($event)">
         @if (user()?.role !== 'ATHLETE') {
           <a routerLink="/dashboard" routerLinkActive="active" ariaCurrentWhenActive="page">Dashboard</a>
         }
@@ -87,6 +92,7 @@ import { ChangePasswordModalComponent } from '../auth/change-password-modal.comp
       gap: 2rem;
       min-height: 5.6rem;
       padding: 0 clamp(1rem, 3vw, 2.5rem);
+      position: relative;
     }
     .brand {
       color: inherit;
@@ -97,6 +103,7 @@ import { ChangePasswordModalComponent } from '../auth/change-password-modal.comp
       white-space: nowrap;
     }
     .brand span { color: #41bf72; }
+    .navigation-toggle { display: none; }
     nav {
       align-items: stretch;
       display: flex;
@@ -137,7 +144,11 @@ import { ChangePasswordModalComponent } from '../auth/change-password-modal.comp
       cursor: pointer;
       font: inherit;
       font-size: .9rem;
+      max-width: 12rem;
+      overflow: hidden;
       padding: .55rem .75rem;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
     .username:hover { background: #414e5e; }
     .username:focus-visible { outline: 2px solid #42c66f; outline-offset: 2px; }
@@ -211,20 +222,39 @@ import { ChangePasswordModalComponent } from '../auth/change-password-modal.comp
       font-size: 1.25rem;
       line-height: 1;
     }
-    @media (max-width: 650px) {
-      .app-header { flex-wrap: wrap; gap: .25rem 1rem; padding-block: .6rem 0; }
-      nav { flex-basis: 100%; gap: .5rem; height: 3.25rem; justify-content: space-between; order: 1; }
-      nav a { font-size: .82rem; padding: 0 .15rem; }
-      .account-menu, .account { margin-left: auto; }
+    @media (max-width: 1000px) {
+      .app-header { gap: .5rem; min-height: 4.5rem; }
+      .brand { margin-right: auto; }
+      .navigation-toggle, .username { box-sizing: border-box; height: 2.75rem; }
+      .navigation-toggle {
+        background: #35404e; border: 1px solid #596575; border-radius: .45rem;
+        color: #fff; cursor: pointer; display: block; font: inherit;
+        min-height: 2.75rem; padding: .5rem .75rem;
+      }
+      .navigation-toggle:focus-visible { outline: 2px solid #42c66f; outline-offset: 2px; }
+      nav {
+        align-items: stretch; background: #202630; box-shadow: 0 .7rem 2rem rgb(15 23 42 / 20%);
+        display: none; flex: none; flex-direction: column; gap: 0; height: auto;
+        left: 0; padding: .35rem 1rem .75rem; position: absolute; right: 0;
+        top: 100%; z-index: 20;
+      }
+      nav.navigation-open { display: flex; }
+      nav a { border-bottom: 0; border-left: 4px solid transparent; min-height: 2.75rem; padding: .5rem .75rem; white-space: normal; }
+      nav a.active { border-left-color: #42c66f; background: #35404e; }
+      .account-menu { min-width: 0; }
+      .username { max-width: min(35vw, 12rem); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .account { flex-shrink: 0; }
     }
   `,
 })
 export class HeaderComponent implements OnDestroy {
+  @ViewChild('navigationButton') private navigationButton?: ElementRef<HTMLButtonElement>;
   private readonly auth = inject(AuthService);
   private readonly router = inject(Router);
   private readonly element = inject(ElementRef<HTMLElement>);
   readonly user = this.auth.currentUser;
   readonly menuOpen = signal(false);
+  readonly navigationOpen = signal(false);
   readonly passwordChangeOpen = signal(false);
   readonly successMessage = signal<string | null>(null);
   private successTimeout: ReturnType<typeof setTimeout> | null = null;
@@ -234,10 +264,16 @@ export class HeaderComponent implements OnDestroy {
     if (!this.element.nativeElement.querySelector('.account-menu')?.contains(event.target as Node)) {
       this.menuOpen.set(false);
     }
+    if (!this.element.nativeElement.querySelector('nav')?.contains(event.target as Node)
+        && !this.navigationButton?.nativeElement.contains(event.target as Node)) {
+      this.navigationOpen.set(false);
+    }
   }
 
   @HostListener('document:keydown.escape')
   closeMenuOnEscape(): void {
+    if (this.navigationOpen()) this.navigationButton?.nativeElement.focus();
+    this.navigationOpen.set(false);
     this.menuOpen.set(false);
   }
 
@@ -248,7 +284,17 @@ export class HeaderComponent implements OnDestroy {
   }
 
   toggleMenu(): void {
+    this.navigationOpen.set(false);
     this.menuOpen.update((open) => !open);
+  }
+
+  toggleNavigation(): void {
+    this.menuOpen.set(false);
+    this.navigationOpen.update((open) => !open);
+  }
+
+  onNavigationClick(event: MouseEvent): void {
+    if (event.target instanceof Element && event.target.closest('a')) this.navigationOpen.set(false);
   }
 
   openPasswordChange(): void {

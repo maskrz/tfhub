@@ -6,6 +6,7 @@ import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { EMPTY, catchError, finalize, forkJoin, take } from 'rxjs';
 import { SearchableSelectComponent, SearchableSelectOption } from '../../shared/searchable-select.component';
 import { formatResult, normalizeTimeInput, parseTimeSeconds } from '../trainings/training-time';
+import { formatRestMinutes, parseRestDuration } from '../trainings/training-rest-time';
 import {
   ImportCandidate, ImportDefinition, ImportExecution, ImportExecutionStatus, ImportMatchStatus,
   ImportSegment, TrainingImportDraft, TrainingImportDraftUpdate,
@@ -18,7 +19,7 @@ type SegmentForm = FormGroup<{
   originalSequence: FormControl<number>;
   metadata: FormControl<Metadata>;
   distanceM: FormControl<number | null>;
-  restAfterSeconds: FormControl<number | null>;
+  restAfterSeconds: FormControl<string>;
   recognitionReviewed: FormControl<boolean>;
 }>;
 type ExecutionForm = FormGroup<{
@@ -50,6 +51,9 @@ type DefinitionForm = FormGroup<{
 type DialogAction = 'accept' | 'reject' | 'remove-definition' | 'remove-segment';
 
 const integerPattern = Validators.pattern(/^\d+$/);
+const restValidator: ValidatorFn = (control) =>
+  typeof control.value === 'string' && (control.value.trim() === '' || parseRestDuration(control.value) !== null)
+    ? null : { restDuration: true };
 const nonBlank: ValidatorFn = (control) =>
   typeof control.value === 'string' && control.value.trim() ? null : { required: true };
 const timeValidator: ValidatorFn = (control) => {
@@ -547,7 +551,7 @@ export class TrainingImportReviewPage implements OnInit {
       originalSequence: new FormControl(segment?.sequenceNumber ?? 0, { nonNullable: true }),
       metadata: new FormControl(segment?.recognitionMetadata ?? {}, { nonNullable: true }),
       distanceM: new FormControl(segment?.distanceM ?? null, { validators: [Validators.min(1), Validators.max(2147483647), integerPattern] }),
-      restAfterSeconds: new FormControl(segment?.restAfterSeconds ?? null, { validators: [Validators.min(0), Validators.max(2147483647), integerPattern] }),
+      restAfterSeconds: new FormControl(formatRestMinutes(segment?.restAfterSeconds ?? null), { nonNullable: true, validators: [restValidator] }),
       recognitionReviewed: new FormControl(segment?.recognitionReviewed ?? false, { nonNullable: true }),
     });
   }
@@ -586,7 +590,7 @@ export class TrainingImportReviewPage implements OnInit {
           id: segment.id,
           sequenceNumber: sequences[segmentIndex],
           distanceM: segment.distanceM,
-          restAfterSeconds: segment.restAfterSeconds,
+          restAfterSeconds: parseRestDuration(segment.restAfterSeconds),
           recognitionReviewed: segment.recognitionReviewed,
         })),
         athleteRows: definition.athleteRows.map((row) => ({

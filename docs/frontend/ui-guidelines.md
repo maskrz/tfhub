@@ -53,7 +53,7 @@ Wspólny nagłówek zawiera:
 
 Aktywny element nawigacji musi być widoczny i rozpoznawalny również bez polegania wyłącznie na kolorze. Nagłówek jest częścią powłoki aplikacji, nie poszczególnych widoków.
 
-Na wąskich ekranach nagłówek ma zachować dostęp do tych samych elementów bez wymuszania poziomego przewijania całej strony. Szczegółowy wariant prezentacji nawigacji mobilnej pozostaje do ustalenia przy implementacji.
+Na wąskich ekranach przycisk „Menu” rozwija pionową nawigację z tymi samymi elementami zależnymi od roli, bez wymuszania poziomego przewijania strony. Wybór odnośnika, kliknięcie poza menu lub Escape zamyka nawigację; Escape przywraca fokus do przycisku.
 
 ## 4. Stopka
 
@@ -122,6 +122,5 @@ Zachować czytelny kontrast tekstu oraz stanów. Animacje powinny być krótkie 
 
 ## 10. Otwarte kwestie
 
-- Sposób zwijania głównej nawigacji na wąskich ekranach.
 - Konkretne breakpointy i szczegółowy system typografii, kolorów oraz ikon.
 - Zawartość i interakcje obszaru użytkownika/konta; uwierzytelnianie jest planowane i opisane w `../security.md`, ale nie jest zaimplementowane.
