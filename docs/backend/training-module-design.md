@@ -5,10 +5,10 @@
 
 ## 1. Design decisions
 
-- A `Training` is one dated session for exactly one existing `TrainingGroup`.
+- A `Training` is one dated session. TEMPO is assigned to exactly one existing `TrainingGroup`; FREE_TEXT is assigned either to one group or directly to one or more athletes.
 - `Training` is the shared root for `TEMPO` and `FREE_TEXT` sessions. Its `training_type` is immutable after creation.
-- `TEMPO` keeps its existing definitions, segments, athlete participations and execution records. `FREE_TEXT` has ordered text sections and no athlete participations or executions.
-- The training group is immutable after creation.
+- `TEMPO` keeps its existing group assignment, definitions, segments, athlete participations and execution records. `FREE_TEXT` has ordered text sections and no athlete participations or executions.
+- FREE_TEXT group assignment uses current athlete membership for visibility. Direct athlete assignment is mutually exclusive with group assignment.
 - A `TrainingDefinition` is a named, ordered variant within one training. It is not a reusable template.
 - Athletes participate in one definition per training.
 - Historical participation and executions remain valid after the athlete's current group changes.
@@ -25,22 +25,34 @@ Use the existing `training_sessions` table as the shared root rather than JPA in
 
 ### 2.1 `training_sessions`
 
-One persisted training event for one group.
+One persisted training event.
 
 | Column | Type | Null | Meaning |
 |---|---|---:|---|
 | `id` | `BIGINT` identity | No | Primary key |
-| `training_group_id` | `BIGINT` | No | FK to `training_groups.id` |
+| `training_group_id` | `BIGINT` | Yes | FK to `training_groups.id`; required for TEMPO and FREE_TEXT/GROUP |
 | `name` | `VARCHAR` | No | Training name |
 | `training_date` | `DATE` | No | Calendar date |
 | `status` | `VARCHAR(20)` | No | `PLANNED` or `COMPLETED`; defaults to `PLANNED` |
 | `training_type` | `VARCHAR(20)` | No | `TEMPO` or `FREE_TEXT`; existing sessions default to `TEMPO` |
+| `assignment_type` | `VARCHAR(20)` | No | `GROUP` or `ATHLETES`; existing sessions default to `GROUP` |
 
-Use `ON DELETE RESTRICT` / `ON UPDATE RESTRICT` for the group FK. Constrain status to `PLANNED` or `COMPLETED`. Do not add creator-based access. Group immutability is an application invariant: creation sets the group, and no create/edit/import operation may subsequently change it. No trigger is proposed.
+Use `ON DELETE RESTRICT` / `ON UPDATE RESTRICT` for the group FK. Constrain status to `PLANNED` or `COMPLETED`. Do not add creator-based access. TEMPO remains group-assigned and its group remains immutable. FREE_TEXT edits may switch assignment modes or replace the selected group/athletes. Row checks enforce the valid `training_type`/`assignment_type`/group combinations; transactional service validation enforces non-empty athlete targets and mode-consistent association rows.
 
-The training type is also immutable. Tempo-specific operations must reject FREE_TEXT sessions; free-text operations must reject TEMPO sessions. The existing tempo tables, their IDs and all their foreign keys remain unchanged.
+The training type is immutable. Tempo-specific operations must reject FREE_TEXT sessions; free-text operations must reject TEMPO sessions. The existing tempo tables, their IDs and all their foreign keys remain unchanged. V16 backfills existing sessions as `GROUP`, retaining every existing group reference.
 
-### 2.2 `training_sections`
+### 2.2 `training_session_athletes`
+
+One explicitly selected athlete for an ATHLETES-mode FREE_TEXT session.
+
+| Column | Type | Null | Meaning |
+|---|---|---:|---|
+| `training_session_id` | `BIGINT` | No | FK to `training_sessions.id` |
+| `athlete_id` | `BIGINT` | No | FK to `athletes.id` |
+
+Use the pair as the primary key and restrictive foreign keys. Add an index beginning with `athlete_id` for athlete-visible list queries. Only active athletes may be selected at create/edit time. A normal row-level `CHECK` cannot enforce child-row presence or absence; the service transaction validates that ATHLETES mode has targets and GROUP mode does not.
+
+### 2.3 `training_sections`
 
 One ordered free-text section within a FREE_TEXT session.
 
@@ -54,7 +66,7 @@ One ordered free-text section within a FREE_TEXT session.
 
 Use a restrictive FK, unique `(training_session_id, sequence_number)` order, and a positive sequence constraint. Keep titles as free text; do not add an exercise entity or fixed section enum. Service validation enforces at least one section and prevents section operations on TEMPO sessions. V14 adds this table. Deletion explicitly removes sections before the session root.
 
-### 2.3 `training_definitions`
+### 2.4 `training_definitions`
 
 One named variant within a training.
 
@@ -67,7 +79,7 @@ One named variant within a training.
 
 Definitions have a unique `(training_session_id, sequence_number)` order. Also enforce `UNIQUE (id, training_session_id)` for the participation composite FK. Names must not be blank.
 
-### 2.4 `training_segments`
+### 2.5 `training_segments`
 
 One planned segment within a definition.
 
@@ -81,7 +93,7 @@ One planned segment within a definition.
 
 Enforce unique `(training_definition_id, sequence_number)`, positive sequence and distance, and nonnegative rest when present. Segment identity is its `id`, not its sequence; reordering updates sequence only. Enforce `UNIQUE (id, training_definition_id)` for execution integrity.
 
-### 2.5 `training_athlete_participations`
+### 2.6 `training_athlete_participations`
 
 One athlete's assignment to one definition in one training.
 
@@ -96,7 +108,7 @@ Enforce `UNIQUE (training_session_id, athlete_id)` so an athlete cannot be assig
 
 At initial assignment, validate that the athlete currently belongs to the training's group and has a group. Do not store or FK the athlete's current group in this participation: reassignment later must not invalidate historical participation. Existing assignments are not revalidated during unrelated edits.
 
-### 2.6 `training_segment_executions`
+### 2.7 `training_segment_executions`
 
 Execution data for one participant and one planned segment.
 
@@ -119,7 +131,7 @@ Enforce:
 - `FOREIGN KEY (training_segment_id, training_definition_id)` to `training_segments(id, training_definition_id)`.
 - Result `>= 0`; `RECORDED` iff result is non-null; status restricted to the allowed values.
 
-### 2.6 Result representation
+### 2.8 Result representation
 
 The existing `TestResult` uses Java `BigDecimal`, JPA precision 12/scale 3, PostgreSQL `NUMERIC(12,3)`, and request validation allowing 9 integer and 3 fractional digits. `test_results` also checks `value > 0`.
 

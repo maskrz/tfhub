@@ -4,6 +4,7 @@ import { provideRouter, Router } from '@angular/router';
 import { signal } from '@angular/core';
 import { Observable, of, throwError } from 'rxjs';
 import { AuthService } from '../../core/auth/auth.service';
+import { AthletesApiService } from '../athletes/athletes-api.service';
 import { TrainingGroup, TrainingGroupsApiService } from '../training-groups/training-groups-api.service';
 import { TrainingCreatePage } from './training-create.page';
 import { CreateTrainingRequest, CreateTrainingResponse } from './training.model';
@@ -17,6 +18,7 @@ const groups: TrainingGroup[] = [
 describe('TrainingCreatePage', () => {
   let fixture: ComponentFixture<TrainingCreatePage>;
   let groupsApi: { getAccessible: ReturnType<typeof vi.fn> };
+  let athletesApi: { getActive: ReturnType<typeof vi.fn> };
   let trainingsApi: {
     create: ReturnType<typeof vi.fn>;
     createFreeText: ReturnType<typeof vi.fn>;
@@ -26,6 +28,12 @@ describe('TrainingCreatePage', () => {
     createLoader: (request: CreateTrainingRequest) => Observable<CreateTrainingResponse> = () => of({ id: 77 }),
   ): Promise<void> {
     groupsApi = { getAccessible: vi.fn(() => of(groups)) };
+    athletesApi = {
+      getActive: vi.fn(() => of([
+        { id: 1, firstName: 'Alex', lastName: 'Runner', birthYear: 2000, gender: 'MALE', active: true },
+        { id: 2, firstName: 'Sam', lastName: 'Runner', birthYear: 2001, gender: 'MALE', active: true },
+      ])),
+    };
     trainingsApi = {
       create: vi.fn(createLoader),
       createFreeText: vi.fn(() => of({ id: 77 })),
@@ -34,6 +42,7 @@ describe('TrainingCreatePage', () => {
       imports: [TrainingCreatePage],
       providers: [
         provideRouter([]),
+        { provide: AthletesApiService, useValue: athletesApi },
         { provide: TrainingGroupsApiService, useValue: groupsApi },
         { provide: TrainingsApiService, useValue: trainingsApi },
         {
@@ -73,6 +82,13 @@ describe('TrainingCreatePage', () => {
   function selectTrainingType(trainingType: 'TEMPO' | 'FREE_TEXT'): void {
     const select = fixture.nativeElement.querySelector('#training-type') as HTMLSelectElement;
     select.value = trainingType;
+    select.dispatchEvent(new Event('change'));
+    fixture.detectChanges();
+  }
+
+  function selectAssignmentType(assignmentType: 'GROUP' | 'ATHLETES'): void {
+    const select = fixture.nativeElement.querySelector('#training-assignment-type') as HTMLSelectElement;
+    select.value = assignmentType;
     select.dispatchEvent(new Event('change'));
     fixture.detectChanges();
   }
@@ -213,13 +229,40 @@ describe('TrainingCreatePage', () => {
     expect(trainingsApi.createFreeText).toHaveBeenCalledWith({
       name: 'Trening szybkościowy',
       trainingDate: '2026-11-11',
+      assignmentType: 'GROUP',
       trainingGroupId: 1,
+      athleteIds: [],
       sections: [
         { title: 'Część główna', content: 'Skip A 3 × 30 m', sequenceNumber: 1 },
         { title: 'Rozgrzewka', content: 'Trucht 10 minut', sequenceNumber: 2 },
       ],
     });
     expect(navigate).toHaveBeenCalledWith(['/trainings', 77]);
+  });
+
+  it('creates FREE_TEXT training for multiple selected athletes without a group', async () => {
+    await createPage();
+    vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+    selectTrainingType('FREE_TEXT');
+    selectAssignmentType('ATHLETES');
+    const page = fixture.componentInstance;
+    page.form.controls.name.setValue('Trening indywidualny');
+    page.form.controls.trainingDate.setValue('2026-11-11');
+    page.form.controls.athleteIds.setValue([1, 2]);
+    page.sections.at(0).controls.title.setValue('Część główna');
+    page.sections.at(0).controls.content.setValue('Ćwiczenia biegowe');
+
+    page.submit();
+    await fixture.whenStable();
+
+    expect(trainingsApi.createFreeText).toHaveBeenCalledWith({
+      name: 'Trening indywidualny',
+      trainingDate: '2026-11-11',
+      assignmentType: 'ATHLETES',
+      trainingGroupId: null,
+      athleteIds: [1, 2],
+      sections: [{ title: 'Część główna', content: 'Ćwiczenia biegowe', sequenceNumber: 1 }],
+    });
   });
 
   it('preserves entered form data and reports failed creation', async () => {

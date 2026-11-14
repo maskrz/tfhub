@@ -45,10 +45,12 @@ describe('AthleteProfilePage', () => {
     updateAthlete: ReturnType<typeof vi.fn>;
   };
   let testsApi: { getAll: ReturnType<typeof vi.fn> };
+  let setUserRole: (role: string) => void;
 
   async function createPage(
     requestedAthlete: AthleteResponse = athlete,
     historyRequest: () => Observable<AthleteProfileResult[]> = () => of(results),
+    role = 'ADMIN',
   ): Promise<void> {
     athletesApi = {
       getById: vi.fn(() => of(requestedAthlete)),
@@ -58,6 +60,8 @@ describe('AthleteProfilePage', () => {
       updateAthlete: vi.fn(),
     };
     testsApi = { getAll: vi.fn(() => of(tests)) };
+    const currentUser = signal({ authenticated: true, userId: 1, username: 'user', role, athleteId: null });
+    setUserRole = (nextRole) => currentUser.update((user) => ({ ...user, role: nextRole }));
     await TestBed.configureTestingModule({
       imports: [AthleteProfilePage],
       providers: [
@@ -67,15 +71,19 @@ describe('AthleteProfilePage', () => {
         { provide: TestsApiService, useValue: testsApi },
         {
           provide: AuthService,
-          useValue: {
-            currentUser: signal({ authenticated: true, userId: 1, username: 'admin', role: 'ADMIN', athleteId: null }),
-          },
+          useValue: { currentUser },
         },
       ],
     }).compileComponents();
     fixture = TestBed.createComponent(AthleteProfilePage);
     fixture.detectChanges();
     await fixture.whenStable();
+    fixture.detectChanges();
+  }
+
+  function expandResultsSection(): void {
+    const button = fixture.nativeElement.querySelector('.athlete-profile-section__toggle') as HTMLButtonElement;
+    button.click();
     fixture.detectChanges();
   }
 
@@ -87,13 +95,45 @@ describe('AthleteProfilePage', () => {
     expect(fixture.nativeElement.textContent).toContain('Aktywny');
     expect(fixture.nativeElement.textContent).toContain('Rocznik 2010');
     expect(athletesApi.getResultHistory).not.toHaveBeenCalled();
+    const toggles = fixture.nativeElement.querySelectorAll('.athlete-profile-section__toggle') as NodeListOf<HTMLButtonElement>;
+    expect(toggles).toHaveLength(2);
+    expect([...toggles].map((button) => button.getAttribute('aria-expanded'))).toEqual(['false', 'false']);
+    expect(fixture.nativeElement.querySelector('#results-section-content')).toBeNull();
+    expect(fixture.nativeElement.querySelector('#training-history-content')).toBeNull();
     expect(fixture.nativeElement.querySelector('.history-card')).toBeNull();
     expect(fixture.nativeElement.querySelector('.chart-card')).toBeNull();
+  });
+
+  it('shows the general trainings link only to athlete accounts', async () => {
+    await createPage(athlete, () => of(results), 'ATHLETE');
+    const link = fixture.nativeElement.querySelector('.general-trainings-link') as HTMLAnchorElement;
+    expect(link.textContent).toContain('Treningi ogólne');
+    expect(link.getAttribute('href')).toBe('/trainings');
+    expect(link.querySelector('span')?.textContent).toBe('→');
+
+    setUserRole('COACH');
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('.general-trainings-link')).toBeNull();
+
+    setUserRole('ADMIN');
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('.general-trainings-link')).toBeNull();
+  });
+
+  it('hides athlete aliases from ATHLETE accounts but shows them to staff', async () => {
+    const athleteWithAlias = { ...athlete, aliases: ['Biegacz 8'] };
+    await createPage(athleteWithAlias, () => of(results), 'ATHLETE');
+    expect(fixture.nativeElement.textContent).not.toContain('Aliasy:');
+
+    setUserRole('COACH');
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).toContain('Aliasy: Biegacz 8');
   });
 
   it('shows results and chart only after the first request succeeds', async () => {
     const response = new Subject<AthleteProfileResult[]>();
     await createPage(athlete, () => response);
+    expandResultsSection();
     (fixture.nativeElement.querySelector('.load-button') as HTMLButtonElement).click();
     fixture.detectChanges();
     expect(fixture.nativeElement.querySelector('.history-card')).toBeNull();
@@ -107,6 +147,7 @@ describe('AthleteProfilePage', () => {
 
   it('shows empty states after a successful empty response', async () => {
     await createPage(athlete, () => of([]));
+    expandResultsSection();
     (fixture.nativeElement.querySelector('.load-button') as HTMLButtonElement).click();
     fixture.detectChanges();
     expect(fixture.nativeElement.querySelector('.history-card')?.textContent).toContain('Brak wyników dla wybranych filtrów.');
@@ -115,6 +156,7 @@ describe('AthleteProfilePage', () => {
 
   it('shows the initial request error and allows retry without displaying the sections', async () => {
     await createPage(athlete, () => throwError(() => new HttpErrorResponse({ status: 500 })));
+    expandResultsSection();
     (fixture.nativeElement.querySelector('.load-button') as HTMLButtonElement).click();
     fixture.detectChanges();
     expect(fixture.nativeElement.querySelector('.history-card')).toBeNull();
@@ -135,6 +177,7 @@ describe('AthleteProfilePage', () => {
 
   it('loads selected tests and date filters only after explicit request, retaining duplicate same-cell results', async () => {
     await createPage();
+    expandResultsSection();
     const checkboxes = fixture.nativeElement.querySelectorAll('.test-option input') as NodeListOf<HTMLInputElement>;
     checkboxes[0].checked = true;
     checkboxes[0].dispatchEvent(new Event('change'));
@@ -166,6 +209,7 @@ describe('AthleteProfilePage', () => {
 
   it('toggles all tests without loading results and preserves selection order when completing a partial selection', async () => {
     await createPage();
+    expandResultsSection();
     const component = fixture.componentInstance;
     const button = fixture.nativeElement.querySelector('.select-all-button') as HTMLButtonElement;
     const checkboxes = fixture.nativeElement.querySelectorAll('.test-option input') as NodeListOf<HTMLInputElement>;
@@ -202,6 +246,7 @@ describe('AthleteProfilePage', () => {
 
   it('groups tests by category and filters them by name, limiting select-all to the visible tests', async () => {
     await createPage();
+    expandResultsSection();
     const component = fixture.componentInstance;
     const titles = () => [...fixture.nativeElement.querySelectorAll('.test-group__title')]
       .map((title) => (title as HTMLElement).textContent?.trim());
@@ -226,6 +271,7 @@ describe('AthleteProfilePage', () => {
 
   it('does not show the select-all action when there are no tests', async () => {
     await createPage();
+    expandResultsSection();
     fixture.componentInstance.tests.set([]);
     fixture.detectChanges();
     expect(fixture.nativeElement.querySelector('.select-all-button')).toBeNull();
@@ -234,6 +280,7 @@ describe('AthleteProfilePage', () => {
 
   it('rejects a reversed date range without requesting results', async () => {
     await createPage();
+    expandResultsSection();
     const filters = fixture.nativeElement.querySelector('.history-filters') as HTMLElement;
     const dateActions = filters.querySelector('.date-actions') as HTMLElement;
     expect(dateActions.querySelector('.date-range')).not.toBeNull();
@@ -278,6 +325,7 @@ describe('AthleteProfilePage', () => {
 
   it('preserves profile results when a refresh request fails', async () => {
     await createPage(athlete, () => of(results));
+    expandResultsSection();
     const component = fixture.componentInstance;
     component.selectedTestIds.set([3, 5]);
     component.loadResults();
@@ -297,6 +345,7 @@ describe('AthleteProfilePage', () => {
 
   it('opens result editing after a double click and preselects the athlete for new results', async () => {
     await createPage();
+    expandResultsSection();
     const component = fixture.componentInstance;
     component.history.set(results);
     component.historyLoaded.set(true);

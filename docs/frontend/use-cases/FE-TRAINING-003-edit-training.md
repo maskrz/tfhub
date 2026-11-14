@@ -4,12 +4,12 @@
 
 Allow an authorized user to edit the plan of an existing planned or completed training: its name, date, definitions and segments. Athlete assignments and execution data are managed separately through FE-TRAINING-009 – Complete Training.
 
-This flow is for TEMPO trainings. FREE_TEXT trainings use the same name/date editing pattern with ordered section management on `/trainings/:id/free-text/edit`.
+This flow covers TEMPO plan editing and the type-specific FREE_TEXT editor at `/trainings/:id/free-text/edit`. TEMPO group assignment remains unchanged; the FREE_TEXT editor also allows changing between GROUP and ATHLETES assignment.
 
 ## 2. Actors and Preconditions
 
 - **ADMIN** – can edit any training.
-- **COACH** – can edit trainings in groups assigned to that coach.
+- **COACH** – can edit group-assigned trainings in groups assigned to that coach; ATHLETES-mode FREE_TEXT only when all selected athletes currently belong to groups assigned to that coach.
 - The user is authenticated, the training exists, and backend UC-503 is available.
 
 ## 3. Main Flow
@@ -17,7 +17,7 @@ This flow is for TEMPO trainings. FREE_TEXT trainings use the same name/date edi
 1. The user opens a training from the list or details view.
 2. The user selects **Edytuj trening**.
 3. The frontend loads the training using UC-504 and populates the form.
-4. The user edits the name, date, definitions and segments. The group is read-only.
+4. The user edits the name, date, definitions and segments. The TEMPO group is read-only.
 5. The user submits the plan to UC-503.
 6. On success, the frontend navigates to the training details view.
 
@@ -28,6 +28,16 @@ This flow is for TEMPO trainings. FREE_TEXT trainings use the same name/date edi
 - Add, edit distance/rest, reorder and remove segments within a definition.
 
 Athlete assignments, execution status, results and spike usage are not editable here. They are managed in FE-TRAINING-009.
+
+### FREE_TEXT Assignment
+
+- The FREE_TEXT editor lets the user choose `GROUP` or `ATHLETES`.
+- GROUP mode selects exactly one group and clears athlete targets.
+- ATHLETES mode selects one or more active athletes and clears the group.
+- The UI must never submit both targets or allow an empty assignment.
+- ADMIN can select any active target. COACH can select only groups assigned to them or athletes whose current groups are all assigned to them.
+- Existing FREE_TEXT assignment is loaded into the form; changing mode replaces the previous target set on successful save.
+- Athlete selection does not create TEMPO participation or execution records. Other athletes in a selected athlete's group do not gain visibility.
 
 ## 5. Data Preservation and Deletion
 
@@ -43,7 +53,7 @@ Athlete assignments, execution status, results and spike usage are not editable 
 
 - Validate required training name/date, non-empty definitions and segments, non-empty definition names, positive integer distances and valid rest values.
 - Accept rest as minutes (for example `4` or `1,5`), seconds (`45s`) or mixed values (`4m 10s`); send seconds to the API.
-- Do not send group, participation or execution fields in the UC-503 request.
+- Do not send group, participation or execution fields in the TEMPO UC-503 request. Send exactly the chosen group or athlete IDs in the FREE_TEXT request.
 - Prevent duplicate submissions.
 - On failure, retain all user changes and display the server error.
 
@@ -53,7 +63,7 @@ Follow FE-TRAINING-002 form patterns and existing TFHub controls, validation and
 
 ## 8. Out of Scope
 
-- Adding/removing/reassigning athletes as a separate task.
+- Editing TEMPO athlete participation as a separate task.
 - Editing execution statuses, results or spike usage.
 - Viewing or deleting trainings (FE-TRAINING-005).
 - OCR and imports.
@@ -69,3 +79,4 @@ Follow FE-TRAINING-002 form patterns and existing TFHub controls, validation and
 6. Backend errors do not discard form changes.
 7. Success navigates to training details.
 8. The UI follows existing TFHub patterns and works on mobile.
+9. FREE_TEXT assignment mode can be changed without affecting TEMPO behavior, and only the submitted target(s) receive visibility.

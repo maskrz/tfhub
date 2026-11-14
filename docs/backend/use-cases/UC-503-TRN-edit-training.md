@@ -6,12 +6,12 @@ Allow an authorized user to edit the plan of an existing training session, regar
 
 The operation preserves the training session's identity, group and historical execution associations.
 
-For `FREE_TEXT` trainings, the same authorized service boundary supports editing the name, date and ordered free-text sections; tempo definitions and execution data are not accepted by that operation.
+For `FREE_TEXT` trainings, the same authorized service boundary supports editing the name, date, ordered free-text sections and assignment; tempo definitions and execution data are not accepted by that operation.
 
 ## 2. Actors and Preconditions
 
 - **ADMIN** – can edit any training session.
-- **COACH** – can edit a training session only while currently assigned to its group.
+- **COACH** – can edit a group-assigned training only while currently assigned to its group; for ATHLETES-mode FREE_TEXT, only while currently assigned to every selected athlete's group.
 - The requester is authenticated and has the ADMIN or COACH role.
 - The training exists.
 
@@ -21,14 +21,15 @@ For `FREE_TEXT` trainings, the same authorized service boundary supports editing
 
 - The training name and date may be changed.
 - The training must retain a non-empty name and valid date.
-- The training group is immutable and is not accepted as an editable request field.
+- TEMPO group assignment is immutable and is not accepted as an editable request field.
 - Training status does not restrict editing; completed training plans can still be corrected.
 - The operation does not edit athlete assignments or execution status, results, or spike usage.
 
 ### 3.2 Authorization
 
 - ADMIN can edit any training.
-- COACH can edit only trainings belonging to groups currently assigned to that coach.
+- COACH can edit group-assigned trainings belonging to groups currently assigned to that coach.
+- COACH can edit ATHLETES-mode FREE_TEXT only while currently assigned to every selected athlete's current group.
 - All coaches assigned to a group have identical permissions.
 - Permissions do not depend on who created the training.
 - Authorization is evaluated from the authenticated user and current group assignments.
@@ -64,26 +65,30 @@ For `FREE_TEXT` trainings, the same authorized service boundary supports editing
 - A FREE_TEXT training has at least one section. Each section has a user-editable title and content and a unique positive sequence number.
 - Sections can be added, edited, removed and reordered. Section IDs belonging to the training are retained when the section remains.
 - A FREE_TEXT training has no definitions, athlete participations or execution data; this operation cannot add any.
-- The training group and lifecycle status cannot be changed through the edit request.
+- The lifecycle status cannot be changed through the edit request.
+- FREE_TEXT assignment may be changed between GROUP and ATHLETES or updated within the current mode. Exactly one group or one or more active athlete IDs must be supplied, never both.
+- In ATHLETES mode, only active athletes may be selected. A coach must have current group access to every selected athlete.
+- Assignment replacement is atomic with the section update; changing assignment does not create TEMPO participation or execution records.
 - An authorized user can mark a planned FREE_TEXT training completed through `PATCH /api/trainings/{trainingId}/complete`; this does not add athlete participation or change the training's type.
 
 ## 4. API Contract
 
 - **Method and path:** `PUT /api/trainings/{trainingId}`
 - **Request:** training `name`, `trainingDate`, and the complete ordered `definitions` collection. Each definition contains nullable `id`, `name`, `sequenceNumber`, and `segments`; each segment contains nullable `id`, `sequenceNumber`, `distanceM`, and nullable `restAfterSeconds`.
-- The request has no `trainingGroupId`, athlete assignments, or execution records. These values cannot be changed through this endpoint.
+- The TEMPO request has no `trainingGroupId`, athlete assignments, or execution records. These values cannot be changed through this endpoint.
 - A null definition or segment ID identifies a new item. Existing IDs identify retained items and must belong to this training/definition.
 - **Response:** at least the updated training `id`.
 
 The exact JSON DTO and error representation follow the backend API conventions.
 
-FREE_TEXT uses `PUT /api/trainings/{trainingId}/free-text`; the request contains name, date and the complete ordered sections collection. Section IDs are nullable for new sections and existing IDs must belong to this training. Its completion transition uses the separate `PATCH /api/trainings/{trainingId}/complete` endpoint.
+FREE_TEXT uses `PUT /api/trainings/{trainingId}/free-text`; the request contains name, date, assignment type, either `trainingGroupId` or `athleteIds`, and the complete ordered sections collection. Section IDs are nullable for new sections and existing IDs must belong to this training. Its completion transition uses the separate `PATCH /api/trainings/{trainingId}/complete` endpoint.
 
 ## 5. Validation and Error Scenarios
 
 - Reject unauthenticated users and users without ADMIN or COACH role.
 - Reject a missing training; do not reveal an inaccessible training to an unassigned coach.
-- Reject edits to missing or inaccessible trainings and edits that attempt to change the training group.
+- Reject edits to missing or inaccessible trainings and TEMPO edits that attempt to change the training group.
+- Reject FREE_TEXT requests with both assignment targets, no valid target for the selected mode, duplicate IDs, inactive/nonexistent athletes, or coach-inaccessible targets.
 - Reject blank names, invalid dates, an empty definitions collection, blank definition names, empty segment collections, invalid distances/rests, duplicate order numbers, or IDs outside the training.
 - Reject removal of a definition with any `RECORDED` execution.
 - Reject removal of a segment with any `RECORDED` execution or a change to its distance while such an execution exists.
@@ -95,7 +100,7 @@ The full plan update, including any required creation/removal of derived `PENDIN
 
 ## 7. Out of Scope
 
-- Adding, removing or moving athlete assignments except as the unavoidable consequence of deleting an eligible definition.
+- Adding, removing or moving TEMPO athlete participations except as the unavoidable consequence of deleting an eligible definition.
 - Editing athlete execution status, result or spike usage.
 - Changing the training group, deleting trainings (UC-505), imports, templates and statistics.
 
@@ -103,10 +108,11 @@ The full plan update, including any required creation/removal of derived `PENDIN
 
 1. ADMIN can edit any training; COACH can edit only while assigned to its group.
 2. Name, date, definition names/order, segment distances/rest/order can be edited.
-3. The training group cannot be changed and is not part of this request.
+3. TEMPO group assignment cannot be changed. FREE_TEXT assignment can be changed only through its type-specific request and remains mutually exclusive.
 4. Existing definition and segment IDs remain stable when items are retained or reordered.
 5. A definition or segment with a `RECORDED` execution cannot be removed; a segment distance with a `RECORDED` execution cannot be changed.
 6. Removing a definition with no `RECORDED` execution removes its assignments and associated executions; removing an eligible segment removes its executions.
 7. Adding a segment initializes a `PENDING` execution for each existing participant in that definition.
 8. Existing execution values are unchanged by plan edits.
 9. All changes are atomic, and inaccessible trainings cannot be edited.
+10. A coach can edit ATHLETES-mode FREE_TEXT only while assigned to every selected athlete's current group.

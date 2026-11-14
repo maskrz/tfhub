@@ -16,6 +16,9 @@ Wspólny język wizualny:
 - subtelne obramowania, oszczędne cienie i umiarkowanie zaokrąglone narożniki;
 - czytelna typografia i swobodne odstępy;
 - stonowane kolory statusów; kolor nie może być jedynym nośnikiem informacji.
+- logo TFHub w lewym górnym rogu nagłówka i dopasowana ikona karty przeglądarki.
+
+Nagłówek używa banera TFHub z `tfhub-frontend/public/tfhub-banner.png`. Ikona favicon pochodzi z wybranego znaku z arkusza identyfikacji i jest udostępniana jako `favicon.ico` oraz `favicon.png`.
 
 Dołączony zrzut ekranu jest głównym odniesieniem wizualnym dla widoku Zarządzanie testami: [Test Management](screenshots/test-management.png). Służy do określenia układu, hierarchii wizualnej, odstępów, kolorów, nawigacji, obszaru wyszukiwania, struktury tabeli i widocznych akcji. Przykładowe nazwy, kategorie, statusy i wartości na zrzucie są ilustracyjne; nie ustanawiają reguł domenowych ani obsługiwanych wartości.
 

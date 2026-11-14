@@ -4,7 +4,11 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { AbstractControl, FormArray, FormControl, FormGroup, ReactiveFormsModule, ValidatorFn, Validators } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { EMPTY, catchError, finalize, take } from 'rxjs';
-import { TrainingDetails } from './training.model';
+import { AthleteResponse } from '../athletes/athlete.model';
+import { AthletesApiService } from '../athletes/athletes-api.service';
+import { MultiSelectDropdownComponent, MultiSelectOption } from '../../shared/multi-select-dropdown.component';
+import { TrainingGroup, TrainingGroupsApiService } from '../training-groups/training-groups-api.service';
+import { TrainingAssignmentType, TrainingDetails } from './training.model';
 import { TrainingsApiService } from './trainings-api.service';
 
 type TrainingSectionForm = FormGroup<{
@@ -41,7 +45,7 @@ function createSectionForm(
 }
 
 @Component({
-  imports: [ReactiveFormsModule, RouterLink],
+  imports: [ReactiveFormsModule, RouterLink, MultiSelectDropdownComponent],
   selector: 'app-free-text-training-edit-page',
   styleUrl: './training-create.page.scss',
   templateUrl: './free-text-training-edit.page.html',
@@ -53,15 +57,32 @@ export class FreeTextTrainingEditPage implements OnInit {
   readonly attemptedSubmit = signal(false);
   readonly loadError = signal<string | null>(null);
   readonly errorMessage = signal<string | null>(null);
+  readonly assignmentError = signal<string | null>(null);
+  readonly assignmentType = signal<TrainingAssignmentType>('GROUP');
+  readonly groups = signal<TrainingGroup[]>([]);
+  readonly athletes = signal<AthleteResponse[]>([]);
+  readonly athleteOptions = () => this.athletes().map((athlete): MultiSelectOption => ({
+    id: athlete.id,
+    name: `${athlete.firstName} ${athlete.lastName}`,
+  }));
+  readonly groupsLoading = signal(true);
+  readonly athletesLoading = signal(true);
   readonly form = new FormGroup({
     name: new FormControl('', { nonNullable: true, validators: [trimmedRequired, Validators.maxLength(255)] }),
     trainingDate: new FormControl('', { nonNullable: true, validators: [Validators.required, validDate] }),
+    trainingGroupId: new FormControl<number | null>(null, Validators.required),
+    athleteIds: new FormControl<number[]>({ value: [], disabled: true }, {
+      nonNullable: true,
+      validators: [Validators.minLength(1)],
+    }),
     sections: new FormArray<TrainingSectionForm>([], { validators: [Validators.minLength(1)] }),
   });
 
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly trainingsApi = inject(TrainingsApiService);
+  private readonly groupsApi = inject(TrainingGroupsApiService);
+  private readonly athletesApi = inject(AthletesApiService);
   private readonly destroyRef = inject(DestroyRef);
   trainingId = 0;
 
@@ -77,6 +98,7 @@ export class FreeTextTrainingEditPage implements OnInit {
       return;
     }
     this.trainingId = trainingId;
+    this.loadAssignmentOptions();
     this.loadTraining();
   }
 
@@ -110,6 +132,26 @@ export class FreeTextTrainingEditPage implements OnInit {
     this.loadTraining();
   }
 
+  onAssignmentTypeChange(event: Event): void {
+    const select = event.target;
+    if (!(select instanceof HTMLSelectElement)) return;
+    if (select.value !== 'GROUP' && select.value !== 'ATHLETES') return;
+    this.applyAssignmentType(select.value);
+  }
+
+  onGroupChange(event: Event): void {
+    const select = event.target;
+    if (!(select instanceof HTMLSelectElement)) return;
+    const groupId = select.value === '' ? null : Number(select.value);
+    if (groupId !== null && !this.groups().some((group) => group.id === groupId)) return;
+    this.form.controls.trainingGroupId.setValue(groupId);
+  }
+
+  onAthleteIdsChange(athleteIds: number[]): void {
+    this.form.controls.athleteIds.setValue(athleteIds);
+    this.form.controls.athleteIds.markAsTouched();
+  }
+
   submit(): void {
     if (this.submitting() || !this.training()) return;
     this.attemptedSubmit.set(true);
@@ -123,6 +165,9 @@ export class FreeTextTrainingEditPage implements OnInit {
     this.trainingsApi.updateFreeText(this.trainingId, {
       name: value.name.trim(),
       trainingDate: value.trainingDate,
+      assignmentType: this.assignmentType(),
+      trainingGroupId: this.assignmentType() === 'GROUP' ? value.trainingGroupId : null,
+      athleteIds: this.assignmentType() === 'ATHLETES' ? value.athleteIds : [],
       sections: value.sections.map((section, index) => ({
         id: section.id,
         title: section.title.trim(),
@@ -159,12 +204,58 @@ export class FreeTextTrainingEditPage implements OnInit {
       this.training.set(training);
       this.form.controls.name.setValue(training.name);
       this.form.controls.trainingDate.setValue(training.trainingDate);
+      this.applyAssignmentType(training.assignmentType, false);
+      this.form.controls.trainingGroupId.setValue(training.trainingGroup?.id ?? null);
+      this.form.controls.athleteIds.setValue(training.assignedAthletes.map((athlete) => athlete.id));
       this.sections.clear();
       for (const section of training.sections) {
         this.sections.push(createSectionForm(section.id, section.title, section.content));
       }
       this.sections.updateValueAndValidity();
     });
+  }
+
+  private loadAssignmentOptions(): void {
+    this.groupsApi.getAccessible().pipe(
+      take(1),
+      catchError((error: unknown) => {
+        this.assignmentError.set(this.getErrorMessage(error));
+        return EMPTY;
+      }),
+      finalize(() => this.groupsLoading.set(false)),
+      takeUntilDestroyed(this.destroyRef),
+    ).subscribe((groups) => this.groups.set(groups));
+    this.athletesApi.getActive().pipe(
+      take(1),
+      catchError((error: unknown) => {
+        this.assignmentError.set(this.getErrorMessage(error));
+        return EMPTY;
+      }),
+      finalize(() => this.athletesLoading.set(false)),
+      takeUntilDestroyed(this.destroyRef),
+    ).subscribe((athletes) => this.athletes.set(athletes));
+  }
+
+  private applyAssignmentType(assignmentType: TrainingAssignmentType, clearTargets = true): void {
+    this.assignmentType.set(assignmentType);
+    const groupControl = this.form.controls.trainingGroupId;
+    const athleteControl = this.form.controls.athleteIds;
+    if (clearTargets) {
+      groupControl.setValue(null, { emitEvent: false });
+      athleteControl.setValue([], { emitEvent: false });
+    }
+    if (assignmentType === 'GROUP') {
+      groupControl.setValidators([Validators.required]);
+      groupControl.enable({ emitEvent: false });
+      athleteControl.disable({ emitEvent: false });
+    } else {
+      groupControl.clearValidators();
+      groupControl.disable({ emitEvent: false });
+      athleteControl.setValidators([Validators.minLength(1)]);
+      athleteControl.enable({ emitEvent: false });
+    }
+    groupControl.updateValueAndValidity({ emitEvent: false });
+    athleteControl.updateValueAndValidity({ emitEvent: false });
   }
 
   private getErrorMessage(error: unknown): string {

@@ -65,6 +65,18 @@
   gap: .5rem;
 }
 
+.general-trainings-link {
+  align-items: center;
+  gap: .6rem;
+  justify-self: start;
+  width: fit-content;
+}
+
+.general-trainings-link span {
+  font-size: 1.2em;
+  line-height: 1;
+}
+
 .section-title h2 {
   color: #172033;
   font-size: 1.2rem;
@@ -72,12 +84,17 @@
   margin: 0;
 }
 
-.history-filters .section-title h2 {
-  color: #141c2b;
-  font-size: clamp(2.4rem, 5vw, 3.4rem);
-  font-weight: 700;
-  letter-spacing: -.045em;
-  line-height: 1.05;
+.history-card,
+.chart-card {
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+}
+
+.history-card {
+  border-bottom: 1px solid #e7ebf0;
+  padding-bottom: 1rem;
 }
 
 .section-title p {
@@ -353,6 +370,7 @@
 @media (max-width: 600px) {
   .profile-page { gap: 1rem; padding-top: 1.5rem; }
   .profile-card { border-radius: .7rem; padding: .8rem; }
+  .athlete-profile-section { border-radius: .7rem; padding: .8rem; }
   .filters { gap: .75rem; }
   .date-actions { gap: .75rem; }
   .date-range { flex-basis: 100%; }

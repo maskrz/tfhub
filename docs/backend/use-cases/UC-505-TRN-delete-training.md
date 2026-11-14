@@ -9,7 +9,7 @@ Deletion is irreversible. It removes the training session, its definitions and s
 ## 2. Actors
 
 - **ADMIN** – can delete any training session.
-- **COACH** – can delete a training session belonging to a group currently assigned to that coach.
+- **COACH** – can delete a group-assigned training while currently assigned to its group, or an ATHLETES-mode FREE_TEXT training while assigned to every selected athlete's current group.
 
 ## 3. Preconditions
 
@@ -30,6 +30,7 @@ Deletion is irreversible. It removes the training session, its definitions and s
   - Segment executions, including measured results and spike usage.
 - If an accepted training import is linked to the session, permanently delete that import and its owned draft, attempts, and source-image metadata as part of the same transaction. Remove its optimized image after commit; the existing image-storage recovery removes any orphan if filesystem cleanup fails.
 - The operation must not delete or modify the associated training group, athletes, or their other data.
+- For ATHLETES-mode FREE_TEXT, deletion also removes only the training's athlete-assignment links; it never deletes the selected athletes.
 - Database foreign keys remain restrictive; the service deletes dependent records in dependency order rather than relying on cascading deletes.
 - No tombstone or soft-deleted training record is retained.
 
@@ -44,8 +45,9 @@ Deletion is irreversible. It removes the training session, its definitions and s
 
 - Only authenticated ADMIN and COACH users may delete training sessions.
 - ADMIN can delete any training session.
-- COACH can delete a session only if its group is currently assigned to that coach.
-- All coaches assigned to the training's group have identical deletion permissions.
+- COACH can delete a group-assigned session only if its group is currently assigned to that coach.
+- COACH can delete ATHLETES-mode FREE_TEXT only while currently assigned to every selected athlete's current group.
+- Coaches with the same current access to all relevant groups have identical deletion permissions.
 - Authorization does not depend on which coach created the training session.
 - The backend derives the requesting user's identity and permissions from the authenticated security context.
 - The backend must not rely on client-supplied user identifiers, roles, or group assignments.
@@ -63,7 +65,7 @@ Deletion is irreversible. It removes the training session, its definitions and s
 - **User without ADMIN or COACH role:** access is rejected.
 - **Training ID is not a positive integer:** return HTTP 400.
 - **Training session does not exist:** return HTTP 404.
-- **Training session exists but COACH is not assigned to its group:** return the same HTTP 404 as for a nonexistent session.
+- **Training session exists but COACH lacks current group/selected-athlete access:** return the same HTTP 404 as for a nonexistent session.
 - **Unexpected server error:** report an appropriate error without exposing internal implementation details.
 - Existing participants or execution records do not prevent deletion.
 
@@ -85,7 +87,7 @@ Deletion is irreversible. It removes the training session, its definitions and s
 ## 10. Acceptance Criteria
 
 1. ADMIN can delete any existing training session.
-2. COACH can delete a training session only while currently assigned to its group.
+2. COACH can delete a group-assigned session only while assigned to its group, and ATHLETES-mode FREE_TEXT only while assigned to every selected athlete's current group.
 3. Coaches assigned to the same group have identical deletion permissions.
 4. Planned and completed sessions can be deleted.
 5. Deletion permanently removes the session and every definition, segment, participation, and execution owned by it.

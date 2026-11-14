@@ -7,6 +7,7 @@ import {
   CompleteTrainingRequest,
   EditTrainingRequest,
   TrainingDetails,
+  TrainingListItem,
   UpdateTrainingResponse,
 } from './training.model';
 import { TrainingsApiService } from './trainings-api.service';
@@ -26,7 +27,7 @@ describe('TrainingsApiService', () => {
   afterEach(() => httpTesting.verify());
 
   it('retrieves planned trainings from the UC-501 endpoint by default', () => {
-    const response = [{
+    const response: TrainingListItem[] = [{
       id: 8,
       name: 'Trening szybkościowy',
       trainingDate: '2026-11-11',
@@ -35,6 +36,8 @@ describe('TrainingsApiService', () => {
       participantCount: 4,
       status: 'PLANNED',
       trainingType: 'TEMPO',
+      assignmentType: 'GROUP',
+      assignedAthleteCount: 0,
     }];
     let actual: typeof response | undefined;
 
@@ -84,6 +87,8 @@ describe('TrainingsApiService', () => {
       trainingDate: '2026-11-11',
       status: 'PLANNED',
       trainingGroup: { id: 3, name: 'Sprint' },
+      assignmentType: 'GROUP',
+      assignedAthletes: [],
       definitions: [],
       trainingType: 'TEMPO',
       sections: [],

@@ -14,6 +14,8 @@ const training: TrainingDetails = {
   trainingDate: '2026-11-11',
   status: 'PLANNED',
   trainingGroup: { id: 3, name: 'Sprint' },
+  assignmentType: 'GROUP',
+  assignedAthletes: [],
   definitions: [{
     id: 5,
     name: 'Główna',

@@ -3,6 +3,7 @@ package pl.tfhub.api.training.dto.response;
 import java.time.LocalDate;
 import java.util.List;
 import pl.tfhub.api.training.enums.TrainingStatus;
+import pl.tfhub.api.training.enums.TrainingAssignmentType;
 import pl.tfhub.api.training.enums.TrainingType;
 import pl.tfhub.api.traininggroup.dto.response.TrainingGroupResponse;
 
@@ -12,6 +13,8 @@ public record TrainingDetailsResponse(
         LocalDate trainingDate,
         TrainingStatus status,
         TrainingGroupResponse trainingGroup,
+        TrainingAssignmentType assignmentType,
+        List<TrainingAssignedAthleteResponse> assignedAthletes,
         List<TrainingDefinitionDetailsResponse> definitions,
         TrainingType trainingType,
         List<TrainingSectionDetailsResponse> sections) {

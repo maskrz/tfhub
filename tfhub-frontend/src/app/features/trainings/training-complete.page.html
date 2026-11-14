@@ -25,7 +25,7 @@
       <div class="summary-heading">
         <div>
           <h2 id="training-info-heading">{{ currentTraining.name }}</h2>
-          <p>{{ currentTraining.trainingDate }} · {{ currentTraining.trainingGroup.name }}</p>
+          <p>{{ currentTraining.trainingDate }} · {{ currentTraining.trainingGroup?.name ?? '' }}</p>
         </div>
       </div>
     </section>

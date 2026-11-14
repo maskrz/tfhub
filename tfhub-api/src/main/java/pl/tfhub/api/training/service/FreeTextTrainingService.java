@@ -9,6 +9,7 @@ import java.util.Set;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import pl.tfhub.api.common.authorization.AccessScopeService;
+import pl.tfhub.api.athlete.service.AthleteService;
 import pl.tfhub.api.training.dto.request.CreateFreeTextTrainingRequest;
 import pl.tfhub.api.training.dto.request.CreateTrainingSectionRequest;
 import pl.tfhub.api.training.dto.request.EditFreeTextTrainingRequest;
@@ -18,10 +19,12 @@ import pl.tfhub.api.training.dto.response.UpdateTrainingResponse;
 import pl.tfhub.api.training.entity.Training;
 import pl.tfhub.api.training.entity.TrainingSection;
 import pl.tfhub.api.training.enums.TrainingType;
+import pl.tfhub.api.training.enums.TrainingAssignmentType;
 import pl.tfhub.api.training.exception.InvalidTrainingIdException;
 import pl.tfhub.api.training.exception.InvalidTrainingRequestException;
 import pl.tfhub.api.training.exception.TrainingNotFoundException;
 import pl.tfhub.api.training.repository.TrainingRepository;
+import pl.tfhub.api.training.repository.TrainingAssignmentRepository;
 import pl.tfhub.api.training.repository.TrainingSectionRepository;
 import pl.tfhub.api.traininggroup.entity.TrainingGroup;
 import pl.tfhub.api.traininggroup.exception.TrainingGroupNotFoundException;
@@ -32,19 +35,25 @@ import pl.tfhub.api.user.enums.UserRole;
 public class FreeTextTrainingService {
 
     private final TrainingRepository trainingRepository;
+    private final TrainingAssignmentRepository assignmentRepository;
     private final TrainingGroupRepository trainingGroupRepository;
     private final TrainingSectionRepository sectionRepository;
     private final AccessScopeService accessScopeService;
+    private final AthleteService athleteService;
 
     public FreeTextTrainingService(
             TrainingRepository trainingRepository,
+            TrainingAssignmentRepository assignmentRepository,
             TrainingGroupRepository trainingGroupRepository,
             TrainingSectionRepository sectionRepository,
-            AccessScopeService accessScopeService) {
+            AccessScopeService accessScopeService,
+            AthleteService athleteService) {
         this.trainingRepository = trainingRepository;
+        this.assignmentRepository = assignmentRepository;
         this.trainingGroupRepository = trainingGroupRepository;
         this.sectionRepository = sectionRepository;
         this.accessScopeService = accessScopeService;
+        this.athleteService = athleteService;
     }
 
     @Transactional
@@ -53,12 +62,16 @@ public class FreeTextTrainingService {
         validateSectionOrders(request.sections().stream()
                 .map(CreateTrainingSectionRequest::sequenceNumber)
                 .toList());
-        TrainingGroup group = trainingGroupRepository.findById(request.trainingGroupId())
-                .orElseThrow(() -> new TrainingGroupNotFoundException(request.trainingGroupId()));
-        accessScopeService.requireGroupAssignment(request.trainingGroupId());
+        ResolvedAssignment assignment = resolveAssignment(
+                request.assignmentType(), request.trainingGroupId(), request.athleteIds());
 
         Training training = trainingRepository.saveAndFlush(new Training(
-                request.name(), request.trainingDate(), group, TrainingType.FREE_TEXT));
+                request.name(),
+                request.trainingDate(),
+                assignment.group(),
+                TrainingType.FREE_TEXT,
+                assignment.type()));
+        assignmentRepository.replaceAthletes(training.getId(), assignment.athleteIds());
         List<TrainingSection> sections = request.sections().stream()
                 .map(section -> new TrainingSection(
                         training, section.title(), section.content(), section.sequenceNumber()))
@@ -71,6 +84,8 @@ public class FreeTextTrainingService {
     public UpdateTrainingResponse update(long trainingId, EditFreeTextTrainingRequest request) {
         Training training = findAccessibleTrainingForUpdate(trainingId);
         requireFreeText(training);
+        ResolvedAssignment assignment = resolveAssignment(
+                request.assignmentType(), request.trainingGroupId(), request.athleteIds());
         validateSectionOrders(request.sections().stream()
                 .map(EditTrainingSectionRequest::sequenceNumber)
                 .toList());
@@ -101,6 +116,8 @@ public class FreeTextTrainingService {
         }
 
         training.updateDetails(request.name(), request.trainingDate());
+        training.changeAssignment(assignment.type(), assignment.group());
+        assignmentRepository.replaceAthletes(trainingId, assignment.athleteIds());
         List<TrainingSection> removedSections = currentSections.stream()
                 .filter(section -> !retainedIds.contains(section.getId()))
                 .toList();
@@ -126,10 +143,41 @@ public class FreeTextTrainingService {
         Training training = trainingRepository.findByIdForUpdate(trainingId)
                 .orElseThrow(() -> new TrainingNotFoundException(trainingId));
         if (accessScopeService.currentUser().role() == UserRole.COACH
-                && !accessScopeService.assignedGroupIds().contains(training.getTrainingGroup().getId())) {
+                && !assignmentRepository.canCoachManage(trainingId, accessScopeService.currentUser().id())) {
             throw new TrainingNotFoundException(trainingId);
         }
         return training;
+    }
+
+    private ResolvedAssignment resolveAssignment(
+            TrainingAssignmentType assignmentType,
+            Long trainingGroupId,
+            List<Long> athleteIds) {
+        if (assignmentType == null) {
+            throw new InvalidTrainingRequestException("A FREE_TEXT training assignment type is required");
+        }
+        if (assignmentType == TrainingAssignmentType.GROUP) {
+            if (trainingGroupId == null || trainingGroupId <= 0
+                    || (athleteIds != null && !athleteIds.isEmpty())) {
+                throw new InvalidTrainingRequestException(
+                        "GROUP assignment requires one training group and no athlete assignments");
+            }
+            accessScopeService.requireGroupAssignment(trainingGroupId);
+            TrainingGroup group = trainingGroupRepository.findById(trainingGroupId)
+                    .orElseThrow(() -> new TrainingGroupNotFoundException(trainingGroupId));
+            return new ResolvedAssignment(assignmentType, group, List.of());
+        }
+
+        if (trainingGroupId != null || athleteIds == null || athleteIds.isEmpty()) {
+            throw new InvalidTrainingRequestException(
+                    "ATHLETES assignment requires one or more athletes and no training group");
+        }
+        Set<Long> uniqueIds = new HashSet<>(athleteIds);
+        if (uniqueIds.size() != athleteIds.size() || uniqueIds.stream().anyMatch(id -> id == null || id <= 0)) {
+            throw new InvalidTrainingRequestException("Athlete IDs must be positive and unique");
+        }
+        athleteService.validateActiveTrainingAssignees(athleteIds);
+        return new ResolvedAssignment(assignmentType, null, List.copyOf(athleteIds));
     }
 
     private void requireFreeText(Training training) {
@@ -148,5 +196,11 @@ public class FreeTextTrainingService {
                 throw new InvalidTrainingRequestException("Section sequence numbers must be positive and unique");
             }
         }
+    }
+
+    private record ResolvedAssignment(
+            TrainingAssignmentType type,
+            TrainingGroup group,
+            List<Long> athleteIds) {
     }
 }

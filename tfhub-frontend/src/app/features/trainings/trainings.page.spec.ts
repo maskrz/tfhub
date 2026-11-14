@@ -20,6 +20,8 @@ const trainings: TrainingListItem[] = [
     participantCount: 5,
     status: 'PLANNED',
     trainingType: 'TEMPO',
+    assignmentType: 'GROUP',
+    assignedAthleteCount: 0,
   },
   {
     id: 2,
@@ -30,6 +32,8 @@ const trainings: TrainingListItem[] = [
     participantCount: 0,
     status: 'PLANNED',
     trainingType: 'TEMPO',
+    assignmentType: 'GROUP',
+    assignedAthleteCount: 0,
   },
 ];
 
@@ -42,6 +46,8 @@ const completedTraining: TrainingListItem = {
   participantCount: 2,
   status: 'COMPLETED',
   trainingType: 'TEMPO',
+  assignmentType: 'GROUP',
+  assignedAthleteCount: 0,
 };
 
 const freeTextTraining: TrainingListItem = {
@@ -53,6 +59,8 @@ const freeTextTraining: TrainingListItem = {
   participantCount: 0,
   status: 'PLANNED',
   trainingType: 'FREE_TEXT',
+  assignmentType: 'GROUP',
+  assignedAthleteCount: 0,
 };
 
 const pendingImport: TrainingImportListItem = {

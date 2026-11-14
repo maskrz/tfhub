@@ -20,7 +20,18 @@
       <div class="summary-heading">
         <div>
           <h2>{{ currentTraining.name }}</h2>
-          <p>{{ formatDate(currentTraining.trainingDate) }} · {{ currentTraining.trainingGroup.name }}</p>
+          <p>{{ formatDate(currentTraining.trainingDate) }}
+            @if (currentTraining.trainingGroup; as group) {
+              · {{ group.name }}
+            } @else {
+              · Trening indywidualny
+            }
+          </p>
+          @if (currentTraining.assignmentType === 'ATHLETES' && canManageTraining) {
+            <p>Przypisani zawodnicy: {{ assignedAthleteNames() }}</p>
+          } @else if (currentTraining.assignmentType === 'ATHLETES') {
+            <p>Trening przypisany bezpośrednio do Ciebie.</p>
+          }
           <span class="training-type-badge">
             {{ currentTraining.trainingType === 'TEMPO' ? 'Trening tempowy' : 'Trening ogólny' }}
           </span>
@@ -32,6 +43,7 @@
       @if (actionError(); as message) {
         <p class="feedback error" role="alert">{{ message }}</p>
       }
+      @if (canManageTraining) {
       <div class="training-actions">
         <a
           class="button button--secondary"
@@ -56,9 +68,10 @@
           Usuń trening
         </button>
       </div>
+      }
     </section>
 
-    @if (deletionDialogOpen()) {
+    @if (canManageTraining && deletionDialogOpen()) {
       @if (training(); as pendingTraining) {
         <app-training-delete-confirmation
           [trainingId]="pendingTraining.id"

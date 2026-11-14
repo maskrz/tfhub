@@ -3,6 +3,7 @@ package pl.tfhub.api.training.service;
 import java.util.List;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.security.access.AccessDeniedException;
 import pl.tfhub.api.common.authorization.AccessScopeService;
 import pl.tfhub.api.training.dto.response.TrainingListItemResponse;
 import pl.tfhub.api.training.enums.TrainingType;
@@ -24,11 +25,17 @@ public class TrainingQueryService {
 
     @Transactional(readOnly = true)
     public List<TrainingListItemResponse> listTrainings(boolean includeCompleted, TrainingType trainingType) {
-        accessScopeService.requireCoachOrAdmin();
         var user = accessScopeService.currentUser();
         if (user.role() == UserRole.ADMIN) {
             return trainingListRepository.findAll(includeCompleted, trainingType);
         }
-        return trainingListRepository.findForCoach(user.id(), includeCompleted, trainingType);
+        if (user.role() == UserRole.COACH) {
+            return trainingListRepository.findForCoach(user.id(), includeCompleted, trainingType);
+        }
+        if (user.role() != UserRole.ATHLETE) {
+            throw new AccessDeniedException("Training access is required");
+        }
+        long athleteId = accessScopeService.currentAthleteId();
+        return trainingListRepository.findForAthlete(athleteId, includeCompleted, trainingType);
     }
 }

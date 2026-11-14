@@ -2,7 +2,7 @@
 
 ## 1. Purpose
 
-Allow an authorized user to create either a TEMPO training with definitions and segments or a FREE_TEXT training with ordered sections. Athlete assignments and execution data are added later only for TEMPO through FE-TRAINING-009 – Complete Training.
+Allow an authorized user to create either a TEMPO training with definitions and segments or a FREE_TEXT training with ordered sections and one of its two assignment modes. Athlete participations and execution data are added later only for TEMPO through FE-TRAINING-009 – Complete Training.
 
 The view must follow the existing TFHUB visual design and interaction patterns.
 
@@ -22,14 +22,14 @@ The view must follow the existing TFHUB visual design and interaction patterns.
 1. The user selects the option to create a training from the training list.
 2. The frontend opens the training creation form.
 3. The user enters the training name and date.
-4. The user selects exactly one training group.
-5. The user selects the training type.
+4. The user selects the training type.
+5. For TEMPO, the user selects exactly one training group. For FREE_TEXT, the user chooses group or individual-athlete assignment and selects the corresponding target(s).
 6. For TEMPO, the user adds one or more TrainingDefinitions. For each definition, the user:
     - Enters its name.
     - Adds one or more training segments.
     - Configures the distance and rest after each segment.
 7. For FREE_TEXT, the user adds one or more sections with editable titles and content and can reorder them.
-8. The user reviews the complete training structure.
+8. The user reviews the complete training structure and assignment.
 9. The user submits the selected type to its UC-502 endpoint.
 10. On success, the user is redirected to the created training's details view.
 
@@ -40,14 +40,18 @@ The view must follow the existing TFHUB visual design and interaction patterns.
 Required fields:
 - Training name.
 - Training date.
-- Training group.
+- For TEMPO and FREE_TEXT/GROUP, one training group.
+- For FREE_TEXT, an assignment type and its corresponding target(s).
 
 Rules:
-- Exactly one group must be selected.
-- The group cannot be changed after the training is created.
+- TEMPO always requires exactly one group.
+- FREE_TEXT/GROUP requires exactly one group and no athlete targets.
+- FREE_TEXT/ATHLETES requires one or more explicitly selected active athletes and no group.
+- Group and athlete targets are mutually exclusive.
 - ADMIN can select any existing group.
-- COACH can select only groups assigned to them.
+- COACH can select only groups assigned to them. For ATHLETES mode, the coach can select only athletes whose current groups are all assigned to that coach.
 - Use the actual group data and existing group-selection mechanisms available in the application.
+- Use the existing athlete selection patterns to select multiple active athletes; other members of their groups are not implicitly assigned.
 
 ### TrainingDefinitions
 
@@ -78,13 +82,15 @@ Rules:
 - Each section contains a free-text title and content; titles are not chosen from a fixed list.
 - Sections can be added, edited, removed and reordered. At least one section with a title and content is required.
 - A new FREE_TEXT training is `PLANNED` and has no athlete participation or execution records.
+- FREE_TEXT assignment mode may be changed later while editing. ATHLETES mode still creates no tempo participation or execution records.
 
 ## 6. Validation
 
 Validate the form before submission:
 - Training name is required.
 - Date is required.
-- Group is required.
+- For TEMPO and FREE_TEXT/GROUP, group is required.
+- For FREE_TEXT, assignment mode is required; GROUP requires a group and ATHLETES requires one or more active athletes.
 - Training type is required.
 - For TEMPO, at least one definition is required.
 - Every definition must have a name.
@@ -126,7 +132,7 @@ All user-facing text must be in Polish.
 
 ## 8. Submission
 
-- Submit the training plan using the actual backend UC-502 request DTO. Do not send athlete assignments or execution data.
+- Submit using the actual backend UC-502 request DTO. TEMPO must not include assignment-mode changes or athlete assignments. FREE_TEXT must submit exactly one valid assignment target mode and no participation/execution data.
 - Do not invent or transform API fields beyond what the backend contract requires.
 - Prevent duplicate submissions while a request is in progress.
 - On success, navigate to the created training details view.
@@ -150,7 +156,7 @@ All user-facing text must be in Polish.
 - User can configure and reorder segments within each definition.
 - Form validation works correctly.
 - Successful submission creates a training plan without athlete participations through UC-502.
-- Successful FREE_TEXT submission creates an ordered section-based training without tempo or athlete records.
+- Successful FREE_TEXT submission creates an ordered section-based training with the selected group or individual-athlete assignment and without tempo participation/execution records.
 - Successful creation redirects to training details.
 - Failed submission preserves entered data.
 - UI matches existing TFHUB forms and controls.

@@ -61,4 +61,6 @@ public interface AthleteRepository extends JpaRepository<Athlete, Long>, JpaSpec
 	boolean existsByIdAndTrainingGroup_Id(long id, long trainingGroupId);
 
 	Optional<Athlete> findByIdAndTrainingGroup_Id(long id, long trainingGroupId);
+
+	List<Athlete> findAllByIdInAndActiveTrue(List<Long> ids);
 }

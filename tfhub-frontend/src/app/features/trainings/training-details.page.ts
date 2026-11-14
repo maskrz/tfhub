@@ -3,6 +3,7 @@ import { Component, DestroyRef, OnInit, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { EMPTY, catchError, finalize, take } from 'rxjs';
+import { AuthService } from '../../core/auth/auth.service';
 import {
   TrainingDetails,
   TrainingExecutionDetails,
@@ -27,11 +28,17 @@ export class TrainingDetailsPage implements OnInit {
   readonly completing = signal(false);
   readonly actionError = signal<string | null>(null);
 
+  readonly auth = inject(AuthService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly trainingsApi = inject(TrainingsApiService);
   private readonly destroyRef = inject(DestroyRef);
   private trainingId = 0;
+
+  get canManageTraining(): boolean {
+    const role = this.auth.currentUser()?.role;
+    return role === 'ADMIN' || role === 'COACH';
+  }
 
   ngOnInit(): void {
     const id = Number(this.route.snapshot.paramMap.get('id'));
@@ -81,6 +88,12 @@ export class TrainingDetailsPage implements OnInit {
   formatDate(date: string): string {
     const [year, month, day] = date.split('-').map(Number);
     return new Intl.DateTimeFormat('pl-PL').format(new Date(year, month - 1, day));
+  }
+
+  assignedAthleteNames(): string {
+    return this.training()?.assignedAthletes
+      .map((athlete) => `${athlete.firstName} ${athlete.lastName}`)
+      .join(', ') ?? '';
   }
 
   resultLabel(execution: TrainingExecutionDetails | undefined): string {

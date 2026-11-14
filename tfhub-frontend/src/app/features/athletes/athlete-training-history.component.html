@@ -1,5 +1,16 @@
-<section class="training-history" aria-labelledby="training-history-heading">
-  <h2 id="training-history-heading">Historia treningów biegowych</h2>
+<section class="athlete-profile-section" aria-labelledby="training-history-heading">
+  <button
+    class="athlete-profile-section__toggle"
+    type="button"
+    aria-controls="training-history-content"
+    [attr.aria-expanded]="expanded()"
+    (click)="toggleExpanded()"
+  >
+    <span id="training-history-heading">Wyniki treningów biegowych</span>
+    <span class="athlete-profile-section__icon" aria-hidden="true"></span>
+  </button>
+  @if (expanded()) {
+  <div id="training-history-content" class="athlete-profile-section__content">
   <div class="date-filters">
     <label class="filter-field">
       <span>Data od</span>
@@ -93,5 +104,7 @@
         </table>
       </div>
     }
+  }
+  </div>
   }
 </section>

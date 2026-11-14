@@ -4,11 +4,13 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import pl.tfhub.api.common.authorization.AccessScopeService;
 import pl.tfhub.api.training.dto.response.TrainingDefinitionDetailsResponse;
 import pl.tfhub.api.training.dto.response.TrainingDetailsResponse;
+import pl.tfhub.api.training.dto.response.TrainingAssignedAthleteResponse;
 import pl.tfhub.api.training.dto.response.TrainingExecutionDetailsResponse;
 import pl.tfhub.api.training.dto.response.TrainingParticipationDetailsResponse;
 import pl.tfhub.api.training.dto.response.TrainingSegmentDetailsResponse;
@@ -20,6 +22,8 @@ import pl.tfhub.api.training.entity.TrainingSegment;
 import pl.tfhub.api.training.entity.TrainingSegmentExecution;
 import pl.tfhub.api.training.exception.InvalidTrainingIdException;
 import pl.tfhub.api.training.exception.TrainingNotFoundException;
+import pl.tfhub.api.training.enums.TrainingType;
+import pl.tfhub.api.training.repository.TrainingAssignmentRepository;
 import pl.tfhub.api.training.repository.AthleteTrainingParticipationRepository;
 import pl.tfhub.api.training.repository.TrainingDefinitionRepository;
 import pl.tfhub.api.training.repository.TrainingRepository;
@@ -38,6 +42,7 @@ public class TrainingDetailsService {
     private final AthleteTrainingParticipationRepository participationRepository;
     private final TrainingSegmentExecutionRepository executionRepository;
     private final TrainingSectionRepository sectionRepository;
+    private final TrainingAssignmentRepository assignmentRepository;
     private final AccessScopeService accessScopeService;
 
     public TrainingDetailsService(
@@ -47,6 +52,7 @@ public class TrainingDetailsService {
             AthleteTrainingParticipationRepository participationRepository,
             TrainingSegmentExecutionRepository executionRepository,
             TrainingSectionRepository sectionRepository,
+            TrainingAssignmentRepository assignmentRepository,
             AccessScopeService accessScopeService) {
         this.trainingRepository = trainingRepository;
         this.definitionRepository = definitionRepository;
@@ -54,33 +60,46 @@ public class TrainingDetailsService {
         this.participationRepository = participationRepository;
         this.executionRepository = executionRepository;
         this.sectionRepository = sectionRepository;
+        this.assignmentRepository = assignmentRepository;
         this.accessScopeService = accessScopeService;
     }
 
     @Transactional(readOnly = true)
     public TrainingDetailsResponse getTraining(long trainingId) {
-        accessScopeService.requireCoachOrAdmin();
         if (trainingId <= 0) {
             throw new InvalidTrainingIdException();
         }
 
+        var user = accessScopeService.currentUser();
         Training training = trainingRepository.findById(trainingId)
                 .orElseThrow(() -> new TrainingNotFoundException(trainingId));
-        if (accessScopeService.currentUser().role() == UserRole.COACH
-                && !accessScopeService.assignedGroupIds().contains(training.getTrainingGroup().getId())) {
+        if (user.role() == UserRole.ATHLETE) {
+            if (training.getTrainingType() != TrainingType.FREE_TEXT) {
+                throw new AccessDeniedException("Athlete accounts cannot access TEMPO training details");
+            }
+            if (!assignmentRepository.isVisibleToAthlete(
+                    trainingId, accessScopeService.currentAthleteId())) {
+                throw new TrainingNotFoundException(trainingId);
+            }
+        } else if (user.role() == UserRole.COACH
+                && !assignmentRepository.canCoachManage(trainingId, user.id())) {
             throw new TrainingNotFoundException(trainingId);
+        } else if (user.role() != UserRole.ADMIN && user.role() != UserRole.COACH) {
+            throw new AccessDeniedException("Training access is required");
         }
 
-        List<TrainingDefinition> definitions =
-                definitionRepository.findAllByTraining_IdOrderBySequenceNumberAsc(trainingId);
+        List<TrainingDefinition> definitions = training.getTrainingType() == TrainingType.TEMPO
+                ? definitionRepository.findAllByTraining_IdOrderBySequenceNumberAsc(trainingId)
+                : List.of();
         List<Long> definitionIds = definitions.stream().map(TrainingDefinition::getId).toList();
         List<TrainingSegment> segments = definitionIds.isEmpty()
                 ? List.of()
                 : segmentRepository
                         .findAllByTrainingDefinition_IdInOrderByTrainingDefinition_IdAscSequenceNumberAsc(
                                 definitionIds);
-        List<AthleteTrainingParticipation> participations =
-                participationRepository.findAllDetailsByTrainingId(trainingId);
+        List<AthleteTrainingParticipation> participations = training.getTrainingType() == TrainingType.TEMPO
+                ? participationRepository.findAllDetailsByTrainingId(trainingId)
+                : List.of();
         List<Long> participationIds = participations.stream()
                 .map(AthleteTrainingParticipation::getId)
                 .toList();
@@ -96,11 +115,13 @@ public class TrainingDetailsService {
                         section.getSequenceNumber()))
                 .toList();
 
-        return toResponse(training, definitions, segments, participations, executions, sections);
+        return toResponse(training, trainingId, user.role(), definitions, segments, participations, executions, sections);
     }
 
     private TrainingDetailsResponse toResponse(
             Training training,
+            long trainingId,
+            UserRole role,
             List<TrainingDefinition> definitions,
             List<TrainingSegment> segments,
             List<AthleteTrainingParticipation> participations,
@@ -164,14 +185,24 @@ public class TrainingDetailsService {
                         List.copyOf(participationsByDefinition.getOrDefault(definition.getId(), List.of()))))
                 .toList();
 
+        List<TrainingAssignedAthleteResponse> assignedAthletes =
+                role == UserRole.ATHLETE
+                        ? List.of()
+                        : assignmentRepository.findAssignedAthletes(trainingId);
+        var trainingGroup = training.getTrainingGroup() == null
+                ? null
+                : new TrainingGroupResponse(
+                        training.getTrainingGroup().getId(),
+                        training.getTrainingGroup().getName());
+
         return new TrainingDetailsResponse(
                 training.getId(),
                 training.getName(),
                 training.getTrainingDate(),
                 training.getStatus(),
-                new TrainingGroupResponse(
-                        training.getTrainingGroup().getId(),
-                        training.getTrainingGroup().getName()),
+                trainingGroup,
+                training.getAssignmentType(),
+                assignedAthletes,
                 definitionResponses,
                 training.getTrainingType(),
                 sections);

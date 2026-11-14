@@ -62,6 +62,22 @@
           }
         </div>
 
+        @if (trainingType() === 'FREE_TEXT') {
+        <div class="field">
+          <label for="training-assignment-type">Sposób przypisania <span aria-hidden="true">*</span></label>
+          <select
+            id="training-assignment-type"
+            class="field-control select-with-arrow"
+            [value]="assignmentType()"
+            (change)="onAssignmentTypeChange($event)"
+          >
+            <option value="GROUP">Cała grupa treningowa</option>
+            <option value="ATHLETES">Wybrani zawodnicy</option>
+          </select>
+        </div>
+        }
+
+        @if (trainingType() === 'TEMPO' || assignmentType() === 'GROUP') {
         <div class="field">
           <label for="training-group">Grupa treningowa <span aria-hidden="true">*</span></label>
           <select
@@ -90,6 +106,33 @@
             <span class="field-error" role="alert">{{ message }}</span>
           }
         </div>
+        }
+
+        @if (trainingType() === 'FREE_TEXT' && assignmentType() === 'ATHLETES') {
+          <div class="field">
+            <span id="training-athletes-label">Zawodnicy <span aria-hidden="true">*</span></span>
+            <app-multi-select-dropdown
+              [options]="athleteOptions()"
+              [selectedIds]="form.controls.athleteIds.value"
+              [label]="'Wybierz zawodników przypisanych do treningu'"
+              [controlId]="'training-athlete-options'"
+              [emptySummary]="'Wybierz co najmniej jednego zawodnika'"
+              [searchable]="true"
+              [searchLabel]="'Szukaj zawodnika'"
+              [searchPlaceholder]="'Wpisz imię lub nazwisko'"
+              (selectedIdsChange)="onAthleteIdsChange($event)"
+            />
+            @if (athletesLoading()) {
+              <span class="field-hint" role="status">Ładowanie aktywnych zawodników...</span>
+            }
+            @if (athletesError(); as message) {
+              <span class="field-error" role="alert">{{ message }}</span>
+            }
+            @if (fieldError(form.controls.athleteIds, 'Wybierz co najmniej jednego zawodnika.', ''); as message) {
+              <span class="field-error">{{ message }}</span>
+            }
+          </div>
+        }
       </div>
     </section>
 
@@ -202,7 +245,6 @@
                     [attr.aria-invalid]="fieldError(segment.controls.restAfterSeconds, '', 'Podaj minuty lub sekundy, np. 5, 1,5 albo 45s.') ? 'true' : null"
                     [attr.aria-describedby]="'segment-rest-hint-' + definitionIndex + '-' + segmentIndex + ' segment-rest-error-' + definitionIndex + '-' + segmentIndex"
                   />
-                  <span class="hint" [id]="'segment-rest-hint-' + definitionIndex + '-' + segmentIndex">Minuty, np. 5 lub 1,5; sekundy, np. 45s; albo 4m 10s.</span>
                   @if (fieldError(segment.controls.restAfterSeconds, '', 'Podaj minuty lub sekundy, np. 5, 1,5 albo 45s.'); as message) {
                     <span class="field-error" [id]="'segment-rest-error-' + definitionIndex + '-' + segmentIndex">{{ message }}</span>
                   }
@@ -294,7 +336,7 @@
                   <div class="field">
                     <label [for]="'section-content-' + sectionIndex">Opis <span aria-hidden="true">*</span></label>
                     <textarea
-                      class="field-control"
+                      class="field-control field-control--auto-grow"
                       rows="4"
                       [id]="'section-content-' + sectionIndex"
                       [formControl]="section.controls.content"

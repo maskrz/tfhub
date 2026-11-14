@@ -21,6 +21,7 @@ import pl.tfhub.api.training.service.FreeTextTrainingService;
 import pl.tfhub.api.training.enums.TrainingType;
 import pl.tfhub.api.training.service.TrainingCreationService;
 import pl.tfhub.api.training.service.TrainingDetailsService;
+import pl.tfhub.api.training.enums.TrainingAssignmentType;
 import pl.tfhub.api.trainingimport.dto.response.TrainingImportAcceptanceResponse;
 import pl.tfhub.api.trainingimport.dto.response.TrainingImportDraftResponse;
 import pl.tfhub.api.trainingimport.dto.response.TrainingImportRejectionResponse;
@@ -82,7 +83,9 @@ public class TrainingImportFinalizationService {
 			CreateTrainingResponse created = freeTextTrainingService.create(new CreateFreeTextTrainingRequest(
 					draft.name(),
 					draft.trainingDate(),
+					TrainingAssignmentType.GROUP,
 					trainingImport.getTrainingGroup().getId(),
+					List.of(),
 					sections));
 			freeTextTrainingService.markCompleted(created.id());
 			trainingImport.accept(created.id());

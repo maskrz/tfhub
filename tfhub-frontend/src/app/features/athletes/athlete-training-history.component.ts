@@ -25,6 +25,7 @@ export class AthleteTrainingHistoryComponent implements OnChanges {
   readonly loaded = signal(false);
   readonly history = signal<AthleteTrainingHistory[]>([]);
   readonly selectedDistances = signal<number[]>([]);
+  readonly expanded = signal(false);
   readonly distances = computed(() => [...new Set(
     this.history().flatMap((training) => training.segments.map((segment) => segment.distanceM)),
   )].sort((a, b) => a - b));
@@ -38,6 +39,7 @@ export class AthleteTrainingHistoryComponent implements OnChanges {
 
   ngOnChanges(): void {
     this.requestId++;
+    this.expanded.set(false);
     this.fromDate.set('');
     this.toDate.set('');
     this.filterError.set(null);
@@ -47,6 +49,10 @@ export class AthleteTrainingHistoryComponent implements OnChanges {
     this.history.set([]);
     this.selectedDistances.set([]);
     this.retryFilters = null;
+  }
+
+  toggleExpanded(): void {
+    this.expanded.update((isExpanded) => !isExpanded);
   }
 
   setDate(event: Event, bound: 'from' | 'to'): void {

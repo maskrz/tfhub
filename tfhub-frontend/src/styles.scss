@@ -51,6 +51,73 @@ button, input { font: inherit; }
   width: 100%;
 }
 
+.field-control--auto-grow {
+  height: auto;
+  line-height: 1.5;
+  max-height: calc(15em + 1.3rem + 2px);
+  min-height: calc(6em + 1.3rem + 2px);
+  overflow-y: auto;
+  resize: vertical;
+}
+
+@supports (field-sizing: content) {
+  .field-control--auto-grow {
+    field-sizing: content;
+    min-height: calc(1.5em + 1.3rem + 2px);
+  }
+}
+
+.athlete-profile-section {
+  background: #fff;
+  border: 1px solid #dfe4eb;
+  border-radius: .8rem;
+  min-width: 0;
+  padding: 1rem;
+}
+
+.athlete-profile-section__toggle {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  border-radius: .45rem;
+  color: #172033;
+  cursor: pointer;
+  display: flex;
+  font: inherit;
+  font-size: 1.2rem;
+  font-weight: 600;
+  justify-content: space-between;
+  padding: .2rem;
+  text-align: left;
+  width: 100%;
+}
+
+.athlete-profile-section__toggle:focus-visible {
+  outline: 3px solid var(--button-focus);
+  outline-offset: 2px;
+}
+
+.athlete-profile-section__icon {
+  border-bottom: 2px solid currentColor;
+  border-right: 2px solid currentColor;
+  flex: 0 0 .65rem;
+  height: .65rem;
+  margin: -.3rem .4rem 0 1rem;
+  transform: rotate(45deg);
+  transition: transform 140ms ease;
+}
+
+.athlete-profile-section__toggle[aria-expanded='true'] .athlete-profile-section__icon {
+  margin-top: .3rem;
+  transform: rotate(225deg);
+}
+
+.athlete-profile-section__content {
+  display: grid;
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
 .field-control:focus-visible {
   border-color: var(--field-border-focus);
   box-shadow: var(--field-focus-shadow);
@@ -198,4 +265,5 @@ button, input { font: inherit; }
 
 @media (prefers-reduced-motion: reduce) {
   .button, .status-toggle, .status-toggle__track, .status-toggle__track::after { transition: none; }
+  .athlete-profile-section__icon { transition: none; }
 }

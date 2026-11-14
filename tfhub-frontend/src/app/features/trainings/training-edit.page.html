@@ -75,7 +75,7 @@
               id="training-group"
               class="field-control"
               type="text"
-              [value]="currentTraining.trainingGroup.name"
+              [value]="currentTraining.trainingGroup?.name ?? ''"
               readonly
               aria-readonly="true"
             />
@@ -182,7 +182,6 @@
                       [attr.aria-invalid]="fieldError(segment.controls.restAfterSeconds, '', 'Podaj minuty lub sekundy, np. 5, 1,5 albo 45s.') ? 'true' : null"
                       [attr.aria-describedby]="'segment-rest-hint-' + definitionIndex + '-' + segmentIndex + ' segment-rest-error-' + definitionIndex + '-' + segmentIndex"
                     />
-                    <span class="hint" [id]="'segment-rest-hint-' + definitionIndex + '-' + segmentIndex">Minuty, np. 5 lub 1,5; sekundy, np. 45s; albo 4m 10s.</span>
                     @if (fieldError(segment.controls.restAfterSeconds, '', 'Podaj minuty lub sekundy, np. 5, 1,5 albo 45s.'); as message) {
                       <span class="field-error" [id]="'segment-rest-error-' + definitionIndex + '-' + segmentIndex">{{ message }}</span>
                     }

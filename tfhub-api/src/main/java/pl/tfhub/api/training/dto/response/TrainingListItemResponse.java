@@ -2,6 +2,7 @@ package pl.tfhub.api.training.dto.response;
 
 import java.time.LocalDate;
 import pl.tfhub.api.training.enums.TrainingStatus;
+import pl.tfhub.api.training.enums.TrainingAssignmentType;
 import pl.tfhub.api.training.enums.TrainingType;
 import pl.tfhub.api.traininggroup.dto.response.TrainingGroupResponse;
 
@@ -13,5 +14,7 @@ public record TrainingListItemResponse(
         long definitionCount,
         long participantCount,
         TrainingStatus status,
-        TrainingType trainingType) {
+        TrainingType trainingType,
+        TrainingAssignmentType assignmentType,
+        long assignedAthleteCount) {
 }

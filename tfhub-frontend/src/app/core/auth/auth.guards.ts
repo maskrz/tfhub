@@ -21,6 +21,17 @@ export const authenticatedGuard: CanActivateFn = (_route, state) => {
   );
 };
 
+export const trainingReadGuard: CanActivateFn = (_route, state) => {
+  const auth = inject(AuthService);
+  const router = inject(Router);
+  return auth.ensureSession().pipe(
+    map((user) => user
+      ? true
+      : router.createUrlTree(['/login'], { queryParams: { returnUrl: state.url } })),
+    catchError(() => of(router.createUrlTree(['/login']))),
+  );
+};
+
 export const homeGuard: CanActivateFn = () => {
   const auth = inject(AuthService);
   const router = inject(Router);

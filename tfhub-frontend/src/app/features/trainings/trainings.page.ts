@@ -46,7 +46,7 @@ export class TrainingsPage implements OnInit {
   readonly groups = computed(() => {
     const groups = new Map<number, string>();
     for (const training of this.allTrainings()) {
-      groups.set(training.trainingGroup.id, training.trainingGroup.name);
+      if (training.trainingGroup) groups.set(training.trainingGroup.id, training.trainingGroup.name);
     }
     return [...groups.entries()]
       .map(([id, name]) => ({ id, name }))
@@ -67,10 +67,12 @@ export class TrainingsPage implements OnInit {
       .filter((training) => {
         if (status && training.status !== status) return false;
         if (trainingType && training.trainingType !== trainingType) return false;
-        if (groupIds.length > 0 && !groupIds.includes(training.trainingGroup.id)) return false;
+        if (groupIds.length > 0
+          && (!training.trainingGroup || !groupIds.includes(training.trainingGroup.id))) return false;
         if (dateFrom && training.trainingDate < dateFrom) return false;
         if (dateTo && training.trainingDate > dateTo) return false;
-        const searchable = `${training.name} ${training.trainingGroup.name}`.toLocaleLowerCase('pl');
+        const searchable = `${training.name} ${training.trainingGroup?.name ?? 'indywidualny'}`
+          .toLocaleLowerCase('pl');
         return terms.every((term) => searchable.includes(term));
       })
       .sort((left, right) => {
@@ -83,8 +85,12 @@ export class TrainingsPage implements OnInit {
         if (this.sortColumn() === 'participants') {
           return (left.participantCount - right.participantCount) * direction;
         }
-        const leftValue = this.sortColumn() === 'name' ? left.name : left.trainingGroup.name;
-        const rightValue = this.sortColumn() === 'name' ? right.name : right.trainingGroup.name;
+        const leftValue = this.sortColumn() === 'name'
+          ? left.name
+          : left.trainingGroup?.name ?? 'indywidualny';
+        const rightValue = this.sortColumn() === 'name'
+          ? right.name
+          : right.trainingGroup?.name ?? 'indywidualny';
         return leftValue.localeCompare(rightValue, 'pl', { sensitivity: 'base', numeric: true }) * direction;
       });
   });
@@ -96,9 +102,14 @@ export class TrainingsPage implements OnInit {
   private importRefreshTimer: ReturnType<typeof setTimeout> | null = null;
   private importRefreshPending = false;
 
+  get canManageTrainings(): boolean {
+    const role = this.auth.currentUser()?.role;
+    return role === 'ADMIN' || role === 'COACH';
+  }
+
   ngOnInit(): void {
     this.loadTrainings();
-    this.refreshImports();
+    if (this.canManageTrainings) this.refreshImports();
     this.destroyRef.onDestroy(() => {
       if (this.importRefreshTimer !== null) clearTimeout(this.importRefreshTimer);
     });
@@ -193,6 +204,7 @@ export class TrainingsPage implements OnInit {
   }
 
   refreshImports(): void {
+    if (!this.canManageTrainings) return;
     if (this.importRefreshTimer !== null) {
       clearTimeout(this.importRefreshTimer);
       this.importRefreshTimer = null;

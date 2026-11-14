@@ -20,6 +20,10 @@ export class AthletesApiService {
     return this.http.post<AthleteResponse[]>('/api/athletes/search', {});
   }
 
+  getActive(): Observable<AthleteResponse[]> {
+    return this.http.post<AthleteResponse[]>('/api/athletes/search', { active: true });
+  }
+
   getById(id: number): Observable<AthleteResponse> {
     return this.http.get<AthleteResponse>(`/api/athletes/${id}`);
   }

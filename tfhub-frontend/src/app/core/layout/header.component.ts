@@ -11,7 +11,7 @@ import { ChangePasswordModalComponent } from '../auth/change-password-modal.comp
   template: `
     <header class="app-header">
       <a class="brand" [routerLink]="user()?.role === 'ATHLETE' ? ['/athletes', user()?.athleteId] : '/dashboard'" aria-label="TFHUB — strona główna">
-        TFHUB<span>.</span>
+        <img src="/tfhub-banner.png" alt="TFHub" />
       </a>
       <button #navigationButton class="navigation-toggle" type="button" aria-controls="main-navigation"
         [attr.aria-expanded]="navigationOpen()" (click)="toggleNavigation()">
@@ -95,14 +95,18 @@ import { ChangePasswordModalComponent } from '../auth/change-password-modal.comp
       position: relative;
     }
     .brand {
+      align-items: center;
       color: inherit;
-      font-size: 1.65rem;
-      font-weight: 750;
-      letter-spacing: -.04em;
+      display: flex;
+      flex: 0 0 auto;
       text-decoration: none;
       white-space: nowrap;
     }
-    .brand span { color: #41bf72; }
+    .brand img {
+      display: block;
+      height: auto;
+      width: clamp(9rem, 16vw, 14rem);
+    }
     .navigation-toggle { display: none; }
     nav {
       align-items: stretch;

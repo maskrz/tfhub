@@ -1,7 +1,7 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component, DestroyRef, OnInit, computed, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { ActivatedRoute } from '@angular/router';
+import { ActivatedRoute, RouterLink } from '@angular/router';
 import { EMPTY, catchError, finalize, forkJoin, take } from 'rxjs';
 import { AthleteFormModalComponent } from './athlete-form-modal.component';
 import { AthleteResponse, Gender } from './athlete.model';
@@ -72,7 +72,7 @@ interface ProfileChart {
 const chartColors = ['#2585d8', '#159c68', '#db8a2f', '#8558c7', '#d55252', '#259da5', '#b64f9a', '#777f31'];
 
 @Component({
-  imports: [AthleteFormModalComponent, ResultFormModalComponent, AthleteTrainingHistoryComponent],
+  imports: [AthleteFormModalComponent, ResultFormModalComponent, AthleteTrainingHistoryComponent, RouterLink],
   selector: 'app-athlete-profile-page',
   styleUrl: './athlete-profile.page.scss',
   templateUrl: './athlete-profile.page.html',
@@ -100,12 +100,14 @@ export class AthleteProfilePage implements OnInit {
   readonly lookupLoading = signal(false);
   readonly lookupError = signal<string | null>(null);
   readonly selectedSeriesIds = signal<number[]>([]);
+  readonly resultsExpanded = signal(false);
   readonly scaleGroupByTestId = signal<Map<number, number>>(new Map());
   readonly chart = computed(() => this.buildChart());
   readonly canEdit = computed(() => {
     const role = this.auth.currentUser()?.role;
     return role === 'ADMIN' || role === 'COACH';
   });
+  readonly canOpenGeneralTrainings = computed(() => this.auth.currentUser()?.role === 'ATHLETE');
   readonly matrixRows = computed(() => {
     const rows = new Map<string, Map<number, MatrixCell[]>>();
     for (const result of this.history()) {
@@ -176,6 +178,7 @@ export class AthleteProfilePage implements OnInit {
           this.selectedTestIds.set([]);
           this.fromDate.set('');
           this.toDate.set('');
+          this.resultsExpanded.set(false);
           this.loadedAthleteId = id;
         }
         this.athleteId = id;
@@ -185,6 +188,10 @@ export class AthleteProfilePage implements OnInit {
 
   genderLabel(gender: Gender): string {
     return gender === 'MALE' ? 'Mężczyzna' : 'Kobieta';
+  }
+
+  toggleResultsSection(): void {
+    this.resultsExpanded.update((expanded) => !expanded);
   }
 
   setTestSelected(testId: number, event: Event): void {

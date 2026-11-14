@@ -10,11 +10,12 @@ The operation must enforce role-based access and training group visibility rules
 
 - **ADMIN** – can retrieve details of any training session.
 - **COACH** – can retrieve details of training sessions belonging to groups currently assigned to that coach.
+- **ATHLETE** – can retrieve only a FREE_TEXT session assigned to the athlete's current group or explicitly assigned to that athlete.
 
 ## 3. Preconditions
 
 - The request is made by an authenticated user.
-- The user has the ADMIN or COACH role.
+- The user has the ADMIN, COACH or ATHLETE role.
 - The training session exists.
 
 ## 4. Business Rules
@@ -28,18 +29,27 @@ The operation must enforce role-based access and training group visibility rules
 ### 4.2 Training Visibility – COACH
 
 - COACH can retrieve a training session only if its group is currently assigned to that coach.
-- A training session belongs to exactly one training group.
+- TEMPO and GROUP-mode FREE_TEXT sessions belong to exactly one group; ATHLETES-mode FREE_TEXT sessions do not have a group.
 - All coaches assigned to the training's group have identical visibility.
 - Visibility does not depend on which coach created the training session.
 - COACH can retrieve both planned and completed training sessions belonging to their assigned groups.
 - A coach who is no longer assigned to the training's group cannot retrieve its details.
+- For ATHLETES-mode FREE_TEXT, a coach can retrieve details only while currently assigned to every selected athlete's current group.
+
+### 4.2.1 Athlete Visibility
+
+- ATHLETE can retrieve FREE_TEXT details only when visible by current group membership (GROUP mode) or explicit athlete assignment (ATHLETES mode).
+- ATHLETE cannot retrieve TEMPO details.
+- An unselected athlete, including one in a selected athlete's group, receives the same not-found result as for a nonexistent training.
+- Athlete responses must not reveal other selected athletes' identities.
 
 ### 4.3 Training Information
 
 The operation must return the complete structure of the training session, including:
 
 - Training identifier, name, date, type and status.
-- Assigned training group.
+- Assignment type and assigned group when applicable; the group is null for ATHLETES mode.
+- Selected athlete identities for authorized ADMIN/COACH users; an ATHLETE response does not disclose other selected athlete identities.
 - For `TEMPO`, all training definitions/segments, athlete participations and execution data.
 - For `FREE_TEXT`, all sections in sequence order, with title and content; no athlete participation or execution data is created or returned.
 
@@ -48,7 +58,7 @@ The response must represent the persisted state of the training session.
 ### 4.4 Athlete Participation and Historical Group
 
 - Athlete participation belongs to the training session, not to the athlete's current group.
-- The training session's assigned group represents the historical group context for all its participants.
+- For TEMPO, the training session's assigned group represents the historical group context for its participants.
 - A later change to an athlete's current group does not modify historical participation or execution data.
 - Current athlete group assignments must not be used to filter historical training details.
 - Authorized coaches can view all participants and execution data belonging to the training session, including athletes who have since moved to another group.
@@ -71,13 +81,17 @@ The response must represent the persisted state of the training session.
 - A training session may have participants without any recorded execution data.
 - The operation must return the training session and its complete planned structure even when no execution data exists.
 - Empty collections must be returned where applicable rather than treating missing related records as an error.
-- `FREE_TEXT` training details are available to authorized ADMIN/COACH users only and must not be exposed through athlete-facing views or APIs.
+- TEMPO details remain available only to authorized ADMIN/COACH users.
 
 ## 5. Authorization Rules
 
-- Only authenticated ADMIN and COACH users may retrieve training details.
+- Only authenticated ADMIN, COACH and ATHLETE users may retrieve training details.
 - ADMIN can retrieve any existing training session.
 - COACH can retrieve a training session only if currently assigned to its group.
+- COACH can retrieve ATHLETES-mode FREE_TEXT only while currently assigned to every selected athlete's current group.
+- ATHLETE can retrieve only visible FREE_TEXT; TEMPO and unassigned FREE_TEXT are inaccessible.
+- COACH can retrieve ATHLETES-mode FREE_TEXT only while currently assigned to every selected athlete's current group.
+- ATHLETE can retrieve only visible FREE_TEXT; TEMPO and unassigned FREE_TEXT are inaccessible.
 - Authorization must be evaluated using the authenticated security context and current coach-to-group assignments.
 - The backend must not rely on client-supplied user identifiers, roles or group assignments.
 - The backend must not filter historical participants using their current group assignments.
@@ -85,9 +99,9 @@ The response must represent the persisted state of the training session.
 ## 6. Validation and Error Scenarios
 
 - **Unauthenticated request:** access is rejected.
-- **User without ADMIN or COACH role:** access is rejected.
+- **User without ADMIN, COACH or ATHLETE role:** access is rejected.
 - **Training session does not exist:** the operation returns an appropriate not-found response.
-- **Training session exists but COACH is not assigned to its group:** the operation returns the same not-found response as for a nonexistent training session.
+- **Training session exists but COACH lacks current group/selected-athlete access:** the operation returns the same not-found response as for a nonexistent training session.
 - **Unexpected server error:** the system reports an appropriate error without exposing internal implementation details.
 
 The backend must not reveal whether an inaccessible training session exists.
@@ -127,7 +141,7 @@ The exact response structure and field types will be defined during API design.
 - A planned training session visible in the standard list must also be accessible through this operation to the same authorized user.
 - Completed training sessions are excluded from the default list but remain accessible through this operation.
 - Historical participation and execution data must remain visible after an athlete changes their current group.
-- The returned training group must represent the immutable group assigned to the training session.
+- The returned group represents the assignment for TEMPO/GROUP-mode FREE_TEXT and is null for ATHLETES-mode FREE_TEXT.
 - The operation must not modify any persisted training data.
 
 ## 10. Out of Scope
@@ -155,4 +169,5 @@ The exact response structure and field types will be defined during API design.
 12. Participants are sorted by last name and then first name.
 13. Empty participant and execution collections are returned normally.
 14. The operation does not modify persisted training data.
-15. Unauthorized users cannot retrieve training details.
+15. ATHLETE can retrieve only assigned FREE_TEXT details, and the response does not disclose other selected athletes.
+16. Unauthorized users cannot retrieve training details.

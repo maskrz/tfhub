@@ -1,7 +1,9 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ActivatedRoute, provideRouter, Router } from '@angular/router';
+import { signal } from '@angular/core';
 import { Observable, Subject, of, throwError } from 'rxjs';
+import { AuthService } from '../../core/auth/auth.service';
 import { TrainingDetails } from './training.model';
 import { TrainingDetailsPage } from './training-details.page';
 import { TrainingsApiService } from './trainings-api.service';
@@ -12,6 +14,8 @@ const training: TrainingDetails = {
   trainingDate: '2026-11-11',
   status: 'PLANNED',
   trainingGroup: { id: 3, name: 'Sprint' },
+  assignmentType: 'GROUP',
+  assignedAthletes: [],
   definitions: [{
     id: 5,
     name: 'Główna',
@@ -61,6 +65,7 @@ describe('TrainingDetailsPage', () => {
   async function createPage(
     loader: () => Observable<TrainingDetails> = () => of(training),
     id = '12',
+    role: 'ADMIN' | 'COACH' | 'ATHLETE' = 'ADMIN',
   ): Promise<void> {
     api = {
       getById: vi.fn(loader),
@@ -73,6 +78,10 @@ describe('TrainingDetailsPage', () => {
         provideRouter([]),
         { provide: ActivatedRoute, useValue: { snapshot: { paramMap: { get: () => id } } } },
         { provide: TrainingsApiService, useValue: api },
+        { provide: AuthService, useValue: { currentUser: signal({
+          authenticated: true, userId: 1, username: role.toLowerCase(), role,
+          athleteId: role === 'ATHLETE' ? 1 : null,
+        }) } },
       ],
     }).compileComponents();
     fixture = TestBed.createComponent(TrainingDetailsPage);
@@ -148,6 +157,23 @@ describe('TrainingDetailsPage', () => {
     fixture.componentInstance.completeFreeTextTraining();
     await fixture.whenStable();
     expect(api.completeFreeText).toHaveBeenCalledWith(12);
+  });
+
+  it('shows assigned FREE_TEXT details to athletes without management actions', async () => {
+    const individual: TrainingDetails = {
+      ...training,
+      trainingType: 'FREE_TEXT',
+      assignmentType: 'ATHLETES',
+      trainingGroup: null,
+      definitions: [],
+      sections: [{ id: 31, title: 'Część główna', content: 'Ćwiczenia biegowe', sequenceNumber: 1 }],
+    };
+    await createPage(() => of(individual), '12', 'ATHLETE');
+
+    expect(fixture.nativeElement.textContent).toContain('Trening przypisany bezpośrednio do Ciebie.');
+    expect(fixture.nativeElement.textContent).toContain('Ćwiczenia biegowe');
+    expect(fixture.nativeElement.querySelector('.training-actions')).toBeNull();
+    expect(fixture.nativeElement.querySelector('.delete-training-button')).toBeNull();
   });
 
   it('displays rest in minutes, seconds and an empty marker', async () => {
@@ -230,6 +256,9 @@ describe('TrainingDetailsPage', () => {
         provideRouter([]),
         { provide: ActivatedRoute, useValue: { snapshot: { paramMap: { get: () => '12' } } } },
         { provide: TrainingsApiService, useValue: api },
+        { provide: AuthService, useValue: { currentUser: signal({
+          authenticated: true, userId: 1, username: 'admin', role: 'ADMIN', athleteId: null,
+        }) } },
       ],
     }).compileComponents();
     fixture = TestBed.createComponent(TrainingDetailsPage);

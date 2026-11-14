@@ -2,14 +2,6 @@
   display: block;
 }
 
-.training-history {
-  background: #fff;
-  border: 1px solid #dfe4e1;
-  border-radius: 0.75rem;
-  margin-top: 1.5rem;
-  padding: 1.25rem;
-}
-
 .date-filters, .actions, .distance-options {
   display: flex;
   flex-wrap: wrap;
@@ -92,10 +84,6 @@ th:first-child {
 }
 
 @media (max-width: 600px) {
-  .training-history {
-    padding: 1rem;
-  }
-
   .date-filters {
     flex-direction: column;
   }

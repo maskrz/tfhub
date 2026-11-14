@@ -126,7 +126,7 @@ export class TrainingCompletePage implements OnInit, OnDestroy {
 
   optionsFor(definitionIndex: number): MultiSelectOption[] {
     const training = this.training();
-    if (!training) return [];
+    if (!training?.trainingGroup) return [];
     const assignedElsewhere = new Set(this.definitions.controls
       .filter((_, index) => index !== definitionIndex)
       .flatMap((definition) => definition.controls.participations.controls
@@ -279,6 +279,10 @@ export class TrainingCompletePage implements OnInit, OnDestroy {
       finalize(() => this.loading.set(false)),
       takeUntilDestroyed(this.destroyRef),
     ).subscribe((training) => {
+      if (training.trainingType !== 'TEMPO' || !training.trainingGroup) {
+        this.loadError.set('Ten trening nie może być uzupełniony.');
+        return;
+      }
       this.training.set(training);
       this.populate(training);
       this.loadAthletes(training.trainingGroup.id);
@@ -378,7 +382,7 @@ export class TrainingCompletePage implements OnInit, OnDestroy {
       }),
       takeUntilDestroyed(this.destroyRef),
     ).subscribe((athletes) => {
-      if (loadId === this.athleteLoadId && this.training()?.trainingGroup.id === groupId) {
+      if (loadId === this.athleteLoadId && this.training()?.trainingGroup?.id === groupId) {
         this.athletes.set(athletes);
       }
     });

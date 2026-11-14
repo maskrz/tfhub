@@ -10,11 +10,12 @@ The operation must enforce role-based access and training group visibility rules
 
 - **ADMIN** – can retrieve all planned training sessions and, when requested, all completed training sessions.
 - **COACH** – can retrieve planned training sessions belonging to groups assigned to that coach and, when requested, completed sessions in those groups.
+- **ATHLETE** – can retrieve only FREE_TEXT sessions assigned to the athlete's current group or explicitly assigned to that athlete.
 
 ## 3. Preconditions
 
 - The request is made by an authenticated user.
-- The user has the ADMIN or COACH role.
+- The user has the ADMIN, COACH or ATHLETE role.
 
 ## 4. Business Rules
 
@@ -30,21 +31,26 @@ The operation must enforce role-based access and training group visibility rules
 - COACH can retrieve a training session only if its assigned training group is currently assigned to that coach.
 - By default, only planned training sessions are returned. When `includeCompleted=true`, completed sessions in assigned groups are also returned.
 - Trainings have type `TEMPO` or `FREE_TEXT`; omitting the type filter returns both.
-- A training session belongs to exactly one training group.
-- A training session without an assigned group is not possible.
+- TEMPO belongs to exactly one group. FREE_TEXT is assigned to either one group or one or more athletes, never both.
 - Visibility does not depend on whether the training session has any participants.
-- All coaches assigned to the training's group have identical visibility.
+- All coaches assigned to a group have identical visibility of its group-assigned sessions.
 - Visibility is based on current coach-to-group assignments, not on which coach created the training session.
+- A coach can view an ATHLETES-mode FREE_TEXT session only while currently assigned to every selected athlete's current group.
 
 ### 4.3 Training and Group Relationships
 
-- Every training session must belong to exactly one training group.
-- The training group assigned to a training session cannot be changed after creation.
+- TEMPO sessions belong to one group. FREE_TEXT sessions use either `GROUP` with one group or `ATHLETES` with one or more explicit athlete targets.
+- TEMPO's group assignment is unchanged; FREE_TEXT assignment can be changed through UC-503.
 - Training sessions for different groups are separate records, even if they have the same name, date and training plan.
 - Athlete participation is separate from training group assignment.
-- Assigning a group to a training session does not automatically assign its athletes.
-- Only athletes belonging to the training's group at the time of assignment can participate in that training session.
+- For TEMPO, assigning a group does not automatically assign its athletes; UC-510 manages participation.
+- GROUP-mode FREE_TEXT visibility follows current group membership. ATHLETES-mode visibility is limited to explicit targets and does not include other group members.
 - A later change to an athlete's group does not change their historical participation in existing training sessions.
+
+### 4.3.1 Athlete Visibility
+
+- ATHLETE list results contain only FREE_TEXT sessions visible through the athlete's current group (GROUP mode) or explicit target row (ATHLETES mode); TEMPO sessions are not included.
+- Athlete accounts can list planned and completed visible FREE_TEXT sessions; `includeCompleted` retains its existing default of false.
 
 ### 4.4 Training Status
 
@@ -71,11 +77,12 @@ The response must include at least:
 - Training name.
 - Training date.
 - Assigned training group, including its identifier and name.
+- Assignment type and, for FREE_TEXT, selected-athlete count. The group is null for ATHLETES mode.
 - Number of training definitions.
 - Number of participating athletes.
 - Training type (`TEMPO` or `FREE_TEXT`).
 
-The number of participating athletes must include all athletes assigned to the training session, regardless of their current training group. FREE_TEXT sessions have zero definitions and participants; they must not create synthetic participation rows.
+The number of participating athletes must include TEMPO participants, regardless of their current training group. FREE_TEXT sessions have no tempo definitions/participations; selected-athlete assignment is not a participation record.
 
 The response must not expose data belonging to unrelated modules or sensitive information.
 
@@ -98,9 +105,10 @@ The response includes the session's status in addition to the identifying and su
 
 ## 8. Authorization Rules
 
-- Only authenticated ADMIN and COACH users may access this operation.
+- Only authenticated ADMIN, COACH and ATHLETE users may access this operation.
 - ADMIN receives all planned training sessions by default, or all sessions when `includeCompleted=true`.
 - COACH receives only sessions belonging to currently assigned groups, with completed sessions included only when `includeCompleted=true`.
+- ATHLETE receives only visible FREE_TEXT sessions; direct assignment is checked by the backend and TEMPO is never returned.
 - The backend must derive the requesting user's identity and permissions from the authenticated security context.
 - The operation must not rely on client-supplied user identifiers or group assignments to determine visibility.
 - Access must not depend on which coach created the training session.
@@ -108,7 +116,7 @@ The response includes the session's status in addition to the identifying and su
 ## 9. Validation and Error Scenarios
 
 - **Unauthenticated request:** access is rejected.
-- **User without ADMIN or COACH role:** access is rejected.
+- **User without ADMIN, COACH or ATHLETE role:** access is rejected.
 - **Invalid `includeCompleted` value:** the request is rejected as an invalid query parameter.
 - **Invalid `trainingType` value:** the request is rejected as an invalid query parameter.
 - **Unexpected server error:** the system reports an appropriate error without exposing internal implementation details.
@@ -128,7 +136,7 @@ If the user has no sessions matching the requested status, the operation returns
 - Group visibility must be evaluated using the current coach-to-group relationships.
 - A coach who is no longer assigned to a training's group must no longer see that training in the standard list.
 - The backend must return each training session only once.
-- The number of participants and definitions must reflect the persisted state of the training session (both are zero for FREE_TEXT).
+- The number of participants and definitions must reflect persisted TEMPO state; FREE_TEXT assignment targets are not participation records.
 
 ## 12. Out of Scope
 
@@ -146,7 +154,7 @@ If the user has no sessions matching the requested status, the operation returns
 2. COACH can retrieve only planned training sessions belonging to groups currently assigned to that coach by default.
 3. All coaches assigned to the same group have identical visibility of its training sessions.
 4. Training visibility does not depend on the number of assigned participants.
-5. A training session belongs to exactly one group.
+5. TEMPO sessions belong to one group; FREE_TEXT sessions have exactly one valid assignment mode.
 6. The response includes the required identifying and summary information.
 7. The participant count includes all participants assigned to the training session, including athletes who have since changed their current group.
 8. Completed training sessions are excluded by default and included only when `includeCompleted=true`.
@@ -155,4 +163,5 @@ If the user has no sessions matching the requested status, the operation returns
 11. No duplicate training sessions are returned.
 12. Each returned item includes its status and type; the optional type filter returns only the selected type, while omission returns both.
 13. An empty collection is returned when no sessions match the requested status and type.
-14. Unauthorized users cannot retrieve the training list.
+14. ATHLETE receives only assigned FREE_TEXT sessions; unselected athletes receive none.
+15. Unauthorized users cannot retrieve the training list.

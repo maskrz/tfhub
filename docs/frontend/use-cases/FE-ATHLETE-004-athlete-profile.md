@@ -25,16 +25,21 @@ Use the athlete ID in the route. Do not rely on the athlete's name as an identif
 The page consists of the following sections, in this order:
 
 1. Athlete information.
-2. Results filters.
-3. Results matrix.
-4. Progress chart.
-5. Running training history.
+2. **Wyniki sprawdzianów** — result filters, matrix and progress chart.
+3. **Wyniki treningów biegowych** — running training history.
+4. **Treningi ogólne** navigation action for ATHLETE accounts only.
 
 Follow the existing TFHUB application layout, shared header, footer, typography, colors, spacing, and component guidelines.
 
 All UI text must be in Polish.
 
+The **Wyniki sprawdzianów** and **Wyniki treningów biegowych** sections use the same card background, border, heading style and spacing. Both start collapsed and expand/collapse from a heading button with a visible chevron icon and correct `aria-expanded`/`aria-controls` state. Their contents are not shown while collapsed.
+
+After both sections, show a **Treningi ogólne** button linking to `/trainings` only when the authenticated user has the `ATHLETE` role. Do not show it to `COACH` or `ADMIN`.
+
 ## Running training history
+
+The section heading is **Wyniki treningów biegowych** and its content follows the shared collapsible section behavior above.
 
 Display a separate history section backed by UC-511. Initially both dates are
 empty and no history is requested. Date changes, quick ranges for the last
@@ -67,7 +72,7 @@ Display:
 - Birth year.
 - Gender.
 - Active/inactive status.
-- Aliases, or a clear empty state if none are configured.
+- Aliases for ADMIN/COACH, or a clear empty state if none are configured. Do not display aliases to ATHLETE accounts.
 
 Actions:
 - **Edytuj zawodnika** — open the existing athlete form in edit mode.

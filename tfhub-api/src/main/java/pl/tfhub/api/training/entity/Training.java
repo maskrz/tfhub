@@ -17,6 +17,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import pl.tfhub.api.training.enums.TrainingStatus;
+import pl.tfhub.api.training.enums.TrainingAssignmentType;
 import pl.tfhub.api.training.enums.TrainingType;
 import pl.tfhub.api.traininggroup.entity.TrainingGroup;
 
@@ -43,9 +44,8 @@ public class Training {
     @Column(name = "training_date", nullable = false)
     private LocalDate trainingDate;
 
-    @NotNull
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "training_group_id", nullable = false,
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "training_group_id", nullable = true,
             foreignKey = @ForeignKey(name = "fk_training_sessions_group"))
     private TrainingGroup trainingGroup;
 
@@ -59,6 +59,11 @@ public class Training {
     @Column(name = "training_type", nullable = false, length = 20)
     private TrainingType trainingType = TrainingType.TEMPO;
 
+    @NotNull
+    @Enumerated(EnumType.STRING)
+    @Column(name = "assignment_type", nullable = false, length = 20)
+    private TrainingAssignmentType assignmentType = TrainingAssignmentType.GROUP;
+
     protected Training() {
     }
 
@@ -71,10 +76,19 @@ public class Training {
             LocalDate trainingDate,
             TrainingGroup trainingGroup,
             TrainingType trainingType) {
+        this(name, trainingDate, trainingGroup, trainingType, TrainingAssignmentType.GROUP);
+    }
+
+    public Training(
+            String name,
+            LocalDate trainingDate,
+            TrainingGroup trainingGroup,
+            TrainingType trainingType,
+            TrainingAssignmentType assignmentType) {
         setName(name);
         this.trainingDate = Objects.requireNonNull(trainingDate);
-        this.trainingGroup = Objects.requireNonNull(trainingGroup);
         this.trainingType = Objects.requireNonNull(trainingType);
+        changeAssignment(assignmentType, trainingGroup);
     }
 
     public void updateDetails(String name, LocalDate trainingDate) {
@@ -84,6 +98,19 @@ public class Training {
 
     public void markCompleted() {
         this.status = TrainingStatus.COMPLETED;
+    }
+
+    public void changeAssignment(TrainingAssignmentType assignmentType, TrainingGroup trainingGroup) {
+        Objects.requireNonNull(assignmentType);
+        if (assignmentType == TrainingAssignmentType.GROUP) {
+            this.trainingGroup = Objects.requireNonNull(trainingGroup);
+        } else {
+            if (trainingType != TrainingType.FREE_TEXT || trainingGroup != null) {
+                throw new IllegalArgumentException("Only FREE_TEXT trainings can be assigned to athletes");
+            }
+            this.trainingGroup = null;
+        }
+        this.assignmentType = assignmentType;
     }
 
     private void setName(String name) {
@@ -115,5 +142,9 @@ public class Training {
 
     public TrainingType getTrainingType() {
         return trainingType;
+    }
+
+    public TrainingAssignmentType getAssignmentType() {
+        return assignmentType;
     }
 }

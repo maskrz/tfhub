@@ -5,16 +5,19 @@ export interface TrainingGroupSummary {
 
 export type TrainingStatus = 'PLANNED' | 'COMPLETED';
 export type TrainingType = 'TEMPO' | 'FREE_TEXT';
+export type TrainingAssignmentType = 'GROUP' | 'ATHLETES';
 
 export interface TrainingListItem {
   id: number;
   name: string;
   trainingDate: string;
-  trainingGroup: TrainingGroupSummary;
+  trainingGroup: TrainingGroupSummary | null;
   definitionCount: number;
   participantCount: number;
   status: TrainingStatus;
   trainingType: TrainingType;
+  assignmentType: TrainingAssignmentType;
+  assignedAthleteCount: number;
 }
 
 export interface CreateTrainingSegmentRequest {
@@ -49,13 +52,18 @@ export interface EditTrainingSectionRequest extends CreateTrainingSectionRequest
 export interface CreateFreeTextTrainingRequest {
   name: string;
   trainingDate: string;
-  trainingGroupId: number;
+  assignmentType: TrainingAssignmentType;
+  trainingGroupId: number | null;
+  athleteIds: number[];
   sections: CreateTrainingSectionRequest[];
 }
 
 export interface EditFreeTextTrainingRequest {
   name: string;
   trainingDate: string;
+  assignmentType: TrainingAssignmentType;
+  trainingGroupId: number | null;
+  athleteIds: number[];
   sections: EditTrainingSectionRequest[];
 }
 
@@ -108,12 +116,20 @@ export interface TrainingSectionDetails {
   sequenceNumber: number;
 }
 
+export interface TrainingAssignedAthlete {
+  id: number;
+  firstName: string;
+  lastName: string;
+}
+
 export interface TrainingDetails {
   id: number;
   name: string;
   trainingDate: string;
   status: TrainingStatus;
-  trainingGroup: TrainingGroupSummary;
+  trainingGroup: TrainingGroupSummary | null;
+  assignmentType: TrainingAssignmentType;
+  assignedAthletes: TrainingAssignedAthlete[];
   definitions: TrainingDefinitionDetails[];
   trainingType: TrainingType;
   sections: TrainingSectionDetails[];

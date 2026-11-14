@@ -195,6 +195,20 @@ public class AthleteService {
 				.toList();
 	}
 
+	@Transactional(readOnly = true)
+	public void validateActiveTrainingAssignees(List<Long> athleteIds) {
+		accessScopeService.requireCoachOrAdmin();
+		Set<Long> activeIds = athleteRepository.findAllByIdInAndActiveTrue(athleteIds).stream()
+				.map(Athlete::getId)
+				.collect(Collectors.toSet());
+		for (Long athleteId : athleteIds) {
+			if (!activeIds.contains(athleteId)) {
+				throw new AthleteNotFoundException(athleteId);
+			}
+			accessScopeService.requireAthleteWriteAccess(athleteId);
+		}
+	}
+
 	private Map<Long, List<String>> aliasesFor(List<Athlete> athletes) {
 		List<Long> ids = athletes.stream().map(Athlete::getId).filter(java.util.Objects::nonNull).toList();
 		if (ids.isEmpty()) {

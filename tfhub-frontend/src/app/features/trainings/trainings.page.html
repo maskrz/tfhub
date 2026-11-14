@@ -150,7 +150,7 @@
             </th>
             <th scope="col" [attr.aria-sort]="sortColumn() === 'group' ? (sortDirection() === 'asc' ? 'ascending' : 'descending') : 'none'">
               <button type="button" class="sort-button" (click)="sortBy('group')">
-                Grupa treningowa
+                Przypisanie
                 <span class="sort-indicator" [class.active]="sortColumn() === 'group'" aria-hidden="true">
                   {{ sortColumn() === 'group' ? (sortDirection() === 'asc' ? '↑' : '↓') : '↕' }}
                 </span>
@@ -165,7 +165,9 @@
               </button>
             </th>
             <th scope="col">Status</th>
-            <th scope="col" aria-label="Akcje"></th>
+            @if (canManageTrainings) {
+              <th scope="col" aria-label="Akcje"></th>
+            }
           </tr>
         </thead>
         <tbody>
@@ -226,13 +228,22 @@
                 </span>
               </td>
               <td data-label="Data">{{ formatDate(training.trainingDate) }}</td>
-              <td data-label="Grupa treningowa">{{ training.trainingGroup.name }}</td>
+              <td data-label="Przypisanie">
+                @if (training.assignmentType === 'GROUP') {
+                  {{ training.trainingGroup?.name ?? '—' }}
+                } @else if (canManageTrainings) {
+                  Zawodnicy: {{ training.assignedAthleteCount }}
+                } @else {
+                  Trening indywidualny
+                }
+              </td>
               <td data-label="Liczba uczestników">{{ training.trainingType === 'TEMPO' ? training.participantCount : '—' }}</td>
               <td data-label="Status">
                 <span class="status-badge" [class.status-badge--completed]="training.status === 'COMPLETED'">
                   {{ training.status === 'COMPLETED' ? 'Zakończony' : 'Planowany' }}
                 </span>
               </td>
+              @if (canManageTrainings) {
               <td data-label="Akcje" class="training-actions">
                 <div class="training-action-buttons">
                   <a
@@ -257,6 +268,7 @@
                   >Usuń</button>
                 </div>
               </td>
+              }
             </tr>
           }
         </tbody>

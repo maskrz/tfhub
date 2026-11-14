@@ -37,6 +37,14 @@ describe('HeaderComponent', () => {
     fixture.detectChanges();
   });
 
+  it('shows the selected TFHub banner image as the home link branding', () => {
+    const brand = fixture.nativeElement.querySelector('.brand') as HTMLAnchorElement;
+    const image = brand.querySelector('img') as HTMLImageElement;
+    expect(brand.getAttribute('aria-label')).toBe('TFHUB — strona główna');
+    expect(image.getAttribute('src')).toBe('/tfhub-banner.png');
+    expect(image.getAttribute('alt')).toBe('TFHub');
+  });
+
   it('opens and closes the account menu when the username is clicked', () => {
     const username = fixture.nativeElement.querySelector('.username') as HTMLButtonElement;
 

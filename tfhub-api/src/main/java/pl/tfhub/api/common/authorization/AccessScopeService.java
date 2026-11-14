@@ -119,6 +119,26 @@ public class AccessScopeService {
 		}
 	}
 
+	public long currentAthleteId() {
+		AuthenticatedUser user = currentUser();
+		if (user.role() != UserRole.ATHLETE) {
+			throw new AccessDeniedException("Athlete account access is required");
+		}
+		List<Long> athleteIds = jdbcClient.sql("""
+						SELECT athlete_id
+						FROM user_athlete_access
+						WHERE user_id = :userId
+						ORDER BY athlete_id
+						""")
+				.param("userId", user.id())
+				.query(Long.class)
+				.list();
+		if (athleteIds.size() != 1) {
+			throw new AccessDeniedException("Athlete account must be linked to exactly one athlete");
+		}
+		return athleteIds.getFirst();
+	}
+
 	public void requireAthleteWriteAccess(long athleteId) {
 		UserRole role = currentUser().role();
 		if (role == UserRole.ATHLETE) {

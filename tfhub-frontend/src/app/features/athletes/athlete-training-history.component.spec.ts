@@ -50,9 +50,18 @@ describe('AthleteTrainingHistoryComponent', () => {
 
   afterEach(() => vi.useRealTimers());
 
+  function expandSection(): void {
+    const button = fixture.nativeElement.querySelector('.athlete-profile-section__toggle') as HTMLButtonElement;
+    button.click();
+    fixture.detectChanges();
+  }
+
   it('starts unloaded, changes dates without requests, and fetches only on action', () => {
     expect(api.getTrainingHistory).not.toHaveBeenCalled();
+    expect(fixture.nativeElement.querySelector('.athlete-profile-section__toggle')?.getAttribute('aria-expanded'))
+      .toBe('false');
     expect(fixture.nativeElement.querySelector('.distance-picker')).toBeNull();
+    expandSection();
     component.fromDate.set('2026-01-01');
     component.toDate.set('2026-11-11');
     expect(api.getTrainingHistory).not.toHaveBeenCalled();
@@ -89,6 +98,7 @@ describe('AthleteTrainingHistoryComponent', () => {
   });
 
   it('renders statuses, precision, spikes, accessible pending and authorized links', () => {
+    expandSection();
     component.load();
     fixture.detectChanges();
     const element = fixture.nativeElement as HTMLElement;
@@ -114,6 +124,7 @@ describe('AthleteTrainingHistoryComponent', () => {
   });
 
   it('filters repeated distances without renumbering and preserves rows when none are selected', () => {
+    expandSection();
     component.load();
     fixture.detectChanges();
     expect(component.selectedDistances()).toEqual([200, 300]);
@@ -144,6 +155,7 @@ describe('AthleteTrainingHistoryComponent', () => {
   });
 
   it('shows loading and empty results and ignores a response for a previous athlete', () => {
+    expandSection();
     const pending = new Subject<AthleteTrainingHistory[]>();
     api.getTrainingHistory.mockReturnValueOnce(pending);
     component.load();
@@ -153,6 +165,7 @@ describe('AthleteTrainingHistoryComponent', () => {
     pending.next(history);
     expect(component.loaded()).toBe(false);
     api.getTrainingHistory.mockReturnValueOnce(of([]));
+    expandSection();
     component.load();
     fixture.detectChanges();
     expect(component.loaded()).toBe(true);

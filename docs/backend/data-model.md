@@ -15,7 +15,7 @@ The application data model consists of athlete, test, result, user, training-gro
 - `TestResult` – a recorded result of an athlete performing a test.
 - `User` – login account, role, and active status.
 - `TrainingGroup` – current athlete group and coach access scope.
-- `Training` – a persisted session belonging to exactly one training group, with definitions, segments, athlete participations, and segment executions.
+- `Training` – a persisted session with TEMPO group assignment or FREE_TEXT group/individual-athlete assignment, plus type-specific training data.
 
 There is no public registration or account-management UI. Administrators manage accounts through the authenticated backend API; training-group and athlete CRUD remain separate use cases.
 
@@ -41,8 +41,15 @@ erDiagram
 
     TRAINING_SESSIONS {
         bigint id PK
-        bigint training_group_id FK
+        bigint training_group_id FK "nullable for ATHLETES mode"
+        varchar training_type
+        varchar assignment_type
         varchar status
+    }
+
+    TRAINING_SESSION_ATHLETES {
+        bigint training_session_id FK
+        bigint athlete_id FK
     }
 
     USER_TRAINING_GROUP {
@@ -56,7 +63,9 @@ erDiagram
     }
 
     TRAINING_GROUPS ||--o{ ATHLETES : contains
-    TRAINING_GROUPS ||--o{ TRAINING_SESSIONS : owns
+    TRAINING_GROUPS o|--o{ TRAINING_SESSIONS : group_assignment
+    TRAINING_SESSIONS ||--o{ TRAINING_SESSION_ATHLETES : targets
+    ATHLETES ||--o{ TRAINING_SESSION_ATHLETES : selected_for
     USERS }o--o{ TRAINING_GROUPS : coaches
     USERS }o--o{ ATHLETES : athlete_access
     ATHLETES ||--o{ TEST_RESULTS : has
@@ -290,6 +299,10 @@ No separate Competition entity is required initially.
 ## 7 Training Session Status
 
 Each persisted training session has a required `training_type` column stored as `VARCHAR(20)`, constrained to `TEMPO` or `FREE_TEXT`. The Java enum values match. V13 defaults and backfills existing sessions to `TEMPO`; training type is immutable after creation.
+
+Training assignment is stored separately from type. TEMPO sessions always use `assignment_type = GROUP` and require `training_group_id`. FREE_TEXT sessions use either `GROUP` with one required group or `ATHLETES` with a null group and one or more rows in `training_session_athletes`. V16 defaults/backfills existing sessions to GROUP and preserves their group IDs. The row-level database checks reject invalid type/mode/group combinations; transactional service validation requires a non-empty, duplicate-free list of active athletes for ATHLETES mode and no athlete links for GROUP mode.
+
+GROUP-mode FREE_TEXT visibility follows the athlete's current `athletes.training_group_id`, so changing group membership changes visibility immediately. ATHLETES-mode visibility is limited to the explicit `training_session_athletes` rows and does not change when those athletes move groups. Coaches can manage an athlete-assigned FREE_TEXT session only while currently assigned to every selected athlete's current group; administrators retain their existing access. Athlete accounts can list and retrieve only FREE_TEXT trainings visible through one of these assignment rules. TEMPO visibility is unchanged.
 
 Each persisted training session also has a required `status` column stored as `VARCHAR(20)`, defaulting to `PLANNED` and constrained to `PLANNED` or `COMPLETED`. The Java enum values match. Sessions created directly start as `PLANNED`; accepting an import atomically creates a `COMPLETED` session. The first successful UC-510 save changes a TEMPO session to `COMPLETED`, even when some segment executions remain `PENDING`; failed saves do not change it. A FREE_TEXT session may be marked completed without creating athlete participation records.
 

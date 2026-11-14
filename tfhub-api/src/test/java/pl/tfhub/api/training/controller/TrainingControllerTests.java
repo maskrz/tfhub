@@ -17,6 +17,7 @@ import pl.tfhub.api.training.dto.response.UpdateTrainingResponse;
 import pl.tfhub.api.training.dto.request.CreateFreeTextTrainingRequest;
 import pl.tfhub.api.training.dto.request.EditFreeTextTrainingRequest;
 import pl.tfhub.api.training.enums.TrainingStatus;
+import pl.tfhub.api.training.enums.TrainingAssignmentType;
 import pl.tfhub.api.training.enums.TrainingType;
 import pl.tfhub.api.training.service.TrainingCreationService;
 import pl.tfhub.api.training.service.TrainingCompletionService;
@@ -107,7 +108,9 @@ class TrainingControllerTests {
                                 {
                                   "name": "Trening ogólny",
                                   "trainingDate": "2026-11-10",
+                                  "assignmentType": "GROUP",
                                   "trainingGroupId": 3,
+                                  "athleteIds": [],
                                   "sections": [
                                     {"title": "Rozgrzewka", "content": "Trucht 10 minut", "sequenceNumber": 1}
                                   ]
@@ -126,7 +129,9 @@ class TrainingControllerTests {
                                 {
                                   "name": "Trening ogólny",
                                   "trainingDate": "2026-11-10",
+                                  "assignmentType": "GROUP",
                                   "trainingGroupId": 3,
+                                  "athleteIds": [],
                                   "sections": []
                                 }
                                 """))
@@ -228,6 +233,8 @@ class TrainingControllerTests {
                         LocalDate.parse("2026-11-10"),
                         TrainingStatus.PLANNED,
                         new TrainingGroupResponse(3, "Group A"),
+                        TrainingAssignmentType.GROUP,
+                        List.of(),
                         List.of(),
                         TrainingType.TEMPO,
                         List.of()));
@@ -241,6 +248,8 @@ class TrainingControllerTests {
                           "trainingDate": "2026-11-10",
                           "status": "PLANNED",
                           "trainingGroup": {"id": 3, "name": "Group A"},
+                          "assignmentType": "GROUP",
+                          "assignedAthletes": [],
                           "definitions": [],
                           "trainingType": "TEMPO",
                           "sections": []
@@ -264,7 +273,7 @@ class TrainingControllerTests {
         when(trainingQueryService.listTrainings(false, null)).thenReturn(List.of(
                 new TrainingListItemResponse(7, "Intervals", LocalDate.parse("2026-11-10"),
                         new TrainingGroupResponse(3, "Group A"), 2, 12,
-                        TrainingStatus.PLANNED, TrainingType.TEMPO)));
+                        TrainingStatus.PLANNED, TrainingType.TEMPO, TrainingAssignmentType.GROUP, 0)));
 
         mockMvc.perform(get("/api/trainings"))
                 .andExpect(status().isOk())
@@ -277,7 +286,9 @@ class TrainingControllerTests {
                           "definitionCount": 2,
                           "participantCount": 12,
                           "status": "PLANNED",
-                          "trainingType": "TEMPO"
+                          "trainingType": "TEMPO",
+                          "assignmentType": "GROUP",
+                          "assignedAthleteCount": 0
                         }]
                         """, true));
 
@@ -289,7 +300,7 @@ class TrainingControllerTests {
         when(trainingQueryService.listTrainings(true, null)).thenReturn(List.of(
                 new TrainingListItemResponse(8, "Archived", LocalDate.parse("2026-11-09"),
                         new TrainingGroupResponse(3, "Group A"), 1, 4,
-                        TrainingStatus.COMPLETED, TrainingType.TEMPO)));
+                        TrainingStatus.COMPLETED, TrainingType.TEMPO, TrainingAssignmentType.GROUP, 0)));
 
         mockMvc.perform(get("/api/trainings").param("includeCompleted", "true"))
                 .andExpect(status().isOk())
@@ -302,7 +313,9 @@ class TrainingControllerTests {
                           "definitionCount": 1,
                           "participantCount": 4,
                           "status": "COMPLETED",
-                          "trainingType": "TEMPO"
+                          "trainingType": "TEMPO",
+                          "assignmentType": "GROUP",
+                          "assignedAthleteCount": 0
                         }]
                         """, true));
 

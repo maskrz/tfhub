@@ -9,7 +9,7 @@ Deletion cannot be undone through the application and requires explicit confirma
 ## 2. Actors and Preconditions
 
 - **ADMIN** – can delete any accessible training.
-- **COACH** – can delete a training only while currently assigned to its group.
+- **COACH** – can delete a group-assigned training only while currently assigned to its group, and an ATHLETES-mode FREE_TEXT training only while currently assigned to every selected athlete's group.
 - The user is authenticated.
 - Backend UC-505 is available.
 - The training is accessible through the training list or details view.

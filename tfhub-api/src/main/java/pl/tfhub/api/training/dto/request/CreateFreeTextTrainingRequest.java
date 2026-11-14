@@ -9,12 +9,16 @@ import jakarta.validation.constraints.Size;
 import java.time.LocalDate;
 import java.util.List;
 import pl.tfhub.api.common.validation.StrictLongDeserializer;
+import pl.tfhub.api.training.enums.TrainingAssignmentType;
 import tools.jackson.databind.annotation.JsonDeserialize;
 
 public record CreateFreeTextTrainingRequest(
         @NotBlank @Size(max = 255) String name,
         @NotNull LocalDate trainingDate,
-        @NotNull @Positive @JsonDeserialize(using = StrictLongDeserializer.class) Long trainingGroupId,
+        @NotNull TrainingAssignmentType assignmentType,
+        @Positive @JsonDeserialize(using = StrictLongDeserializer.class) Long trainingGroupId,
+        @JsonDeserialize(contentUsing = StrictLongDeserializer.class)
+        List<@NotNull @Positive Long> athleteIds,
         @NotEmpty List<@NotNull @Valid CreateTrainingSectionRequest> sections) {
 
     public CreateFreeTextTrainingRequest {

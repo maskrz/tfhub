@@ -4,7 +4,7 @@ import { AthleteProfilePage } from './features/athletes/athlete-profile.page';
 import { DashboardPage } from './features/dashboard/dashboard.page';
 import { ResultsPage } from './features/results/results.page';
 import { TestManagementPage } from './features/tests/test-management.page';
-import { adminGuard, authenticatedGuard, homeGuard, staffGuard } from './core/auth/auth.guards';
+import { adminGuard, authenticatedGuard, homeGuard, staffGuard, trainingReadGuard } from './core/auth/auth.guards';
 import { LoginPage } from './core/auth/login.page';
 
 export const routes: Routes = [
@@ -36,7 +36,7 @@ export const routes: Routes = [
   {
     path: 'trainings/:id',
     loadComponent: () => import('./features/trainings/training-details.page').then((module) => module.TrainingDetailsPage),
-    canActivate: [staffGuard],
+    canActivate: [trainingReadGuard],
     title: 'Szczegóły treningu',
   },
   {
@@ -60,7 +60,7 @@ export const routes: Routes = [
   {
     path: 'trainings',
     loadComponent: () => import('./features/trainings/trainings.page').then((module) => module.TrainingsPage),
-    canActivate: [staffGuard],
+    canActivate: [trainingReadGuard],
     title: 'Treningi',
   },
   { path: '**', redirectTo: 'dashboard' },

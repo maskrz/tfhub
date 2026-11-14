@@ -21,6 +21,9 @@
     <form [formGroup]="form" (ngSubmit)="submit()" novalidate>
       <section class="form-section" aria-labelledby="training-details-heading">
         <h2 id="training-details-heading">Dane treningu</h2>
+        @if (assignmentError(); as message) {
+          <p class="form-error" role="alert">{{ message }}</p>
+        }
         <div class="details-grid">
           <div class="field">
             <label for="training-name">Nazwa <span aria-hidden="true">*</span></label>
@@ -37,9 +40,61 @@
             }
           </div>
           <div class="field">
-            <label for="training-group">Grupa treningowa</label>
-            <input id="training-group" class="field-control" type="text" [value]="training()?.trainingGroup?.name" readonly />
+            <label for="training-assignment-type">Sposób przypisania <span aria-hidden="true">*</span></label>
+            <select
+              id="training-assignment-type"
+              class="field-control select-with-arrow"
+              [value]="assignmentType()"
+              (change)="onAssignmentTypeChange($event)"
+            >
+              <option value="GROUP">Cała grupa treningowa</option>
+              <option value="ATHLETES">Wybrani zawodnicy</option>
+            </select>
           </div>
+          @if (assignmentType() === 'GROUP') {
+            <div class="field">
+              <label for="training-group">Grupa treningowa <span aria-hidden="true">*</span></label>
+              <select
+                id="training-group"
+                class="field-control select-with-arrow"
+                [value]="form.controls.trainingGroupId.value ?? ''"
+                [disabled]="groupsLoading() || groups().length === 0"
+                (change)="onGroupChange($event)"
+              >
+                <option value="" disabled>Wybierz grupę</option>
+                @for (group of groups(); track group.id) {
+                  <option [value]="group.id">{{ group.name }}</option>
+                }
+              </select>
+              @if (groupsLoading()) {
+                <span class="field-hint" role="status">Ładowanie grup treningowych...</span>
+              }
+              @if (attemptedSubmit() && form.controls.trainingGroupId.hasError('required')) {
+                <span class="field-error">Wybierz grupę treningową.</span>
+              }
+            </div>
+          } @else {
+            <div class="field">
+              <span id="training-athletes-label">Zawodnicy <span aria-hidden="true">*</span></span>
+              <app-multi-select-dropdown
+                [options]="athleteOptions()"
+                [selectedIds]="form.controls.athleteIds.value"
+                [label]="'Wybierz zawodników przypisanych do treningu'"
+                [controlId]="'training-athlete-options'"
+                [emptySummary]="'Wybierz co najmniej jednego zawodnika'"
+                [searchable]="true"
+                [searchLabel]="'Szukaj zawodnika'"
+                [searchPlaceholder]="'Wpisz imię lub nazwisko'"
+                (selectedIdsChange)="onAthleteIdsChange($event)"
+              />
+              @if (athletesLoading()) {
+                <span class="field-hint" role="status">Ładowanie aktywnych zawodników...</span>
+              }
+              @if (attemptedSubmit() && form.controls.athleteIds.hasError('minlength')) {
+                <span class="field-error">Wybierz co najmniej jednego zawodnika.</span>
+              }
+            </div>
+          }
         </div>
       </section>
 
@@ -80,7 +135,7 @@
             </div>
             <div class="field">
               <label [for]="'section-content-' + sectionIndex">Opis <span aria-hidden="true">*</span></label>
-              <textarea class="field-control" rows="4" [id]="'section-content-' + sectionIndex" [formControl]="section.controls.content"></textarea>
+              <textarea class="field-control field-control--auto-grow" rows="4" [id]="'section-content-' + sectionIndex" [formControl]="section.controls.content"></textarea>
               @if (fieldError(section.controls.content, 'Wpisz opis sekcji.', ''); as message) {
                 <span class="field-error">{{ message }}</span>
               }

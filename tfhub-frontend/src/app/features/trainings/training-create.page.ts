@@ -1,10 +1,13 @@
 import { HttpErrorResponse } from '@angular/common/http';
-import { Component, DestroyRef, OnInit, inject, signal } from '@angular/core';
+import { Component, DestroyRef, OnInit, computed, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { AbstractControl, FormArray, FormControl, FormGroup, ReactiveFormsModule, ValidatorFn, Validators } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { EMPTY, catchError, finalize, take } from 'rxjs';
 import { AuthService } from '../../core/auth/auth.service';
+import { AthleteResponse } from '../athletes/athlete.model';
+import { AthletesApiService } from '../athletes/athletes-api.service';
+import { MultiSelectDropdownComponent, MultiSelectOption } from '../../shared/multi-select-dropdown.component';
 import { TrainingGroup, TrainingGroupsApiService } from '../training-groups/training-groups-api.service';
 import {
   CreateFreeTextTrainingRequest,
@@ -13,6 +16,7 @@ import {
   CreateTrainingResponse,
   CreateTrainingSectionRequest,
   TrainingType,
+  TrainingAssignmentType,
 } from './training.model';
 import { parseRestDuration } from './training-rest-time';
 import { TrainingsApiService } from './trainings-api.service';
@@ -94,15 +98,23 @@ function createTrainingSectionForm(): TrainingSectionForm {
 }
 
 @Component({
-  imports: [ReactiveFormsModule, RouterLink],
+  imports: [ReactiveFormsModule, RouterLink, MultiSelectDropdownComponent],
   selector: 'app-training-create-page',
   styleUrl: './training-create.page.scss',
   templateUrl: './training-create.page.html',
 })
 export class TrainingCreatePage implements OnInit {
   readonly trainingType = signal<TrainingType>('TEMPO');
+  readonly assignmentType = signal<TrainingAssignmentType>('GROUP');
   readonly groups = signal<TrainingGroup[]>([]);
+  readonly athletes = signal<AthleteResponse[]>([]);
+  readonly athleteOptions = computed<MultiSelectOption[]>(() => this.athletes().map((athlete) => ({
+    id: athlete.id,
+    name: `${athlete.firstName} ${athlete.lastName}`,
+  })));
   readonly groupsLoading = signal(false);
+  readonly athletesLoading = signal(false);
+  readonly athletesError = signal<string | null>(null);
   readonly submitting = signal(false);
   readonly attemptedSubmit = signal(false);
   readonly errorMessage = signal<string | null>(null);
@@ -117,11 +129,16 @@ export class TrainingCreatePage implements OnInit {
       validators: [Validators.required, validDate],
     }),
     trainingGroupId: new FormControl<number | null>(null, Validators.required),
+    athleteIds: new FormControl<number[]>({ value: [], disabled: true }, {
+      nonNullable: true,
+      validators: [Validators.minLength(1)],
+    }),
     definitions: new FormArray<DefinitionForm>([createDefinitionForm()]),
   });
   readonly sections = new FormArray<TrainingSectionForm>([createTrainingSectionForm()]);
 
   readonly auth = inject(AuthService);
+  private readonly athletesApi = inject(AthletesApiService);
   private readonly groupsApi = inject(TrainingGroupsApiService);
   private readonly trainingsApi = inject(TrainingsApiService);
   private readonly router = inject(Router);
@@ -143,12 +160,30 @@ export class TrainingCreatePage implements OnInit {
     const trainingType = select.value as TrainingType;
     this.trainingType.set(trainingType);
     if (trainingType === 'TEMPO') {
+      this.setAssignmentType('GROUP');
+    } else {
+      this.loadActiveAthletes();
+    }
+    if (trainingType === 'TEMPO') {
       this.definitions.enable({ emitEvent: false });
       this.definitions.setValidators(Validators.minLength(1));
     } else {
       this.definitions.disable({ emitEvent: false });
     }
     this.definitions.updateValueAndValidity();
+  }
+
+  onAssignmentTypeChange(event: Event): void {
+    const select = event.target;
+    if (!(select instanceof HTMLSelectElement)) return;
+    if (select.value !== 'GROUP' && select.value !== 'ATHLETES') return;
+    this.setAssignmentType(select.value);
+    if (select.value === 'ATHLETES') this.loadActiveAthletes();
+  }
+
+  onAthleteIdsChange(athleteIds: number[]): void {
+    this.form.controls.athleteIds.setValue(athleteIds);
+    this.form.controls.athleteIds.markAsTouched();
   }
 
   onGroupChange(event: Event): void {
@@ -224,6 +259,7 @@ export class TrainingCreatePage implements OnInit {
   ): string | null {
     if (!this.attemptedSubmit() || control.valid) return null;
     if (control.hasError('required')) return requiredMessage;
+    if (control.hasError('minlength')) return requiredMessage;
     if (control.hasError('min') || control.hasError('max') || control.hasError('integer')) {
       return invalidMessage;
     }
@@ -313,9 +349,45 @@ export class TrainingCreatePage implements OnInit {
     return {
       name: value.name.trim(),
       trainingDate: value.trainingDate,
-      trainingGroupId: value.trainingGroupId!,
+      assignmentType: this.assignmentType(),
+      trainingGroupId: this.assignmentType() === 'GROUP' ? value.trainingGroupId : null,
+      athleteIds: this.assignmentType() === 'ATHLETES' ? value.athleteIds : [],
       sections,
     };
+  }
+
+  private setAssignmentType(assignmentType: TrainingAssignmentType): void {
+    this.assignmentType.set(assignmentType);
+    const groupControl = this.form.controls.trainingGroupId;
+    const athleteControl = this.form.controls.athleteIds;
+    athleteControl.setValue([]);
+    if (assignmentType === 'GROUP') {
+      groupControl.enable({ emitEvent: false });
+      groupControl.setValidators([Validators.required]);
+      athleteControl.disable({ emitEvent: false });
+    } else {
+      groupControl.setValue(null, { emitEvent: false });
+      groupControl.clearValidators();
+      groupControl.disable({ emitEvent: false });
+      athleteControl.enable({ emitEvent: false });
+    }
+    groupControl.updateValueAndValidity({ emitEvent: false });
+    athleteControl.updateValueAndValidity({ emitEvent: false });
+  }
+
+  private loadActiveAthletes(): void {
+    if (this.athletesLoading() || this.athletes().length > 0) return;
+    this.athletesLoading.set(true);
+    this.athletesError.set(null);
+    this.athletesApi.getActive().pipe(
+      take(1),
+      catchError((error: unknown) => {
+        this.athletesError.set(this.getResourceError(error, 'aktywnych zawodników'));
+        return EMPTY;
+      }),
+      finalize(() => this.athletesLoading.set(false)),
+      takeUntilDestroyed(this.destroyRef),
+    ).subscribe((athletes) => this.athletes.set(athletes));
   }
 
   private getResourceError(error: unknown, resource: string): string {

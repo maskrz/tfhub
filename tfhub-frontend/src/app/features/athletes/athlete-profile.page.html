@@ -16,7 +16,9 @@
         <div class="athlete-details">
           <h2>{{ currentAthlete.firstName }} {{ currentAthlete.lastName }}</h2>
           <p>Rocznik {{ currentAthlete.birthYear }} · {{ genderLabel(currentAthlete.gender) }}</p>
-          <p>Aliasy: {{ currentAthlete.aliases?.length ? currentAthlete.aliases?.join(', ') : 'brak' }}</p>
+          @if (canEdit()) {
+            <p>Aliasy: {{ currentAthlete.aliases?.length ? currentAthlete.aliases?.join(', ') : 'brak' }}</p>
+          }
           <span class="status-badge" [class.status-badge--inactive]="!currentAthlete.active">
             {{ currentAthlete.active ? 'Aktywny' : 'Nieaktywny' }}
           </span>
@@ -43,11 +45,21 @@
       }
     </section>
 
-    <section class="history-filters" aria-labelledby="history-heading">
-      <div class="section-title">
-        <h2 id="history-heading">Historia wyników</h2>
-      </div>
+    <section class="athlete-profile-section" aria-labelledby="results-heading">
+      <button
+        class="athlete-profile-section__toggle"
+        type="button"
+        aria-controls="results-section-content"
+        [attr.aria-expanded]="resultsExpanded()"
+        (click)="toggleResultsSection()"
+      >
+        <span id="results-heading">Wyniki sprawdzianów</span>
+        <span class="athlete-profile-section__icon" aria-hidden="true"></span>
+      </button>
 
+      @if (resultsExpanded()) {
+      <div id="results-section-content" class="athlete-profile-section__content">
+      <section class="history-filters">
       <div class="filters">
         <fieldset class="test-picker">
           <legend>Testy</legend>
@@ -283,7 +295,15 @@
       }
     </section>
     }
+      </div>
+      }
+    </section>
     <app-athlete-training-history [athleteId]="athleteId" />
+    @if (canOpenGeneralTrainings()) {
+      <a class="button button--primary general-trainings-link" routerLink="/trainings">
+        Treningi ogólne <span aria-hidden="true">→</span>
+      </a>
+    }
   }
 </main>
 

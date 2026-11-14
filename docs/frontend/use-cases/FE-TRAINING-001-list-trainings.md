@@ -10,6 +10,7 @@ The view must follow the existing TFHUB visual design and interaction patterns.
 
 - **ADMIN** – can view all planned trainings and may include completed trainings.
 - **COACH** – can view trainings belonging to groups assigned to that coach and may include completed trainings.
+- **ATHLETE** – can view only FREE_TEXT trainings assigned to their current group or directly to them.
 
 ## 3. Preconditions
 
@@ -35,7 +36,8 @@ Each training list item must display:
 
 - Training name.
 - Training date.
-- Training group.
+- Assignment information: training group for TEMPO/GROUP mode, or individual-athlete assignment for FREE_TEXT/ATHLETES. The group may be null in ATHLETES mode.
+- Selected-athlete count for ATHLETES-mode FREE_TEXT; do not present these targets as TEMPO participants.
 - Training type.
 - Number of participants for TEMPO; FREE_TEXT has no participant count.
 
@@ -65,6 +67,7 @@ Retrieve active import summaries separately from `GET /api/training-imports`. Sh
 - Provide **Edytuj trening** and **Uzupełnij trening** only for TEMPO records; FREE_TEXT records navigate to their section editor and expose completion only while planned. Authorization remains backend-enforced.
 - Display the planned/completed state as a read-only status label.
 - Provide **Usuń** for all items (FE-TRAINING-005), requiring explicit confirmation before permanent deletion.
+- ATHLETE users have read-only access to visible FREE_TEXT list items and do not receive create, import, edit, complete or delete actions.
 - Use a blank, accessible actions-column header rather than displaying the text **Akcje**.
 
 ## 8. UI and UX Requirements
@@ -104,6 +107,7 @@ The view must be mobile-first and consistent with the existing TFHUB application
 - The frontend must respect the authenticated user's role and available actions.
 - Do not rely on frontend authorization as a security mechanism. The backend remains authoritative.
 - Do not display trainings that the backend did not return.
+- The frontend must not infer visibility from group membership or locally broaden the backend result.
 
 ## 11. Out of Scope
 
@@ -127,4 +131,5 @@ The view must be mobile-first and consistent with the existing TFHUB application
 - The view is responsive and usable on mobile devices.
 - The visual style and behavior of controls match existing TFHUB views.
 - Active imports are shown above trainings and refresh independently while processing or an automatic retry is scheduled.
+- ATHLETE users see only their assigned FREE_TEXT trainings and have no staff-only training or import actions.
 - Existing frontend functionality remains unaffected.

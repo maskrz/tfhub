@@ -1,8 +1,12 @@
 package pl.tfhub.api.training.repository;
 
 import java.math.BigDecimal;
+import java.sql.DriverManager;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.UUID;
+import org.flywaydb.core.Flyway;
+import org.flywaydb.core.api.MigrationVersion;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -53,6 +57,7 @@ import pl.tfhub.api.training.entity.TrainingSection;
 import pl.tfhub.api.training.entity.TrainingSegment;
 import pl.tfhub.api.training.entity.TrainingSegmentExecution;
 import pl.tfhub.api.training.enums.TrainingExecutionStatus;
+import pl.tfhub.api.training.enums.TrainingAssignmentType;
 import pl.tfhub.api.training.enums.TrainingStatus;
 import pl.tfhub.api.training.enums.TrainingType;
 import pl.tfhub.api.training.exception.InvalidTrainingRequestException;
@@ -347,7 +352,9 @@ class TrainingDomainIntegrationTests {
         var created = freeTextTrainingService.create(new CreateFreeTextTrainingRequest(
                 "General session",
                 LocalDate.parse("2026-03-02"),
+                TrainingAssignmentType.GROUP,
                 1L,
+                List.of(),
                 List.of(
                         new CreateTrainingSectionRequest("Warm-up", "Easy run", 1),
                         new CreateTrainingSectionRequest("Main part", "Running drills", 2))));
@@ -366,6 +373,9 @@ class TrainingDomainIntegrationTests {
         freeTextTrainingService.update(created.id(), new EditFreeTextTrainingRequest(
                 "General session updated",
                 LocalDate.parse("2026-03-03"),
+                TrainingAssignmentType.GROUP,
+                1L,
+                List.of(),
                 List.of(
                         new EditTrainingSectionRequest(secondSectionId, "Main part", "Updated drills", 1),
                         new EditTrainingSectionRequest(firstSectionId, "Warm-up", "Easy run", 2))));
@@ -384,6 +394,176 @@ class TrainingDomainIntegrationTests {
 
         trainingDeletionService.deleteTraining(created.id());
         assertEquals(0, sectionRepository.findAllByTraining_IdOrderBySequenceNumberAsc(created.id()).size());
+    }
+
+    @Test
+    void individualFreeTextAssignmentsExposeOnlySelectedAthletesAndRemainVisibleByIdOnlyToThem() {
+        long oneAthleteTraining = createFreeTextTraining(
+                "One athlete", TrainingAssignmentType.ATHLETES, null, List.of(1L));
+        long multipleAthletesTraining = createFreeTextTraining(
+                "Two athletes", TrainingAssignmentType.ATHLETES, null, List.of(1L, 2L));
+        long tempoTraining = insertTraining("Tempo session");
+        long athleteOneUser = insertAthleteAccount(1, "athlete-one");
+        long athleteTwoUser = insertAthleteAccount(2, "athlete-two");
+        long athleteThreeUser = insertAthleteAccount(3, "athlete-three");
+
+        authenticate(athleteOneUser, UserRole.ATHLETE, "athlete-one");
+        assertEquals(List.of(multipleAthletesTraining, oneAthleteTraining),
+                trainingQueryService.listTrainings(true, null).stream().map(item -> item.id()).toList());
+        assertEquals(List.of(), trainingQueryService.listTrainings(true, TrainingType.TEMPO));
+        assertEquals(TrainingAssignmentType.ATHLETES,
+                trainingDetailsService.getTraining(oneAthleteTraining).assignmentType());
+        assertThrows(AccessDeniedException.class, () -> trainingDetailsService.getTraining(tempoTraining));
+
+        authenticate(athleteTwoUser, UserRole.ATHLETE, "athlete-two");
+        assertEquals(List.of(multipleAthletesTraining),
+                trainingQueryService.listTrainings(true, null).stream().map(item -> item.id()).toList());
+        trainingDetailsService.getTraining(multipleAthletesTraining);
+        assertThrows(TrainingNotFoundException.class, () -> trainingDetailsService.getTraining(oneAthleteTraining));
+
+        authenticate(athleteThreeUser, UserRole.ATHLETE, "athlete-three");
+        assertEquals(List.of(), trainingQueryService.listTrainings(true, null));
+        assertThrows(TrainingNotFoundException.class,
+                () -> trainingDetailsService.getTraining(multipleAthletesTraining));
+    }
+
+    @Test
+    void groupFreeTextVisibilityFollowsCurrentAthleteMembership() {
+        long groupTraining = createFreeTextTraining(
+                "Group session", TrainingAssignmentType.GROUP, 1L, List.of());
+        long otherGroup = insertGroup("Other group");
+        long athleteOneUser = insertAthleteAccount(1, "group-athlete-one");
+        long athleteTwoUser = insertAthleteAccount(2, "group-athlete-two");
+        long athleteThreeUser = insertAthleteAccount(3, "group-athlete-three");
+
+        authenticate(athleteOneUser, UserRole.ATHLETE, "group-athlete-one");
+        assertEquals(List.of(groupTraining),
+                trainingQueryService.listTrainings(true, null).stream().map(item -> item.id()).toList());
+        authenticate(athleteTwoUser, UserRole.ATHLETE, "group-athlete-two");
+        trainingDetailsService.getTraining(groupTraining);
+
+        jdbcTemplate.update("UPDATE athletes SET training_group_id = ? WHERE id = ?", otherGroup, 2);
+        jdbcTemplate.update("UPDATE athletes SET training_group_id = ? WHERE id = ?", otherGroup, 3);
+
+        authenticate(athleteTwoUser, UserRole.ATHLETE, "group-athlete-two");
+        assertEquals(List.of(), trainingQueryService.listTrainings(true, null));
+        assertThrows(TrainingNotFoundException.class, () -> trainingDetailsService.getTraining(groupTraining));
+        authenticate(athleteThreeUser, UserRole.ATHLETE, "group-athlete-three");
+        assertEquals(List.of(), trainingQueryService.listTrainings(true, null));
+    }
+
+    @Test
+    void coachCanManageAthleteAssignedTrainingOnlyWhileAssignedToEverySelectedAthletesCurrentGroup() {
+        long secondGroup = insertGroup("Second group");
+        long thirdGroup = insertGroup("Third group");
+        jdbcTemplate.update("UPDATE athletes SET training_group_id = ? WHERE id = ?", secondGroup, 2);
+        long individualTraining = createFreeTextTraining(
+                "Individual session", TrainingAssignmentType.ATHLETES, null, List.of(1L, 2L));
+        long tempoTraining = insertTraining("Group tempo");
+        long coachId = insertUser("multi-group-coach", "COACH");
+        jdbcTemplate.update("INSERT INTO user_training_group (user_id, training_group_id) VALUES (?, 1)", coachId);
+        jdbcTemplate.update(
+                "INSERT INTO user_training_group (user_id, training_group_id) VALUES (?, ?)", coachId, secondGroup);
+
+        authenticate(coachId, UserRole.COACH, "multi-group-coach");
+        assertEquals(List.of(tempoTraining, individualTraining),
+                trainingQueryService.listTrainings(true, null).stream().map(item -> item.id()).toList());
+        trainingDetailsService.getTraining(individualTraining);
+        freeTextTrainingService.update(individualTraining, new EditFreeTextTrainingRequest(
+                "Updated individual session",
+                LocalDate.parse("2026-03-05"),
+                TrainingAssignmentType.ATHLETES,
+                null,
+                List.of(1L, 2L),
+                List.of(new EditTrainingSectionRequest(null, "Section", "Updated content", 1))));
+
+        jdbcTemplate.update("UPDATE athletes SET training_group_id = ? WHERE id = ?", thirdGroup, 2);
+        assertEquals(List.of(tempoTraining),
+                trainingQueryService.listTrainings(true, null).stream().map(item -> item.id()).toList());
+        assertThrows(TrainingNotFoundException.class, () -> trainingDetailsService.getTraining(individualTraining));
+        assertThrows(TrainingNotFoundException.class, () -> freeTextTrainingService.update(
+                individualTraining,
+                new EditFreeTextTrainingRequest(
+                        "Not allowed",
+                        LocalDate.parse("2026-03-05"),
+                        TrainingAssignmentType.ATHLETES,
+                        null,
+                        List.of(1L, 2L),
+                        List.of(new EditTrainingSectionRequest(null, "Section", "Content", 1)))));
+    }
+
+    @Test
+    void athleteAssignmentRejectsInactiveAthletesAndLegacyFreeTextRowsRemainGroupAssigned() {
+        long legacyTraining = insertTraining("Legacy free text");
+        jdbcTemplate.update("UPDATE training_sessions SET training_type = 'FREE_TEXT' WHERE id = ?", legacyTraining);
+        assertEquals(1L, jdbcTemplate.queryForObject(
+                "SELECT training_group_id FROM training_sessions WHERE id = ?", Long.class, legacyTraining));
+        assertEquals("GROUP", jdbcTemplate.queryForObject(
+                "SELECT assignment_type FROM training_sessions WHERE id = ?", String.class, legacyTraining));
+
+        jdbcTemplate.update("UPDATE athletes SET active = FALSE WHERE id = 3");
+        assertThrows(AthleteNotFoundException.class, () -> createFreeTextTraining(
+                "Inactive assignment", TrainingAssignmentType.ATHLETES, null, List.of(3L)));
+    }
+
+    @Test
+    void v16MigrationPreservesExistingFreeTextGroupAssignment() throws Exception {
+        String schema = "migration_" + UUID.randomUUID().toString().replace("-", "");
+        try {
+            Flyway.configure()
+                    .dataSource(POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword())
+                    .schemas(schema)
+                    .defaultSchema(schema)
+                    .target(MigrationVersion.fromVersion("15"))
+                    .load()
+                    .migrate();
+
+            long groupId;
+            long trainingId;
+            try (var connection = DriverManager.getConnection(
+                    POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword());
+                    var statement = connection.createStatement();
+                    var groupResult = statement.executeQuery(
+                            "INSERT INTO " + schema + ".training_groups (name) VALUES ('Legacy group') RETURNING id")) {
+                groupResult.next();
+                groupId = groupResult.getLong(1);
+            }
+            try (var connection = DriverManager.getConnection(
+                    POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword());
+                    var statement = connection.createStatement();
+                    var trainingResult = statement.executeQuery(
+                            "INSERT INTO " + schema + ".training_sessions "
+                                    + "(name, training_date, training_group_id, status, training_type) "
+                                    + "VALUES ('Legacy free text', DATE '2026-03-05', " + groupId
+                                    + ", 'PLANNED', 'FREE_TEXT') RETURNING id")) {
+                trainingResult.next();
+                trainingId = trainingResult.getLong(1);
+            }
+
+            Flyway.configure()
+                    .dataSource(POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword())
+                    .schemas(schema)
+                    .defaultSchema(schema)
+                    .load()
+                    .migrate();
+
+            try (var connection = DriverManager.getConnection(
+                    POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword());
+                    var statement = connection.createStatement();
+                    var result = statement.executeQuery(
+                            "SELECT training_group_id, assignment_type FROM " + schema
+                                    + ".training_sessions WHERE id = " + trainingId)) {
+                assertTrue(result.next());
+                assertEquals(groupId, result.getLong("training_group_id"));
+                assertEquals("GROUP", result.getString("assignment_type"));
+            }
+        } finally {
+            try (var connection = DriverManager.getConnection(
+                    POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword());
+                    var statement = connection.createStatement()) {
+                statement.execute("DROP SCHEMA IF EXISTS " + schema + " CASCADE");
+            }
+        }
     }
 
     @Test
@@ -1058,10 +1238,11 @@ class TrainingDomainIntegrationTests {
     }
 
     @Test
-    void rejectsMissingTrainingAndUsersWithoutCoachOrAdminRole() {
+    void rejectsMissingTrainingAndDeniesTempoDetailsToAthletes() {
         assertThrows(TrainingNotFoundException.class, () -> trainingDetailsService.getTraining(999));
+        long tempoTraining = insertTraining("Tempo");
         authenticate(1, UserRole.ATHLETE, "athlete-view");
-        assertThrows(AccessDeniedException.class, () -> trainingDetailsService.getTraining(1));
+        assertThrows(AccessDeniedException.class, () -> trainingDetailsService.getTraining(tempoTraining));
     }
 
     @Test
@@ -1329,6 +1510,20 @@ class TrainingDomainIntegrationTests {
                 """, Long.class, name, trainingDate, groupId);
     }
 
+    private long createFreeTextTraining(
+            String name,
+            TrainingAssignmentType assignmentType,
+            Long trainingGroupId,
+            List<Long> athleteIds) {
+        return freeTextTrainingService.create(new CreateFreeTextTrainingRequest(
+                name,
+                LocalDate.parse("2026-03-04"),
+                assignmentType,
+                trainingGroupId,
+                athleteIds,
+                List.of(new CreateTrainingSectionRequest("Section", "Content", 1)))).id();
+    }
+
     private long insertGroup(String name) {
         return jdbcTemplate.queryForObject("""
                 INSERT INTO training_groups (name) VALUES (?) RETURNING id
@@ -1377,6 +1572,21 @@ class TrainingDomainIntegrationTests {
         SecurityContextHolder.getContext().setAuthentication(
                 UsernamePasswordAuthenticationToken.authenticated(
                         new AuthenticatedUser(userId, username, "", role, true), null, java.util.List.of()));
+    }
+
+    private long insertAthleteAccount(long athleteId, String username) {
+        long userId = insertUser(username, "ATHLETE");
+        jdbcTemplate.update(
+                "INSERT INTO user_athlete_access (user_id, athlete_id) VALUES (?, ?)", userId, athleteId);
+        return userId;
+    }
+
+    private long insertUser(String username, String role) {
+        return jdbcTemplate.queryForObject("""
+                INSERT INTO users (username, password_hash, role)
+                VALUES (?, 'test-hash', ?)
+                RETURNING id
+                """, Long.class, username, role);
     }
 
     private CreateTrainingRequest basicTrainingRequest(long groupId, List<Long> athleteIds) {

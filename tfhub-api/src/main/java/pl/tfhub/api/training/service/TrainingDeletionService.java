@@ -14,6 +14,7 @@ import pl.tfhub.api.training.exception.TrainingNotFoundException;
 import pl.tfhub.api.training.repository.AthleteTrainingParticipationRepository;
 import pl.tfhub.api.training.repository.TrainingDefinitionRepository;
 import pl.tfhub.api.training.repository.TrainingRepository;
+import pl.tfhub.api.training.repository.TrainingAssignmentRepository;
 import pl.tfhub.api.training.repository.TrainingSegmentExecutionRepository;
 import pl.tfhub.api.training.repository.TrainingSegmentRepository;
 import pl.tfhub.api.training.repository.TrainingSectionRepository;
@@ -28,6 +29,7 @@ public class TrainingDeletionService {
     private final AthleteTrainingParticipationRepository participationRepository;
     private final TrainingSegmentExecutionRepository executionRepository;
     private final TrainingSectionRepository sectionRepository;
+    private final TrainingAssignmentRepository assignmentRepository;
     private final AccessScopeService accessScopeService;
     private final AcceptedTrainingImportCleanup acceptedTrainingImportCleanup;
 
@@ -38,6 +40,7 @@ public class TrainingDeletionService {
             AthleteTrainingParticipationRepository participationRepository,
             TrainingSegmentExecutionRepository executionRepository,
             TrainingSectionRepository sectionRepository,
+            TrainingAssignmentRepository assignmentRepository,
             AccessScopeService accessScopeService,
             AcceptedTrainingImportCleanup acceptedTrainingImportCleanup) {
         this.trainingRepository = trainingRepository;
@@ -46,6 +49,7 @@ public class TrainingDeletionService {
         this.participationRepository = participationRepository;
         this.executionRepository = executionRepository;
         this.sectionRepository = sectionRepository;
+        this.assignmentRepository = assignmentRepository;
         this.accessScopeService = accessScopeService;
         this.acceptedTrainingImportCleanup = acceptedTrainingImportCleanup;
     }
@@ -60,7 +64,7 @@ public class TrainingDeletionService {
         Training training = trainingRepository.findByIdForUpdate(trainingId)
                 .orElseThrow(() -> new TrainingNotFoundException(trainingId));
         if (accessScopeService.currentUser().role() == UserRole.COACH
-                && !accessScopeService.assignedGroupIds().contains(training.getTrainingGroup().getId())) {
+                && !assignmentRepository.canCoachManage(trainingId, accessScopeService.currentUser().id())) {
             throw new TrainingNotFoundException(trainingId);
         }
 
@@ -92,6 +96,7 @@ public class TrainingDeletionService {
         sectionRepository.deleteAll(
                 sectionRepository.findAllByTraining_IdOrderBySequenceNumberAsc(trainingId));
         sectionRepository.flush();
+        assignmentRepository.deleteForTraining(trainingId);
         acceptedTrainingImportCleanup.deleteForTraining(trainingId);
         trainingRepository.delete(training);
         trainingRepository.flush();
