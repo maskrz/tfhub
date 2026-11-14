@@ -5,9 +5,12 @@ import {
   CreateTrainingRequest,
   CreateTrainingResponse,
   CompleteTrainingRequest,
+  CreateFreeTextTrainingRequest,
   EditTrainingRequest,
+  EditFreeTextTrainingRequest,
   TrainingDetails,
   TrainingListItem,
+  TrainingType,
   UpdateTrainingResponse,
 } from './training.model';
 
@@ -15,14 +18,21 @@ import {
 export class TrainingsApiService {
   private readonly http = inject(HttpClient);
 
-  getAll(includeCompleted = false): Observable<TrainingListItem[]> {
+  getAll(includeCompleted = false, trainingType?: TrainingType): Observable<TrainingListItem[]> {
+    const params: Record<string, string> = {};
+    if (includeCompleted) params['includeCompleted'] = 'true';
+    if (trainingType) params['trainingType'] = trainingType;
     return this.http.get<TrainingListItem[]>('/api/trainings', {
-      params: includeCompleted ? { includeCompleted: 'true' } : {},
+      params,
     });
   }
 
   create(request: CreateTrainingRequest): Observable<CreateTrainingResponse> {
     return this.http.post<CreateTrainingResponse>('/api/trainings', request);
+  }
+
+  createFreeText(request: CreateFreeTextTrainingRequest): Observable<CreateTrainingResponse> {
+    return this.http.post<CreateTrainingResponse>('/api/trainings/free-text', request);
   }
 
   getById(id: number): Observable<TrainingDetails> {
@@ -33,8 +43,16 @@ export class TrainingsApiService {
     return this.http.put<UpdateTrainingResponse>(`/api/trainings/${id}`, request);
   }
 
+  updateFreeText(id: number, request: EditFreeTextTrainingRequest): Observable<UpdateTrainingResponse> {
+    return this.http.put<UpdateTrainingResponse>(`/api/trainings/${id}/free-text`, request);
+  }
+
   complete(id: number, request: CompleteTrainingRequest): Observable<UpdateTrainingResponse> {
     return this.http.patch<UpdateTrainingResponse>(`/api/trainings/${id}/participations`, request);
+  }
+
+  completeFreeText(id: number): Observable<UpdateTrainingResponse> {
+    return this.http.patch<UpdateTrainingResponse>(`/api/trainings/${id}/complete`, {});
   }
 
   deleteTraining(id: number): Observable<void> {

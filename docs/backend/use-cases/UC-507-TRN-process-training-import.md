@@ -2,7 +2,7 @@
 
 ## 1. Purpose
 
-Provide an asynchronous process for recognizing and extracting training data from an uploaded training sheet photo.
+Provide an asynchronous process for recognizing and extracting training data from an uploaded training sheet photo, using the immutable type selected during UC-506.
 
 The process must use an AI-based image recognition service to identify the training structure, recognize handwritten execution data, match athletes against the selected training group and create an editable import draft.
 
@@ -52,6 +52,7 @@ The exact state transition rules must be enforced by the backend.
 ### 4.3 Image Recognition
 
 - The optimized JPEG retained by UC-506 must be used as the source document.
+- Select the Git-versioned prompt from application resources based on the import type: `prompts/training-import-recognition.txt` for `TEMPO` and `prompts/free-text-training-import-recognition.txt` for `FREE_TEXT`. Do not use database-backed prompt configuration.
 - The initial implementation must use Gemini Flash-Lite 3.5 for image understanding and handwriting recognition.
 - Exactly one Gemini model call is made for each processing attempt; the system does not call a fallback or second model.
 - The model must receive the image together with instructions defining the expected training sheet structure and recognition rules.
@@ -63,6 +64,14 @@ The exact state transition rules must be enforced by the backend.
 - The model must recognize measured values, completion markers and spike indicators.
 - The model must return structured data suitable for backend validation and further processing.
 - The model response must not be treated as trusted application data.
+
+### 4.3.1 FREE_TEXT Recognition
+
+- Recognize the training name/date and ordered exercises or descriptions; do not create athlete rows, definitions, segments or execution data.
+- Preserve recognized source order and use explicit headings when present. When absent, group related activities into a small number of logical sections where reasonable; do not invent exercises or details.
+- A valid response may contain one section or uncertain/incomplete section structure. If no useful structure is recognized, return one `Trening` section containing the recognized text in original order.
+- Represent uncertain or unreadable text using draft recognition metadata so the coach can inspect and correct it. Section uncertainty, one-section output or imperfect grouping alone is not a processing failure.
+- Distinguish technical/API failure and malformed or unusable structured output from a valid but imperfect result. Only technical failures and structurally unusable responses follow the existing processing failure/retry path.
 
 ### 4.4 Handwritten Execution Data Recognition
 
@@ -121,6 +130,7 @@ Additional recognition rules:
 - The draft must be editable through UC-508.
 - Processing must not create persisted training session, definition, segment, participation or execution records.
 - The optimized JPEG must remain available for subsequent review.
+- For `FREE_TEXT`, the draft contains ordered user-editable sections with free-text titles and content, and no tempo definitions, athlete rows or execution records. Empty or uncertain OCR content may remain reviewable; readiness validation and explicit review happen in UC-508.
 
 ### 4.8 Processing Retry
 
@@ -152,6 +162,7 @@ Additional recognition rules:
 - The import must enter FAILED state if processing cannot be completed.
 - Failure information must be available for diagnosis without exposing API keys, credentials or sensitive configuration.
 - The system must not silently accept partially recognized data as a completed import.
+- A valid but imperfect `FREE_TEXT` response is not an AI-service failure and must remain available in `REVIEW_REQUIRED`.
 
 ## 5. Authorization Rules
 
@@ -242,3 +253,5 @@ When processing succeeds, the import must expose sufficient information to retri
 27. The import remains FAILED while waiting for an automatic retry, and its status response includes the scheduled `nextRetryAt`.
 28. Explicit retry starts a fresh automatic-retry allowance.
 29. Approximate surname suggestions are restricted to active athletes in the selected group and require explicit manual selection; they never assign an athlete automatically.
+30. FREE_TEXT imports use a separate resource prompt and produce ordered sections without athlete matching or tempo execution data.
+31. Missing headings, one-section fallback, or OCR uncertainty alone do not fail a structurally usable FREE_TEXT import.

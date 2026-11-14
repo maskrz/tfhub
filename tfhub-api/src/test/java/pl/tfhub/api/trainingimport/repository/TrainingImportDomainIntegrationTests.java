@@ -45,6 +45,7 @@ import pl.tfhub.api.athlete.enums.Gender;
 import pl.tfhub.api.athlete.exception.AthleteNotFoundException;
 import pl.tfhub.api.training.entity.Training;
 import pl.tfhub.api.training.enums.TrainingExecutionStatus;
+import pl.tfhub.api.training.enums.TrainingType;
 import pl.tfhub.api.training.repository.TrainingRepository;
 import pl.tfhub.api.training.service.TrainingDeletionService;
 import pl.tfhub.api.training.service.TrainingDetailsService;
@@ -96,11 +97,13 @@ import pl.tfhub.api.user.service.AuthenticatedUser;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -749,6 +752,56 @@ class TrainingImportDomainIntegrationTests {
 	}
 
 	@Test
+	void acceptsFreeTextImportAsCompletedTrainingWithoutAthletesAndRetainsSourceImage() {
+		byte[] sourceImage = new byte[] {(byte) 0xff, (byte) 0xd8, 1, 2};
+		TrainingImport trainingImport = saveImportWithStoredImage(
+				1, "free-text.jpg", "9".repeat(64), sourceImage, TrainingType.FREE_TEXT);
+		String response = """
+				{
+				  "name":{"value":"Trening ogólny","originalText":"Trening ogólny","uncertain":false},
+				  "trainingDate":{"value":"2026-11-10","originalText":"10.11.2026","uncertain":false},
+				  "sections":[
+				    {
+				      "sequenceNumber":1,
+				      "title":{"value":"Rozgrzewka","originalText":"Rozgrzewka","uncertain":false},
+				      "content":{"value":"Trucht 10 minut","originalText":"Trucht 10'","uncertain":false}
+				    },
+				    {
+				      "sequenceNumber":2,
+				      "title":{"value":"Część główna","originalText":"Część główna","uncertain":false},
+				      "content":{"value":"Skip A 3 x 30 m","originalText":"Skip A 3 x 30 m","uncertain":false}
+				    }
+				  ]
+				}
+				""";
+		when(geminiClient.recognize(any(), eq(TrainingType.FREE_TEXT))).thenReturn(
+				new GeminiTrainingRecognitionClient.GeminiRecognitionResponse("raw", response));
+		Long attemptId = processingStateService.claimPending(trainingImport.getId());
+
+		processingService.processClaimedAttempt(attemptId);
+
+		TrainingImportDraftResponse draft = draftService.getDraft(trainingImport.getId());
+		assertEquals(TrainingType.FREE_TEXT, draft.trainingType());
+		assertTrue(draft.validation().readyForAcceptance());
+		assertTrue(draft.definitions().isEmpty());
+		assertEquals(List.of("Rozgrzewka", "Część główna"),
+				draft.sections().stream().map(TrainingImportDraftResponse.Section::title).toList());
+
+		var accepted = finalizationService.accept(trainingImport.getId());
+		var training = trainingDetailsService.getTraining(accepted.trainingId());
+		assertEquals(TrainingType.FREE_TEXT, training.trainingType());
+		assertEquals(pl.tfhub.api.training.enums.TrainingStatus.COMPLETED, training.status());
+		assertTrue(training.definitions().isEmpty());
+		assertEquals(List.of("Rozgrzewka", "Część główna"),
+				training.sections().stream().map(section -> section.title()).toList());
+		assertEquals(0L, count("training_athlete_participations"));
+		assertEquals(0L, count("training_segment_executions"));
+		assertEquals(TrainingImportStatus.ACCEPTED,
+				trainingImportRepository.findById(trainingImport.getId()).orElseThrow().getStatus());
+		assertArrayEquals(sourceImage, sourceImageService.getSourceImage(trainingImport.getId()));
+	}
+
+	@Test
 	void persistenceFailureRollsBackTrainingAndLeavesImportReviewable() {
 		TrainingImport trainingImport = saveReviewDraft(1, "accept-rollback.jpg");
 		TrainingImportDraftResponse initial = draftService.getDraft(trainingImport.getId());
@@ -1345,11 +1398,21 @@ class TrainingImportDomainIntegrationTests {
 			String filename,
 			String hash,
 			byte[] contents) {
+		return saveImportWithStoredImage(groupId, filename, hash, contents, TrainingType.TEMPO);
+	}
+
+	private TrainingImport saveImportWithStoredImage(
+			long groupId,
+			String filename,
+			String hash,
+			byte[] contents,
+			TrainingType trainingType) {
 		TrainingImport trainingImport = trainingImportRepository.saveAndFlush(new TrainingImport(
 				trainingGroupRepository.findById(groupId).orElseThrow(),
 				userRepository.findById(1L).orElseThrow(),
 				OffsetDateTime.now(ZoneOffset.UTC),
-				false));
+				false,
+				trainingType));
 		String storageKey = imageStorage.store(contents);
 		sourceImageRepository.saveAndFlush(new TrainingImportSourceImage(
 				trainingImport, storageKey, filename, contents.length, 2, 2, hash));

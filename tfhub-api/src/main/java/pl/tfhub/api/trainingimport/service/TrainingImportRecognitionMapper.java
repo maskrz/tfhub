@@ -20,6 +20,7 @@ import org.springframework.stereotype.Component;
 import pl.tfhub.api.athlete.service.AthleteService;
 import pl.tfhub.api.athlete.service.AthleteService.ImportCandidate;
 import pl.tfhub.api.training.enums.TrainingExecutionStatus;
+import pl.tfhub.api.training.enums.TrainingType;
 import pl.tfhub.api.trainingimport.enums.TrainingImportAthleteMatchStatus;
 
 @Component
@@ -41,7 +42,17 @@ public class TrainingImportRecognitionMapper {
 	}
 
 	public TrainingImportRecognizedDraft validateAndMap(String candidateText, long trainingGroupId) {
+		return validateAndMap(candidateText, trainingGroupId, TrainingType.TEMPO);
+	}
+
+	public TrainingImportRecognizedDraft validateAndMap(
+			String candidateText,
+			long trainingGroupId,
+			TrainingType trainingType) {
 		TrainingImportRecognitionData recognized = parse(candidateText);
+		if (trainingType == TrainingType.FREE_TEXT) {
+			return mapFreeText(recognized);
+		}
 		validateHeader(recognized);
 		LocalDate trainingDate = LocalDate.parse(recognized.trainingDate().value());
 		List<ImportCandidate> groupAthletes = athleteService.findImportCandidates(trainingGroupId);
@@ -172,10 +183,93 @@ public class TrainingImportRecognitionMapper {
 		putIfPresent(rootMetadata, "recognizedGroupName", recognized.recognizedGroupName());
 
 		return new TrainingImportRecognizedDraft(
+				TrainingType.TEMPO,
 				nameOrDefault(recognized.name(), "Trening " + trainingDate.format(DEFAULT_NAME_DATE_FORMAT)),
 				trainingDate,
 				Map.copyOf(rootMetadata),
-				List.copyOf(definitions));
+				List.copyOf(definitions),
+				List.of());
+	}
+
+	private TrainingImportRecognizedDraft mapFreeText(TrainingImportRecognitionData recognized) {
+		if (recognized == null || recognized.trainingDate() == null) {
+			throw invalid("The model response is missing required training information");
+		}
+		requireField(recognized.trainingDate(), "training date");
+		LocalDate trainingDate;
+		try {
+			trainingDate = LocalDate.parse(recognized.trainingDate().value());
+		} catch (RuntimeException exception) {
+			throw invalid("The recognized training date is invalid");
+		}
+		validateName(recognized.name(), "training name");
+
+		List<TrainingImportRecognitionData.Section> recognizedSections = recognized.sections();
+		boolean useFallback = recognizedSections == null || recognizedSections.isEmpty();
+		if (useFallback) {
+			recognizedSections = List.of();
+		}
+		List<TrainingImportRecognizedDraft.Section> sections = new ArrayList<>();
+		Set<Integer> sequences = new HashSet<>();
+		for (int index = 0; index < recognizedSections.size(); index++) {
+			TrainingImportRecognitionData.Section section = recognizedSections.get(index);
+			if (section == null || section.sequenceNumber() == null
+					|| section.sequenceNumber() <= 0 || !sequences.add(section.sequenceNumber())) {
+				throw invalid("Recognized training section ordering is invalid");
+			}
+			String title = nameOrDefault(section.title(), "Trening");
+			String content = section.content() == null || section.content().value() == null
+					? "" : section.content().value();
+			Map<String, Object> metadata = sectionMetadata(section.title(), section.content());
+			sections.add(new TrainingImportRecognizedDraft.Section(
+					title, content, section.sequenceNumber(), Map.copyOf(metadata)));
+		}
+		if (useFallback) {
+			Map<String, Object> titleMetadata = new LinkedHashMap<>();
+			titleMetadata.put("uncertain", true);
+			titleMetadata.put("manuallyReviewed", false);
+			titleMetadata.put("uncertaintyReason", "No section structure could be recognized");
+			Map<String, Object> contentMetadata = new LinkedHashMap<>();
+			contentMetadata.put("uncertain", true);
+			contentMetadata.put("manuallyReviewed", false);
+			contentMetadata.put("uncertaintyReason", "No exercise content could be recognized");
+			Map<String, Object> metadata = new LinkedHashMap<>();
+			metadata.put("uncertain", true);
+			metadata.put("manuallyReviewed", false);
+			metadata.put("fields", Map.of(
+					"title", Map.copyOf(titleMetadata),
+					"content", Map.copyOf(contentMetadata)));
+			sections.add(new TrainingImportRecognizedDraft.Section(
+					"Trening", "", 1, Map.copyOf(metadata)));
+		}
+
+		Map<String, Object> rootMetadata = new LinkedHashMap<>();
+		rootMetadata.put("uncertain", isUncertain(recognized.name()) || isUncertain(recognized.trainingDate()));
+		rootMetadata.put("manuallyReviewed", false);
+		rootMetadata.put("fields", Map.of(
+				"name", fieldMetadata(recognized.name()),
+				"trainingDate", fieldMetadata(recognized.trainingDate())));
+		putIfPresent(rootMetadata, "recognizedGroupName", recognized.recognizedGroupName());
+		return new TrainingImportRecognizedDraft(
+				TrainingType.FREE_TEXT,
+				nameOrDefault(recognized.name(), "Trening " + trainingDate.format(DEFAULT_NAME_DATE_FORMAT)),
+				trainingDate,
+				Map.copyOf(rootMetadata),
+				List.of(),
+				List.copyOf(sections));
+	}
+
+	private Map<String, Object> sectionMetadata(
+			TrainingImportRecognitionData.RecognizedField title,
+			TrainingImportRecognitionData.RecognizedField content) {
+		Map<String, Object> metadata = new LinkedHashMap<>();
+		metadata.put("uncertain", isUncertain(title) || isUncertain(content));
+		metadata.put("manuallyReviewed", false);
+		Map<String, Object> fields = new LinkedHashMap<>();
+		fields.put("title", fieldMetadata(title));
+		fields.put("content", fieldMetadata(content));
+		metadata.put("fields", fields);
+		return metadata;
 	}
 
 	private TrainingImportRecognitionData parse(String candidateText) {

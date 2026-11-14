@@ -57,6 +57,7 @@ h1 {
   margin: 0;
 }
 .summary-heading p { color: #59667e; margin: .35rem 0 0; }
+.training-type-badge { color: #59667e; display: inline-block; font-size: .85rem; margin-top: .35rem; }
 .status-badge {
   background: #eef0f3;
   border-radius: 2rem;
@@ -71,6 +72,7 @@ h1 {
 
 .definition-card { display: grid; gap: 1rem; }
 .section-heading h2 { color: #20283a; font-size: 1.3rem; margin: 0; }
+.training-section-content { color: #27344a; line-height: 1.6; margin: 0; white-space: pre-wrap; }
 .participants-section {
   border-top: 1px solid #e1e5ec;
   display: grid;

@@ -67,7 +67,7 @@ class TrainingImportControllerTests {
 						.get("/api/training-imports"))
 				.andExpect(status().isOk())
 				.andExpect(content().json("""
-						[{"id":42,"trainingGroupId":7,"trainingGroupName":"Group A","status":"FAILED",
+						[{"id":42,"trainingGroupId":7,"trainingGroupName":"Group A","trainingType":"TEMPO","status":"FAILED",
 						  "nextRetryAt":null,"createdAt":"2026-11-12T10:00:00Z","possibleDuplicate":true,
 						  "name":null,"trainingDate":null,"failureMessage":"Safe error"}]
 						""", true));
@@ -76,7 +76,7 @@ class TrainingImportControllerTests {
 
 	@Test
 	void acceptsExactlyOneImageAndReturnsUploadDetails() throws Exception {
-		when(uploadService.upload(eq(7L), any()))
+		when(uploadService.upload(eq(7L), eq(pl.tfhub.api.training.enums.TrainingType.TEMPO), any()))
 				.thenReturn(new TrainingImportUploadResponse(42, 7, TrainingImportStatus.PENDING, true));
 
 		mockMvc.perform(uploadRequest().file(image("photo.png")))
@@ -90,7 +90,7 @@ class TrainingImportControllerTests {
 						}
 						""", true));
 
-		verify(uploadService).upload(eq(7L), any());
+		verify(uploadService).upload(eq(7L), eq(pl.tfhub.api.training.enums.TrainingType.TEMPO), any());
 	}
 
 	@Test
@@ -126,12 +126,14 @@ class TrainingImportControllerTests {
 						{
 						  "importId": 42,
 						  "status": "REVIEW_REQUIRED",
+						  "trainingType": "TEMPO",
 						  "trainingGroup": {"id": 7, "name": "Group A"},
 						  "name": "Intervals",
 						  "trainingDate": "2026-11-10",
 						  "recognitionMetadata": {},
 						  "recognitionReviewed": true,
 						  "definitions": [],
+						  "sections": [],
 						  "validation": {"readyForAcceptance": true, "issues": []}
 						}
 						""", true));

@@ -14,13 +14,17 @@ import pl.tfhub.api.training.dto.response.TrainingListItemResponse;
 import pl.tfhub.api.training.dto.response.CreateTrainingResponse;
 import pl.tfhub.api.training.dto.response.TrainingDetailsResponse;
 import pl.tfhub.api.training.dto.response.UpdateTrainingResponse;
+import pl.tfhub.api.training.dto.request.CreateFreeTextTrainingRequest;
+import pl.tfhub.api.training.dto.request.EditFreeTextTrainingRequest;
 import pl.tfhub.api.training.enums.TrainingStatus;
+import pl.tfhub.api.training.enums.TrainingType;
 import pl.tfhub.api.training.service.TrainingCreationService;
 import pl.tfhub.api.training.service.TrainingCompletionService;
 import pl.tfhub.api.training.service.TrainingDetailsService;
 import pl.tfhub.api.training.service.TrainingDeletionService;
 import pl.tfhub.api.training.service.TrainingQueryService;
 import pl.tfhub.api.training.service.TrainingUpdateService;
+import pl.tfhub.api.training.service.FreeTextTrainingService;
 import pl.tfhub.api.traininggroup.dto.response.TrainingGroupResponse;
 
 import static org.mockito.Mockito.verify;
@@ -52,6 +56,9 @@ class TrainingControllerTests {
 
     @MockitoBean
     private TrainingCompletionService trainingCompletionService;
+
+    @MockitoBean
+    private FreeTextTrainingService freeTextTrainingService;
 
     @Test
     void createsTrainingAndReturnsItsIdentifierAndLocation() throws Exception {
@@ -87,6 +94,54 @@ class TrainingControllerTests {
                                 {"name":"Intervals","trainingDate":"2026-11-10","definitions":[]}
                                 """))
                 .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void createsFreeTextTrainingThroughItsDedicatedEndpoint() throws Exception {
+        when(freeTextTrainingService.create(org.mockito.ArgumentMatchers.any()))
+                .thenReturn(new CreateTrainingResponse(43));
+
+        mockMvc.perform(MockMvcRequestBuilders.post("/api/trainings/free-text")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "name": "Trening ogólny",
+                                  "trainingDate": "2026-11-10",
+                                  "trainingGroupId": 3,
+                                  "sections": [
+                                    {"title": "Rozgrzewka", "content": "Trucht 10 minut", "sequenceNumber": 1}
+                                  ]
+                                }
+                                """))
+                .andExpect(status().isCreated())
+                .andExpect(MockMvcResultMatchers.header().string("Location", "/api/trainings/43"))
+                .andExpect(content().json("{\"id\":43}", true));
+    }
+
+    @Test
+    void rejectsFreeTextTrainingWithoutSections() throws Exception {
+        mockMvc.perform(MockMvcRequestBuilders.post("/api/trainings/free-text")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "name": "Trening ogólny",
+                                  "trainingDate": "2026-11-10",
+                                  "trainingGroupId": 3,
+                                  "sections": []
+                                }
+                                """))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void marksFreeTextTrainingCompletedWithoutUsingParticipationEndpoint() throws Exception {
+        when(freeTextTrainingService.markCompleted(43)).thenReturn(new UpdateTrainingResponse(43));
+
+        mockMvc.perform(MockMvcRequestBuilders.patch("/api/trainings/43/complete"))
+                .andExpect(status().isOk())
+                .andExpect(content().json("{\"id\":43}", true));
+
+        verify(freeTextTrainingService).markCompleted(43);
     }
 
     @Test
@@ -173,6 +228,8 @@ class TrainingControllerTests {
                         LocalDate.parse("2026-11-10"),
                         TrainingStatus.PLANNED,
                         new TrainingGroupResponse(3, "Group A"),
+                        List.of(),
+                        TrainingType.TEMPO,
                         List.of()));
 
         mockMvc.perform(get("/api/trainings/42"))
@@ -184,7 +241,9 @@ class TrainingControllerTests {
                           "trainingDate": "2026-11-10",
                           "status": "PLANNED",
                           "trainingGroup": {"id": 3, "name": "Group A"},
-                          "definitions": []
+                          "definitions": [],
+                          "trainingType": "TEMPO",
+                          "sections": []
                         }
                         """, true));
 
@@ -202,9 +261,10 @@ class TrainingControllerTests {
 
     @Test
     void returnsTrainingSummariesFromTheService() throws Exception {
-        when(trainingQueryService.listTrainings(false)).thenReturn(List.of(
+        when(trainingQueryService.listTrainings(false, null)).thenReturn(List.of(
                 new TrainingListItemResponse(7, "Intervals", LocalDate.parse("2026-11-10"),
-                        new TrainingGroupResponse(3, "Group A"), 2, 12, TrainingStatus.PLANNED)));
+                        new TrainingGroupResponse(3, "Group A"), 2, 12,
+                        TrainingStatus.PLANNED, TrainingType.TEMPO)));
 
         mockMvc.perform(get("/api/trainings"))
                 .andExpect(status().isOk())
@@ -216,18 +276,20 @@ class TrainingControllerTests {
                           "trainingGroup": {"id": 3, "name": "Group A"},
                           "definitionCount": 2,
                           "participantCount": 12,
-                          "status": "PLANNED"
+                          "status": "PLANNED",
+                          "trainingType": "TEMPO"
                         }]
                         """, true));
 
-        verify(trainingQueryService).listTrainings(false);
+        verify(trainingQueryService).listTrainings(false, null);
     }
 
     @Test
     void includesCompletedTrainingsWhenRequested() throws Exception {
-        when(trainingQueryService.listTrainings(true)).thenReturn(List.of(
+        when(trainingQueryService.listTrainings(true, null)).thenReturn(List.of(
                 new TrainingListItemResponse(8, "Archived", LocalDate.parse("2026-11-09"),
-                        new TrainingGroupResponse(3, "Group A"), 1, 4, TrainingStatus.COMPLETED)));
+                        new TrainingGroupResponse(3, "Group A"), 1, 4,
+                        TrainingStatus.COMPLETED, TrainingType.TEMPO)));
 
         mockMvc.perform(get("/api/trainings").param("includeCompleted", "true"))
                 .andExpect(status().isOk())
@@ -239,16 +301,36 @@ class TrainingControllerTests {
                           "trainingGroup": {"id": 3, "name": "Group A"},
                           "definitionCount": 1,
                           "participantCount": 4,
-                          "status": "COMPLETED"
+                          "status": "COMPLETED",
+                          "trainingType": "TEMPO"
                         }]
                         """, true));
 
-        verify(trainingQueryService).listTrainings(true);
+        verify(trainingQueryService).listTrainings(true, null);
+    }
+
+    @Test
+    void filtersTrainingsByTypeWhenRequested() throws Exception {
+        when(trainingQueryService.listTrainings(true, TrainingType.FREE_TEXT)).thenReturn(List.of());
+
+        mockMvc.perform(get("/api/trainings")
+                        .param("includeCompleted", "true")
+                        .param("trainingType", "FREE_TEXT"))
+                .andExpect(status().isOk())
+                .andExpect(content().json("[]", true));
+
+        verify(trainingQueryService).listTrainings(true, TrainingType.FREE_TEXT);
+    }
+
+    @Test
+    void rejectsUnknownTrainingTypeFilter() throws Exception {
+        mockMvc.perform(get("/api/trainings").param("trainingType", "UNKNOWN"))
+                .andExpect(status().isBadRequest());
     }
 
     @Test
     void returnsAnEmptyCollectionWhenNoTrainingsAreVisible() throws Exception {
-        when(trainingQueryService.listTrainings(false)).thenReturn(List.of());
+        when(trainingQueryService.listTrainings(false, null)).thenReturn(List.of());
 
         mockMvc.perform(get("/api/trainings"))
                 .andExpect(status().isOk())

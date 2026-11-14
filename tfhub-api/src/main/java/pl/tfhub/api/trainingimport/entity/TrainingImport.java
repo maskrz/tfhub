@@ -14,6 +14,7 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToOne;
 import jakarta.persistence.Table;
 import pl.tfhub.api.traininggroup.entity.TrainingGroup;
+import pl.tfhub.api.training.enums.TrainingType;
 import pl.tfhub.api.trainingimport.enums.TrainingImportStatus;
 import pl.tfhub.api.user.entity.User;
 
@@ -28,6 +29,10 @@ public class TrainingImport {
 	@ManyToOne(fetch = FetchType.LAZY, optional = false)
 	@JoinColumn(name = "training_group_id", nullable = false, updatable = false)
 	private TrainingGroup trainingGroup;
+
+	@Enumerated(EnumType.STRING)
+	@Column(name = "training_type", nullable = false, updatable = false, length = 32)
+	private TrainingType trainingType;
 
 	@ManyToOne(fetch = FetchType.LAZY, optional = false)
 	@JoinColumn(name = "initiated_by_user_id", nullable = false, updatable = false)
@@ -63,8 +68,18 @@ public class TrainingImport {
 			User initiatedBy,
 			OffsetDateTime createdAt,
 			boolean possibleDuplicate) {
+		this(trainingGroup, initiatedBy, createdAt, possibleDuplicate, TrainingType.TEMPO);
+	}
+
+	public TrainingImport(
+			TrainingGroup trainingGroup,
+			User initiatedBy,
+			OffsetDateTime createdAt,
+			boolean possibleDuplicate,
+			TrainingType trainingType) {
 		this.trainingGroup = trainingGroup;
 		this.initiatedBy = initiatedBy;
+		this.trainingType = trainingType;
 		this.status = TrainingImportStatus.PENDING;
 		this.createdAt = createdAt;
 		this.possibleDuplicate = possibleDuplicate;
@@ -76,6 +91,10 @@ public class TrainingImport {
 
 	public TrainingGroup getTrainingGroup() {
 		return trainingGroup;
+	}
+
+	public TrainingType getTrainingType() {
+		return trainingType;
 	}
 
 	public User getInitiatedBy() {

@@ -12,6 +12,7 @@ import org.springframework.transaction.annotation.Transactional;
 import pl.tfhub.api.athlete.entity.Athlete;
 import pl.tfhub.api.athlete.repository.AthleteRepository;
 import pl.tfhub.api.training.enums.TrainingExecutionStatus;
+import pl.tfhub.api.training.enums.TrainingType;
 import pl.tfhub.api.traininggroup.dto.response.TrainingGroupResponse;
 import pl.tfhub.api.trainingimport.dto.request.TrainingImportDraftUpdateRequest;
 import pl.tfhub.api.trainingimport.dto.response.TrainingImportAthleteCandidateResponse;
@@ -22,6 +23,7 @@ import pl.tfhub.api.trainingimport.entity.TrainingImportDraftAthleteRow;
 import pl.tfhub.api.trainingimport.entity.TrainingImportDraftDefinition;
 import pl.tfhub.api.trainingimport.entity.TrainingImportDraftExecution;
 import pl.tfhub.api.trainingimport.entity.TrainingImportDraftSegment;
+import pl.tfhub.api.trainingimport.entity.TrainingImportDraftSection;
 import pl.tfhub.api.trainingimport.enums.TrainingImportAthleteMatchStatus;
 import pl.tfhub.api.trainingimport.enums.TrainingImportStatus;
 import pl.tfhub.api.trainingimport.exception.InvalidTrainingImportDraftException;
@@ -32,6 +34,7 @@ import pl.tfhub.api.trainingimport.repository.TrainingImportDraftDefinitionRepos
 import pl.tfhub.api.trainingimport.repository.TrainingImportDraftExecutionRepository;
 import pl.tfhub.api.trainingimport.repository.TrainingImportDraftRepository;
 import pl.tfhub.api.trainingimport.repository.TrainingImportDraftSegmentRepository;
+import pl.tfhub.api.trainingimport.repository.TrainingImportDraftSectionRepository;
 
 @Service
 public class TrainingImportDraftService {
@@ -42,6 +45,7 @@ public class TrainingImportDraftService {
 	private final TrainingImportDraftRepository draftRepository;
 	private final TrainingImportDraftDefinitionRepository definitionRepository;
 	private final TrainingImportDraftSegmentRepository segmentRepository;
+	private final TrainingImportDraftSectionRepository sectionRepository;
 	private final TrainingImportDraftAthleteRowRepository athleteRowRepository;
 	private final TrainingImportDraftExecutionRepository executionRepository;
 	private final AthleteRepository athleteRepository;
@@ -51,6 +55,7 @@ public class TrainingImportDraftService {
 			TrainingImportDraftRepository draftRepository,
 			TrainingImportDraftDefinitionRepository definitionRepository,
 			TrainingImportDraftSegmentRepository segmentRepository,
+			TrainingImportDraftSectionRepository sectionRepository,
 			TrainingImportDraftAthleteRowRepository athleteRowRepository,
 			TrainingImportDraftExecutionRepository executionRepository,
 			AthleteRepository athleteRepository) {
@@ -58,6 +63,7 @@ public class TrainingImportDraftService {
 		this.draftRepository = draftRepository;
 		this.definitionRepository = definitionRepository;
 		this.segmentRepository = segmentRepository;
+		this.sectionRepository = sectionRepository;
 		this.athleteRowRepository = athleteRowRepository;
 		this.executionRepository = executionRepository;
 		this.athleteRepository = athleteRepository;
@@ -74,6 +80,9 @@ public class TrainingImportDraftService {
 	public TrainingImportDraftResponse updateDraft(long importId, TrainingImportDraftUpdateRequest request) {
 		TrainingImport trainingImport = getReviewableImportForUpdate(importId);
 		TrainingImportDraft draft = findDraft(importId);
+		if (trainingImport.getTrainingType() == TrainingType.FREE_TEXT) {
+			return updateFreeTextDraft(trainingImport, draft, request);
+		}
 		DraftData existing = loadDraftData(draft);
 		Map<Long, Athlete> matchedAthletes = validateUpdate(request, existing);
 
@@ -263,6 +272,8 @@ public class TrainingImportDraftService {
 	}
 
 	private DraftData loadDraftData(TrainingImportDraft draft) {
+		List<TrainingImportDraftSection> sections =
+				sectionRepository.findByDraft_IdOrderBySequenceNumberAsc(draft.getId());
 		List<TrainingImportDraftDefinition> definitions =
 				definitionRepository.findByDraft_IdOrderBySequenceNumberAsc(draft.getId());
 		List<TrainingImportDraftSegment> segments = new ArrayList<>();
@@ -273,7 +284,7 @@ public class TrainingImportDraftService {
 		}
 		List<TrainingImportDraftExecution> executions =
 				executionRepository.findByDraft_IdOrderByIdAsc(draft.getId());
-		return new DraftData(draft, definitions, segments, athleteRows, executions);
+		return new DraftData(draft, definitions, segments, athleteRows, executions, sections);
 	}
 
 	private TrainingImportDraftResponse toResponse(
@@ -353,12 +364,24 @@ public class TrainingImportDraftService {
 							rowResponses);
 				})
 				.toList();
+		List<TrainingImportDraftResponse.Section> sectionResponses = data.sections().stream()
+				.sorted((left, right) -> Integer.compare(
+						left.getSequenceNumber(), right.getSequenceNumber()))
+				.map(section -> new TrainingImportDraftResponse.Section(
+						section.getId(),
+						section.getSequenceNumber(),
+						section.getTitle(),
+						section.getContent(),
+						section.getRecognitionMetadata(),
+						TrainingImportRecognitionMetadata.isReviewed(section.getRecognitionMetadata())))
+				.toList();
 
 		List<TrainingImportDraftResponse.ValidationIssue> issues =
 				validateReadiness(draft, data, trainingImport.getTrainingGroup().getId());
 		return new TrainingImportDraftResponse(
 				trainingImport.getId(),
 				trainingImport.getStatus(),
+				trainingImport.getTrainingType(),
 				new TrainingGroupResponse(
 						trainingImport.getTrainingGroup().getId(),
 						trainingImport.getTrainingGroup().getName()),
@@ -367,6 +390,7 @@ public class TrainingImportDraftService {
 				draft.getRecognitionMetadata(),
 				TrainingImportRecognitionMetadata.isReviewed(draft.getRecognitionMetadata()),
 				definitionResponses,
+				sectionResponses,
 				new TrainingImportDraftResponse.Validation(issues.isEmpty(), issues));
 	}
 
@@ -391,6 +415,24 @@ public class TrainingImportDraftService {
 		List<TrainingImportDraftResponse.ValidationIssue> issues = new ArrayList<>();
 		addRecognitionIssue(issues, "training", draft.getRecognitionMetadata(),
 				TrainingImportRecognitionMetadata.isReviewed(draft.getRecognitionMetadata()));
+		if (draft.getTrainingImport().getTrainingType() == TrainingType.FREE_TEXT) {
+			if (data.sections().isEmpty()) {
+				issues.add(issue("NO_SECTIONS", "sections", "At least one training section is required"));
+			}
+			for (TrainingImportDraftSection section : data.sections()) {
+				String path = "sections/" + section.getSequenceNumber();
+				if (section.getTitle().isBlank()) {
+					issues.add(issue("SECTION_TITLE_REQUIRED", path + "/title", "A section title is required"));
+				}
+				if (section.getContent().isBlank()) {
+					issues.add(issue("SECTION_CONTENT_REQUIRED", path + "/content",
+							"Section content must be reviewed or completed"));
+				}
+				addRecognitionIssue(issues, path, section.getRecognitionMetadata(),
+						TrainingImportRecognitionMetadata.isReviewed(section.getRecognitionMetadata()));
+			}
+			return List.copyOf(issues);
+		}
 		if (data.definitions().isEmpty()) {
 			issues.add(issue("NO_DEFINITIONS", "definitions", "At least one definition is required"));
 		}
@@ -452,6 +494,60 @@ public class TrainingImportDraftService {
 			}
 		}
 		return List.copyOf(issues);
+	}
+
+	private TrainingImportDraftResponse updateFreeTextDraft(
+			TrainingImport trainingImport,
+			TrainingImportDraft draft,
+			TrainingImportDraftUpdateRequest request) {
+		if (request == null || request.name() == null || request.name().isBlank()
+				|| request.name().length() > 255 || request.trainingDate() == null
+				|| request.sections() == null || request.sections().isEmpty()) {
+			throw invalid("Training name, date, and at least one section are required");
+		}
+		if (request.definitions() == null || !request.definitions().isEmpty()) {
+			throw invalid("FREE_TEXT drafts cannot contain tempo definitions");
+		}
+		DraftData existing = loadDraftData(draft);
+		if (TrainingImportRecognitionMetadata.isUncertain(existingRootMetadata(existing))
+				&& !request.recognitionReviewed()) {
+			throw invalid("Uncertain training information must be confirmed or corrected");
+		}
+		Map<Long, TrainingImportDraftSection> sectionsById = existing.sectionsById();
+		Set<Long> usedIds = new HashSet<>();
+		Set<Integer> sequences = new HashSet<>();
+		List<TrainingImportDraftSection> updatedSections = new ArrayList<>();
+		for (TrainingImportDraftUpdateRequest.Section section : request.sections()) {
+			if (section == null || section.sequenceNumber() <= 0
+					|| section.title() == null || section.title().isBlank() || section.title().length() > 255
+					|| section.content() == null || section.content().isBlank()
+					|| !sequences.add(section.sequenceNumber())) {
+				throw invalid("FREE_TEXT section values must be nonblank and sequence numbers unique");
+			}
+			Map<String, Object> metadata = Map.of();
+			if (section.id() != null) {
+				TrainingImportDraftSection old = sectionsById.get(section.id());
+				if (old == null || !usedIds.add(section.id())) {
+					throw invalid("A section ID does not belong to this draft or is duplicated");
+				}
+				metadata = old.getRecognitionMetadata();
+			}
+			updatedSections.add(new TrainingImportDraftSection(
+					draft,
+					section.sequenceNumber(),
+					section.title(),
+					section.content(),
+					TrainingImportRecognitionMetadata.withReviewState(metadata, section.recognitionReviewed())));
+		}
+
+		draft.update(request.name(), request.trainingDate());
+		draft.setRecognitionMetadata(TrainingImportRecognitionMetadata.withReviewState(
+				draft.getRecognitionMetadata(), request.recognitionReviewed()));
+		draftRepository.saveAndFlush(draft);
+		sectionRepository.deleteAll(existing.sections());
+		sectionRepository.flush();
+		sectionRepository.saveAllAndFlush(updatedSections);
+		return toResponse(draft, loadDraftData(draft), trainingImport);
 	}
 
 	private void addRecognitionIssue(
@@ -657,7 +753,16 @@ public class TrainingImportDraftService {
 			List<TrainingImportDraftDefinition> definitions,
 			List<TrainingImportDraftSegment> segments,
 			List<TrainingImportDraftAthleteRow> athleteRows,
-			List<TrainingImportDraftExecution> executions) {
+			List<TrainingImportDraftExecution> executions,
+			List<TrainingImportDraftSection> sections) {
+
+		Map<Long, TrainingImportDraftSection> sectionsById() {
+			Map<Long, TrainingImportDraftSection> result = new HashMap<>();
+			for (TrainingImportDraftSection section : sections) {
+				result.put(section.getId(), section);
+			}
+			return result;
+		}
 
 		Map<Long, TrainingImportDraftDefinition> definitionsById() {
 			Map<Long, TrainingImportDraftDefinition> result = new HashMap<>();

@@ -16,6 +16,15 @@
     }
 
     <div class="field">
+      <label for="training-type">Rodzaj treningu <span aria-hidden="true">*</span></label>
+      <select id="training-type" class="field-control select-with-arrow"
+        [value]="trainingType()" [disabled]="uploading()" (change)="onTrainingTypeChange($event)">
+        <option value="TEMPO">Trening tempowy</option>
+        <option value="FREE_TEXT">Trening ogólny</option>
+      </select>
+    </div>
+
+    <div class="field">
       <label for="training-group">Grupa treningowa <span aria-hidden="true">*</span></label>
       <select
         id="training-group"

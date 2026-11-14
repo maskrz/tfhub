@@ -30,6 +30,7 @@ import pl.tfhub.api.trainingimport.service.TrainingImportUploadService;
 import pl.tfhub.api.trainingimport.service.TrainingImportProcessingService;
 import pl.tfhub.api.trainingimport.service.TrainingImportFinalizationService;
 import pl.tfhub.api.trainingimport.service.TrainingImportListService;
+import pl.tfhub.api.training.enums.TrainingType;
 
 @RestController
 @RequestMapping("/api/training-imports")
@@ -65,13 +66,14 @@ public class TrainingImportController {
 	@PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
 	public ResponseEntity<TrainingImportUploadResponse> upload(
 			@RequestParam("trainingGroupId") long trainingGroupId,
+			@RequestParam(name = "trainingType", defaultValue = "TEMPO") TrainingType trainingType,
 			MultipartHttpServletRequest request) {
 		MultiValueMap<String, MultipartFile> files = request.getMultiFileMap();
 		List<MultipartFile> images = files.get("image");
 		if (files.size() != 1 || images == null || images.size() != 1) {
 			throw new InvalidTrainingImportUploadException("Exactly one image file is required");
 		}
-		return ResponseEntity.accepted().body(uploadService.upload(trainingGroupId, images.get(0)));
+		return ResponseEntity.accepted().body(uploadService.upload(trainingGroupId, trainingType, images.get(0)));
 	}
 
 	@GetMapping("/{importId}")

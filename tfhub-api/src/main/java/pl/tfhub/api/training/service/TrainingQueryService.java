@@ -5,6 +5,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import pl.tfhub.api.common.authorization.AccessScopeService;
 import pl.tfhub.api.training.dto.response.TrainingListItemResponse;
+import pl.tfhub.api.training.enums.TrainingType;
 import pl.tfhub.api.training.repository.TrainingListRepository;
 import pl.tfhub.api.user.enums.UserRole;
 
@@ -22,12 +23,12 @@ public class TrainingQueryService {
     }
 
     @Transactional(readOnly = true)
-    public List<TrainingListItemResponse> listTrainings(boolean includeCompleted) {
+    public List<TrainingListItemResponse> listTrainings(boolean includeCompleted, TrainingType trainingType) {
         accessScopeService.requireCoachOrAdmin();
         var user = accessScopeService.currentUser();
         if (user.role() == UserRole.ADMIN) {
-            return trainingListRepository.findAll(includeCompleted);
+            return trainingListRepository.findAll(includeCompleted, trainingType);
         }
-        return trainingListRepository.findForCoach(user.id(), includeCompleted);
+        return trainingListRepository.findForCoach(user.id(), includeCompleted, trainingType);
     }
 }

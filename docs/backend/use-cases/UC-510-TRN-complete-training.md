@@ -5,6 +5,7 @@
 Allow an authorized user to manage athlete participation in an existing training and record or correct each participant's execution status, measured result and spike usage.
 
 The training plan is managed separately through UC-503 – Edit Training.
+This operation applies only to `TEMPO` trainings; `FREE_TEXT` trainings do not have athlete participation or execution records and use the training completion transition exposed by UC-503.
 
 ## 2. Actors and Preconditions
 
@@ -21,6 +22,7 @@ The training plan is managed separately through UC-503 – Edit Training.
 - COACH can do so only while assigned to the training's group.
 - All assigned coaches have identical permissions; creator ownership is not used.
 - The training group is immutable and is never accepted as a request field.
+- A `FREE_TEXT` training is not eligible for this operation.
 
 ### 3.2 Athlete Participation
 
@@ -68,6 +70,7 @@ The backend validates the complete combined result of all requested operations b
 
 - Reject unauthenticated users and users without ADMIN or COACH role.
 - Reject a missing training; do not reveal an inaccessible training to an unassigned coach.
+- Reject a FREE_TEXT training because it has no tempo participation or execution data.
 - Reject nonexistent athletes, new athletes not currently assigned to the training's group, duplicate athletes, invalid definition or segment references, duplicate IDs, and IDs belonging to another training.
 - Reject removal or reassignment of a participant with any `RECORDED` execution.
 - Reject invalid execution statuses, negative or out-of-range results, missing results for `RECORDED`, and results supplied for another status.

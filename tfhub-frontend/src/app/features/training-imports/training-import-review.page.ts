@@ -48,6 +48,14 @@ type DefinitionForm = FormGroup<{
   segments: FormArray<SegmentForm>;
   athleteRows: FormArray<RowForm>;
 }>;
+type SectionForm = FormGroup<{
+  id: FormControl<number | null>;
+  originalSequence: FormControl<number>;
+  metadata: FormControl<Metadata>;
+  title: FormControl<string>;
+  content: FormControl<string>;
+  recognitionReviewed: FormControl<boolean>;
+}>;
 type DialogAction = 'accept' | 'reject' | 'remove-definition' | 'remove-segment';
 
 const integerPattern = Validators.pattern(/^\d+$/);
@@ -88,6 +96,7 @@ export class TrainingImportReviewPage implements OnInit {
     trainingDate: new FormControl('', { nonNullable: true, validators: Validators.required }),
     recognitionReviewed: new FormControl(false, { nonNullable: true }),
     definitions: new FormArray<DefinitionForm>([]),
+    sections: new FormArray<SectionForm>([]),
   });
 
   private readonly route = inject(ActivatedRoute);
@@ -100,6 +109,7 @@ export class TrainingImportReviewPage implements OnInit {
   private pendingRemoval: { definition: number; segment?: number } | null = null;
 
   get definitions(): FormArray<DefinitionForm> { return this.form.controls.definitions; }
+  get sections(): FormArray<SectionForm> { return this.form.controls.sections; }
   busy(): boolean { return this.saving() || this.accepting() || this.rejecting(); }
 
   ngOnInit(): void {
@@ -148,6 +158,11 @@ export class TrainingImportReviewPage implements OnInit {
     return segment.controls.distanceM.value === null || segment.controls.distanceM.invalid
       || segment.controls.restAfterSeconds.invalid
       || (this.isUncertain(segment.controls.metadata.value) && !segment.controls.recognitionReviewed.value);
+  }
+
+  needsSectionReview(section: SectionForm): boolean {
+    return this.isUncertain(section.controls.metadata.value)
+      && !section.controls.recognitionReviewed.value;
   }
 
   needsAthleteReview(row: RowForm): boolean {
@@ -310,6 +325,22 @@ export class TrainingImportReviewPage implements OnInit {
     this.move(this.definitions, index, offset);
   }
 
+  addSection(): void {
+    if (this.busy()) return;
+    this.sections.push(this.sectionForm());
+    this.form.markAsDirty();
+  }
+
+  removeSection(index: number): void {
+    if (this.busy() || this.sections.length <= 1) return;
+    this.sections.removeAt(index);
+    this.form.markAsDirty();
+  }
+
+  moveSection(index: number, offset: number): void {
+    this.moveSections(this.sections, index, offset);
+  }
+
   addSegment(definition: number): void {
     if (this.busy()) return;
     this.segments(definition).push(this.segmentForm());
@@ -340,9 +371,11 @@ export class TrainingImportReviewPage implements OnInit {
     if (!this.draft() || this.busy() || this.rejected()) return;
     this.message.set(null);
     this.error.set(null);
-    if (this.form.invalid) {
+    if (this.form.invalid || (this.draft()?.trainingType === 'FREE_TEXT' && this.sections.length === 0)) {
       this.form.markAllAsTouched();
-      this.error.set('Sprawdź dane formularza: nazwy, datę, dystanse i przerwy.');
+      this.error.set(this.draft()?.trainingType === 'FREE_TEXT'
+        ? 'Sprawdź nazwę, datę oraz tytuły i opisy sekcji.'
+        : 'Sprawdź dane formularza: nazwy, datę, dystanse i przerwy.');
       return;
     }
     this.saving.set(true);
@@ -443,6 +476,9 @@ export class TrainingImportReviewPage implements OnInit {
       RECOGNITION_REVIEW_REQUIRED: 'Potwierdź lub popraw niepewne dane.',
       NO_DEFINITIONS: 'Dodaj co najmniej jeden wariant.',
       NO_SEGMENTS: 'Każdy wariant musi zawierać odcinek.',
+      NO_SECTIONS: 'Dodaj co najmniej jedną sekcję.',
+      SECTION_TITLE_REQUIRED: 'Uzupełnij tytuł sekcji.',
+      SECTION_CONTENT_REQUIRED: 'Uzupełnij opis sekcji.',
       SPIKE_USAGE_UNRESOLVED: 'Potwierdź użycie kolców.',
       ATHLETE_UNRESOLVED: 'Przypisz zawodnika lub pomiń wiersz.',
       ATHLETE_OUTSIDE_GROUP: 'Przypisany zawodnik nie należy już do wybranej grupy.',
@@ -452,6 +488,8 @@ export class TrainingImportReviewPage implements OnInit {
   }
 
   issueLocation(path: string): string {
+    const section = /^sections\/(\d+)/.exec(path);
+    if (section) return `Sekcja ${section[1]}`;
     const definition = /^definitions\/(\d+)(?:\/segments\/(\d+))?/.exec(path);
     if (definition) {
       const found = this.draft()?.definitions.find((item) => item.id === Number(definition[1]));
@@ -484,11 +522,26 @@ export class TrainingImportReviewPage implements OnInit {
     this.form.markAsDirty();
   }
 
+  private moveSections(array: FormArray<SectionForm>, index: number, offset: number): void {
+    const target = index + offset;
+    if (this.busy() || target < 0 || target >= array.length) return;
+    const controls = [...array.controls];
+    const [control] = controls.splice(index, 1);
+    controls.splice(target, 0, control);
+    array.controls.splice(0, array.length, ...controls);
+    array.updateValueAndValidity();
+    this.form.markAsDirty();
+  }
+
   private setDraft(draft: TrainingImportDraft): void {
     const previousControls = this.initialized ? this.resettableControls() : [];
     this.draft.set(draft);
     this.definitions.clear();
     for (const definition of draft.definitions) this.definitions.push(this.definitionForm(definition));
+    this.sections.clear();
+    for (const section of draft.sections) {
+      this.sections.push(this.sectionForm(section));
+    }
     this.form.controls.name.setValue(draft.name);
     this.form.controls.trainingDate.setValue(draft.trainingDate);
     this.form.controls.recognitionReviewed.setValue(draft.recognitionReviewed);
@@ -509,6 +562,7 @@ export class TrainingImportReviewPage implements OnInit {
     return [
       this.form.controls.name,
       this.form.controls.trainingDate,
+      ...this.sections.controls.flatMap((section) => [section.controls.title, section.controls.content]),
       ...this.definitions.controls.flatMap((definition) => [
         definition.controls.name,
         ...definition.controls.segments.controls.flatMap((segment) => [
@@ -542,6 +596,17 @@ export class TrainingImportReviewPage implements OnInit {
         executions: new FormArray(segments.map((segment) =>
           this.executionForm(row.executions.find((execution) => execution.segmentId === segment.id)))),
       }))),
+    });
+  }
+
+  private sectionForm(section?: TrainingImportDraft['sections'][number]): SectionForm {
+    return new FormGroup({
+      id: new FormControl(section?.id ?? null),
+      originalSequence: new FormControl(section?.sequenceNumber ?? 0, { nonNullable: true }),
+      metadata: new FormControl(section?.recognitionMetadata ?? {}, { nonNullable: true }),
+      title: new FormControl(section?.title ?? '', { nonNullable: true, validators: [nonBlank, Validators.maxLength(255)] }),
+      content: new FormControl(section?.content ?? '', { nonNullable: true, validators: [nonBlank] }),
+      recognitionReviewed: new FormControl(section?.recognitionReviewed ?? false, { nonNullable: true }),
     });
   }
 
@@ -609,6 +674,13 @@ export class TrainingImportReviewPage implements OnInit {
         })),
         };
       }),
+      sections: value.sections.map((section, index) => ({
+        id: section.id,
+        sequenceNumber: this.sequenceNumbers(value.sections.map((item) => item.originalSequence))[index],
+        title: section.title.trim(),
+        content: section.content.trim(),
+        recognitionReviewed: section.recognitionReviewed,
+      })),
     };
   }
 

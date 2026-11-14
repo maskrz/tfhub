@@ -7,9 +7,12 @@ import { EMPTY, catchError, finalize, take } from 'rxjs';
 import { AuthService } from '../../core/auth/auth.service';
 import { TrainingGroup, TrainingGroupsApiService } from '../training-groups/training-groups-api.service';
 import {
+  CreateFreeTextTrainingRequest,
   CreateTrainingDefinitionRequest,
   CreateTrainingRequest,
   CreateTrainingResponse,
+  CreateTrainingSectionRequest,
+  TrainingType,
 } from './training.model';
 import { parseRestDuration } from './training-rest-time';
 import { TrainingsApiService } from './trainings-api.service';
@@ -22,6 +25,11 @@ type SegmentForm = FormGroup<{
 type DefinitionForm = FormGroup<{
   name: FormControl<string>;
   segments: FormArray<SegmentForm>;
+}>;
+
+type TrainingSectionForm = FormGroup<{
+  title: FormControl<string>;
+  content: FormControl<string>;
 }>;
 
 const trimmedRequired: ValidatorFn = (control) =>
@@ -78,6 +86,13 @@ function createDefinitionForm(): DefinitionForm {
   });
 }
 
+function createTrainingSectionForm(): TrainingSectionForm {
+  return new FormGroup({
+    title: new FormControl('', { nonNullable: true, validators: [trimmedRequired] }),
+    content: new FormControl('', { nonNullable: true, validators: [trimmedRequired] }),
+  });
+}
+
 @Component({
   imports: [ReactiveFormsModule, RouterLink],
   selector: 'app-training-create-page',
@@ -85,6 +100,7 @@ function createDefinitionForm(): DefinitionForm {
   templateUrl: './training-create.page.html',
 })
 export class TrainingCreatePage implements OnInit {
+  readonly trainingType = signal<TrainingType>('TEMPO');
   readonly groups = signal<TrainingGroup[]>([]);
   readonly groupsLoading = signal(false);
   readonly submitting = signal(false);
@@ -101,10 +117,9 @@ export class TrainingCreatePage implements OnInit {
       validators: [Validators.required, validDate],
     }),
     trainingGroupId: new FormControl<number | null>(null, Validators.required),
-    definitions: new FormArray<DefinitionForm>([createDefinitionForm()], {
-      validators: [Validators.minLength(1)],
-    }),
+    definitions: new FormArray<DefinitionForm>([createDefinitionForm()]),
   });
+  readonly sections = new FormArray<TrainingSectionForm>([createTrainingSectionForm()]);
 
   readonly auth = inject(AuthService);
   private readonly groupsApi = inject(TrainingGroupsApiService);
@@ -117,7 +132,23 @@ export class TrainingCreatePage implements OnInit {
   }
 
   ngOnInit(): void {
+    this.form.controls.definitions.setValidators(Validators.minLength(1));
     this.loadGroups();
+  }
+
+  onTrainingTypeChange(event: Event): void {
+    const select = event.target;
+    if (!(select instanceof HTMLSelectElement)) return;
+    if (select.value !== 'TEMPO' && select.value !== 'FREE_TEXT') return;
+    const trainingType = select.value as TrainingType;
+    this.trainingType.set(trainingType);
+    if (trainingType === 'TEMPO') {
+      this.definitions.enable({ emitEvent: false });
+      this.definitions.setValidators(Validators.minLength(1));
+    } else {
+      this.definitions.disable({ emitEvent: false });
+    }
+    this.definitions.updateValueAndValidity();
   }
 
   onGroupChange(event: Event): void {
@@ -169,6 +200,23 @@ export class TrainingCreatePage implements OnInit {
     segments.updateValueAndValidity();
   }
 
+  addSection(): void {
+    this.sections.push(createTrainingSectionForm());
+  }
+
+  removeSection(index: number): void {
+    if (this.sections.length > 1) this.sections.removeAt(index);
+  }
+
+  moveSection(index: number, offset: number): void {
+    const target = index + offset;
+    if (target < 0 || target >= this.sections.length) return;
+    const section = this.sections.at(index);
+    this.sections.removeAt(index, { emitEvent: false });
+    this.sections.insert(target, section, { emitEvent: false });
+    this.sections.updateValueAndValidity();
+  }
+
   fieldError(
     control: AbstractControl,
     requiredMessage: string,
@@ -194,11 +242,19 @@ export class TrainingCreatePage implements OnInit {
     this.attemptedSubmit.set(true);
     this.errorMessage.set(null);
     this.form.markAllAsTouched();
-    this.definitions.updateValueAndValidity();
-    if (this.form.invalid) return;
+    if (this.trainingType() === 'TEMPO') {
+      this.definitions.updateValueAndValidity();
+    } else {
+      this.sections.markAllAsTouched();
+      this.sections.updateValueAndValidity();
+    }
+    if (this.form.invalid || (this.trainingType() === 'FREE_TEXT' && this.sections.invalid)) return;
 
     this.submitting.set(true);
-    this.trainingsApi.create(this.toRequest()).pipe(
+    const createRequest = this.trainingType() === 'TEMPO'
+      ? this.trainingsApi.create(this.toRequest())
+      : this.trainingsApi.createFreeText(this.toFreeTextRequest());
+    createRequest.pipe(
       take(1),
       catchError((error: unknown) => {
         this.errorMessage.set(this.getErrorMessage(error));
@@ -244,6 +300,21 @@ export class TrainingCreatePage implements OnInit {
       trainingDate: value.trainingDate,
       trainingGroupId: value.trainingGroupId!,
       definitions,
+    };
+  }
+
+  private toFreeTextRequest(): CreateFreeTextTrainingRequest {
+    const value = this.form.getRawValue();
+    const sections: CreateTrainingSectionRequest[] = this.sections.getRawValue().map((section, index) => ({
+      title: section.title.trim(),
+      content: section.content.trim(),
+      sequenceNumber: index + 1,
+    }));
+    return {
+      name: value.name.trim(),
+      trainingDate: value.trainingDate,
+      trainingGroupId: value.trainingGroupId!,
+      sections,
     };
   }
 

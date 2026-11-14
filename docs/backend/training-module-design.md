@@ -1,11 +1,13 @@
 # TFHub Training Module — Data Model Design
 
 **Status:** Agreed design decisions
-**Scope:** Running training sessions, named variants, segment execution, printable sheets, and reviewed OCR imports.
+**Scope:** Shared training sessions, TEMPO plans and execution, FREE_TEXT sections, and reviewed OCR imports.
 
 ## 1. Design decisions
 
 - A `Training` is one dated session for exactly one existing `TrainingGroup`.
+- `Training` is the shared root for `TEMPO` and `FREE_TEXT` sessions. Its `training_type` is immutable after creation.
+- `TEMPO` keeps its existing definitions, segments, athlete participations and execution records. `FREE_TEXT` has ordered text sections and no athlete participations or executions.
 - The training group is immutable after creation.
 - A `TrainingDefinition` is a named, ordered variant within one training. It is not a reusable template.
 - Athletes participate in one definition per training.
@@ -16,6 +18,8 @@
 - Do not add a generic exercise abstraction, sheet snapshot tables, draft revision history, audit log, or event-sourcing mechanism.
 
 The existing application uses PostgreSQL, Spring Data JPA, Flyway, identity `BIGINT` primary keys, plural snake_case tables, string-valued enums, and restrictive foreign keys for historical records. Add schema through a new Flyway migration; do not modify an existing migration.
+
+Use the existing `training_sessions` table as the shared root rather than JPA inheritance or separate root tables. V13 adds `training_type`, defaults and backfills existing rows to `TEMPO`, and constrains values to `TEMPO` and `FREE_TEXT`. This keeps all existing session identifiers and tempo foreign keys in place.
 
 ## 2. Persisted training data
 
@@ -30,10 +34,27 @@ One persisted training event for one group.
 | `name` | `VARCHAR` | No | Training name |
 | `training_date` | `DATE` | No | Calendar date |
 | `status` | `VARCHAR(20)` | No | `PLANNED` or `COMPLETED`; defaults to `PLANNED` |
+| `training_type` | `VARCHAR(20)` | No | `TEMPO` or `FREE_TEXT`; existing sessions default to `TEMPO` |
 
 Use `ON DELETE RESTRICT` / `ON UPDATE RESTRICT` for the group FK. Constrain status to `PLANNED` or `COMPLETED`. Do not add creator-based access. Group immutability is an application invariant: creation sets the group, and no create/edit/import operation may subsequently change it. No trigger is proposed.
 
-### 2.2 `training_definitions`
+The training type is also immutable. Tempo-specific operations must reject FREE_TEXT sessions; free-text operations must reject TEMPO sessions. The existing tempo tables, their IDs and all their foreign keys remain unchanged.
+
+### 2.2 `training_sections`
+
+One ordered free-text section within a FREE_TEXT session.
+
+| Column | Type | Null | Meaning |
+|---|---|---:|---|
+| `id` | `BIGINT` identity | No | Stable section identity |
+| `training_session_id` | `BIGINT` | No | FK to `training_sessions.id` |
+| `title` | `TEXT` | No | User-editable section title |
+| `content` | `TEXT` | No | User-editable exercise/description text |
+| `sequence_number` | `INTEGER` | No | Display order |
+
+Use a restrictive FK, unique `(training_session_id, sequence_number)` order, and a positive sequence constraint. Keep titles as free text; do not add an exercise entity or fixed section enum. Service validation enforces at least one section and prevents section operations on TEMPO sessions. V14 adds this table. Deletion explicitly removes sections before the session root.
+
+### 2.3 `training_definitions`
 
 One named variant within a training.
 
@@ -46,7 +67,7 @@ One named variant within a training.
 
 Definitions have a unique `(training_session_id, sequence_number)` order. Also enforce `UNIQUE (id, training_session_id)` for the participation composite FK. Names must not be blank.
 
-### 2.3 `training_segments`
+### 2.4 `training_segments`
 
 One planned segment within a definition.
 
@@ -60,7 +81,7 @@ One planned segment within a definition.
 
 Enforce unique `(training_definition_id, sequence_number)`, positive sequence and distance, and nonnegative rest when present. Segment identity is its `id`, not its sequence; reordering updates sequence only. Enforce `UNIQUE (id, training_definition_id)` for execution integrity.
 
-### 2.4 `training_athlete_participations`
+### 2.5 `training_athlete_participations`
 
 One athlete's assignment to one definition in one training.
 
@@ -75,7 +96,7 @@ Enforce `UNIQUE (training_session_id, athlete_id)` so an athlete cannot be assig
 
 At initial assignment, validate that the athlete currently belongs to the training's group and has a group. Do not store or FK the athlete's current group in this participation: reassignment later must not invalidate historical participation. Existing assignments are not revalidated during unrelated edits.
 
-### 2.5 `training_segment_executions`
+### 2.6 `training_segment_executions`
 
 Execution data for one participant and one planned segment.
 

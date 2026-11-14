@@ -1,0 +1,100 @@
+<section class="page" aria-labelledby="page-title">
+  <div class="page-heading">
+    <div>
+      <a class="back-link" [routerLink]="['/trainings', trainingId]">← Wróć do treningu</a>
+      <h1 id="page-title">Edytuj trening ogólny</h1>
+    </div>
+  </div>
+
+  @if (loading()) {
+    <p class="field-hint" role="status">Ładowanie treningu...</p>
+  } @else if (loadError(); as message) {
+    <div class="form-error" role="alert">
+      <p>{{ message }}</p>
+      <button type="button" class="button button--secondary" (click)="retry()">Spróbuj ponownie</button>
+    </div>
+  } @else if (training()) {
+    @if (errorMessage(); as message) {
+      <p class="form-error page-error" role="alert">{{ message }}</p>
+    }
+
+    <form [formGroup]="form" (ngSubmit)="submit()" novalidate>
+      <section class="form-section" aria-labelledby="training-details-heading">
+        <h2 id="training-details-heading">Dane treningu</h2>
+        <div class="details-grid">
+          <div class="field">
+            <label for="training-name">Nazwa <span aria-hidden="true">*</span></label>
+            <input id="training-name" class="field-control" type="text" maxlength="255" [formControl]="form.controls.name" />
+            @if (fieldError(form.controls.name, 'Wpisz nazwę treningu.', ''); as message) {
+              <span class="field-error">{{ message }}</span>
+            }
+          </div>
+          <div class="field">
+            <label for="training-date">Data <span aria-hidden="true">*</span></label>
+            <input id="training-date" class="field-control" type="date" [formControl]="form.controls.trainingDate" />
+            @if (fieldError(form.controls.trainingDate, 'Wybierz prawidłową datę.', 'Wybierz prawidłową datę.'); as message) {
+              <span class="field-error">{{ message }}</span>
+            }
+          </div>
+          <div class="field">
+            <label for="training-group">Grupa treningowa</label>
+            <input id="training-group" class="field-control" type="text" [value]="training()?.trainingGroup?.name" readonly />
+          </div>
+        </div>
+      </section>
+
+      <section class="form-section definitions-section" aria-labelledby="sections-heading">
+        <div class="section-heading">
+          <div>
+            <h2 id="sections-heading">Sekcje treningu</h2>
+            <p>Zmień kolejność, tytuły i opisy poszczególnych części.</p>
+          </div>
+          <button type="button" class="button button--secondary" (click)="addSection()">Dodaj sekcję</button>
+        </div>
+
+        @if (sections.hasError('minlength') && attemptedSubmit()) {
+          <p class="field-error" role="alert">Dodaj co najmniej jedną sekcję.</p>
+        }
+
+        @for (section of sections.controls; track section; let sectionIndex = $index) {
+          <article class="definition-card" [attr.aria-labelledby]="'training-section-heading-' + sectionIndex">
+            <div class="definition-heading">
+              <h3 [id]="'training-section-heading-' + sectionIndex">Sekcja {{ sectionIndex + 1 }}</h3>
+              <div class="item-actions">
+                <button type="button" class="button button--secondary segment-action-button"
+                  [attr.aria-label]="'Przenieś sekcję ' + (sectionIndex + 1) + ' w górę'"
+                  [disabled]="sectionIndex === 0" (click)="moveSection(sectionIndex, -1)">↑</button>
+                <button type="button" class="button button--secondary segment-action-button"
+                  [attr.aria-label]="'Przenieś sekcję ' + (sectionIndex + 1) + ' w dół'"
+                  [disabled]="sectionIndex === sections.length - 1" (click)="moveSection(sectionIndex, 1)">↓</button>
+                <button type="button" class="button button--secondary remove-button segment-action-button"
+                  [disabled]="sections.length === 1" (click)="removeSection(sectionIndex)">Usuń</button>
+              </div>
+            </div>
+            <div class="field">
+              <label [for]="'section-title-' + sectionIndex">Tytuł <span aria-hidden="true">*</span></label>
+              <input class="field-control" type="text" [id]="'section-title-' + sectionIndex" [formControl]="section.controls.title" />
+              @if (fieldError(section.controls.title, 'Wpisz tytuł sekcji.', ''); as message) {
+                <span class="field-error">{{ message }}</span>
+              }
+            </div>
+            <div class="field">
+              <label [for]="'section-content-' + sectionIndex">Opis <span aria-hidden="true">*</span></label>
+              <textarea class="field-control" rows="4" [id]="'section-content-' + sectionIndex" [formControl]="section.controls.content"></textarea>
+              @if (fieldError(section.controls.content, 'Wpisz opis sekcji.', ''); as message) {
+                <span class="field-error">{{ message }}</span>
+              }
+            </div>
+          </article>
+        }
+      </section>
+
+      <footer class="form-actions">
+        <a class="button button--secondary" [routerLink]="['/trainings', trainingId]">Anuluj</a>
+        <button type="submit" class="button button--primary" [disabled]="submitting()">
+          {{ submitting() ? 'Zapisywanie...' : 'Zapisz zmiany' }}
+        </button>
+      </footer>
+    </form>
+  }
+</section>

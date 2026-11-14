@@ -21,18 +21,33 @@
         <div>
           <h2>{{ currentTraining.name }}</h2>
           <p>{{ formatDate(currentTraining.trainingDate) }} · {{ currentTraining.trainingGroup.name }}</p>
+          <span class="training-type-badge">
+            {{ currentTraining.trainingType === 'TEMPO' ? 'Trening tempowy' : 'Trening ogólny' }}
+          </span>
         </div>
         <span class="status-badge" [class.status-badge--completed]="currentTraining.status === 'COMPLETED'">
           {{ currentTraining.status === 'COMPLETED' ? 'Zakończony' : 'Planowany' }}
         </span>
       </div>
+      @if (actionError(); as message) {
+        <p class="feedback error" role="alert">{{ message }}</p>
+      }
       <div class="training-actions">
-        <a class="button button--secondary" [routerLink]="['/trainings', currentTraining.id, 'edit']">
-          Edytuj trening
-        </a>
-        <a class="button button--primary" [routerLink]="['/trainings', currentTraining.id, 'complete']">
-          Uzupełnij trening
-        </a>
+        <a
+          class="button button--secondary"
+          [routerLink]="currentTraining.trainingType === 'TEMPO'
+            ? ['/trainings', currentTraining.id, 'edit']
+            : ['/trainings', currentTraining.id, 'free-text', 'edit']"
+        >Edytuj trening</a>
+        @if (currentTraining.trainingType === 'TEMPO') {
+          <a class="button button--primary" [routerLink]="['/trainings', currentTraining.id, 'complete']">
+            Uzupełnij trening
+          </a>
+        } @else if (currentTraining.status === 'PLANNED') {
+          <button type="button" class="button button--primary" [disabled]="completing()" (click)="completeFreeTextTraining()">
+            {{ completing() ? 'Zapisywanie...' : 'Oznacz jako zakończony' }}
+          </button>
+        }
         <button
           type="button"
           class="button button--danger delete-training-button"
@@ -54,7 +69,20 @@
       }
     }
 
-    @if (currentTraining.definitions.length === 0) {
+    @if (currentTraining.trainingType === 'FREE_TEXT') {
+      @if (currentTraining.sections.length === 0) {
+        <p class="feedback" role="status">Ten trening nie ma jeszcze sekcji.</p>
+      } @else {
+        @for (section of currentTraining.sections; track section.id) {
+          <section class="details-card definition-card" [attr.aria-labelledby]="'training-section-' + section.id">
+            <div class="section-heading">
+              <h2 [id]="'training-section-' + section.id">{{ section.sequenceNumber }}. {{ section.title }}</h2>
+            </div>
+            <p class="training-section-content">{{ section.content }}</p>
+          </section>
+        }
+      }
+    } @else if (currentTraining.definitions.length === 0) {
       <p class="feedback" role="status">Ten trening nie ma jeszcze podgrup.</p>
     } @else {
       @for (definition of currentTraining.definitions; track definition.id) {

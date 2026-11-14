@@ -29,15 +29,9 @@ Rejection must preserve the import, its current draft, processing attempts and o
 - Acceptance confirms the entire training import in one operation.
 - The user must explicitly confirm the complete reviewed draft.
 - Individual cells, athletes or training definitions cannot be accepted separately.
-- Acceptance creates exactly one persisted training session.
-- The training session must be created using the data from the latest saved and validated draft.
-- The persisted training session must include:
-    - Training name and date.
-    - Exactly one assigned training group.
-    - All training definitions.
-    - All training segments.
-    - All matched athlete participations.
-    - All valid execution data.
+- Acceptance creates exactly one persisted training session using the import's immutable type and latest saved, validated draft.
+- For `TEMPO`, the persisted session includes the training name/date, one assigned group, ordered definitions/segments, matched participations and valid executions.
+- For `FREE_TEXT`, the persisted session includes the training name/date, one assigned group and ordered free-text sections. It creates no definitions, athlete participations or execution records.
 - Athlete rows explicitly marked as skipped must not create athlete participations or execution records.
 - Unresolved athlete rows must prevent acceptance.
 - Only athletes matched to existing athletes belonging to the selected training group may be persisted.
@@ -45,6 +39,7 @@ Rejection must preserve the import, its current draft, processing attempts and o
 - Training definitions and segments must preserve their reviewed order.
 - Execution status, measured results and spike usage must preserve the values confirmed during review.
 - The created training session must have status `COMPLETED`, even if some executions remain `PENDING`.
+- An accepted `FREE_TEXT` training is also created with status `COMPLETED`; normal manually created FREE_TEXT trainings may remain planned until completed later.
 - The created training session must retain the immutable group selected during upload.
 - The import must transition to ACCEPTED only after the complete training session and its related data have been successfully persisted.
 
@@ -99,6 +94,7 @@ Rejection must preserve the import, its current draft, processing attempts and o
 - Acceptance or rejection must not modify or delete the source image.
 - The source image must remain associated with the import for future inspection.
 - If the accepted training is later permanently deleted under UC-505, the linked import and its source image are also deleted.
+- The accepted import retains its association with the resulting training, and the image remains protected by the existing authorized source-image endpoint; accepted-import cleanup must not remove it while the training exists.
 
 ## 5. Authorization Rules
 
@@ -202,8 +198,8 @@ Use `POST /api/training-imports/{importId}/reject`.
 7. All athlete rows must be matched or explicitly skipped before acceptance.
 8. Only existing athletes belonging to the selected group can be persisted as participants.
 9. Skipped athlete rows do not create athlete participations or execution records.
-10. Acceptance creates exactly one training session with status `COMPLETED`, even if some executions remain `PENDING`.
-11. The created training session contains the reviewed definitions, segments, participants and execution data. Import acceptance remains an atomic path that creates a complete session; normal post-creation participation and execution changes use UC-510.
+10. Acceptance creates exactly one training session with status `COMPLETED`.
+11. A TEMPO session contains the reviewed definitions, segments, participants and execution data; a FREE_TEXT session contains its ordered sections and no athlete records. TEMPO participation and execution changes after creation use UC-510.
 12. Execution statuses, measured results and spike usage are preserved.
 13. The import transitions to ACCEPTED only after successful creation of all training data.
 14. Acceptance is atomic: failure leaves no partially created training data and the import remains REVIEW_REQUIRED.

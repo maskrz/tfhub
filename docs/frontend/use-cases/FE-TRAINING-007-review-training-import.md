@@ -15,8 +15,8 @@ Allow an authorized user to inspect and correct the current OCR draft before the
 
 1. The user selects a review-required import from the training list and the frontend retrieves `GET /api/training-imports/{importId}/draft`.
 2. The frontend retrieves the optimized JPEG from `GET /api/training-imports/{importId}/source-image`.
-3. The user compares the image with recognized data, corrects the draft and resolves every athlete row by matching or explicitly skipping it.
-4. The frontend retrieves athlete candidates from `GET /api/training-imports/{importId}/athlete-candidates?query=...`.
+3. The user compares the image with recognized data and corrects the type-specific draft. TEMPO review resolves athlete rows; FREE_TEXT review edits ordered section titles and content without athlete matching.
+4. For TEMPO, the frontend retrieves athlete candidates from `GET /api/training-imports/{importId}/athlete-candidates?query=...`.
 5. The user saves all corrections with `PUT /api/training-imports/{importId}/draft`.
 6. The frontend displays backend validation results and remains in review until the user explicitly accepts or rejects through FE-TRAINING-008.
 
@@ -34,6 +34,8 @@ The user may:
 - Correct each execution status, measured result and spike usage independently.
 
 The group selected at upload is read-only. Athlete candidate results and assignments must be restricted to that group for both ADMIN and COACH users. The user cannot create athletes or change their group assignments.
+
+For FREE_TEXT imports, show editable section titles/content in order, allow section add/remove/reorder, and preserve partial or uncertain OCR for correction. A one-section fallback or uncertain grouping is reviewable; only outstanding required data/review issues should block readiness, not successful draft retrieval.
 
 ## 5. Validation and Saving
 
@@ -79,3 +81,4 @@ The group selected at upload is read-only. Athlete candidate results and assignm
 8. Failed saves preserve user edits; successful saves do not automatically accept or reject the import.
 9. Draft changes do not create or alter persisted training data.
 10. The UI uses existing TFHUB patterns, Polish text and responsive behavior.
+11. FREE_TEXT review permits section corrections and does not request athlete matching or display tempo execution controls.

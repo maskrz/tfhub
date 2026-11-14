@@ -46,6 +46,8 @@ const training: TrainingDetails = {
     segments: [{ id: 18, sequenceNumber: 1, distanceM: 100, restAfterSeconds: null }],
     participations: [],
   }],
+  trainingType: 'TEMPO',
+  sections: [],
 };
 
 describe('TrainingDetailsPage', () => {
@@ -53,6 +55,7 @@ describe('TrainingDetailsPage', () => {
   let api: {
     getById: ReturnType<typeof vi.fn>;
     deleteTraining: ReturnType<typeof vi.fn>;
+    completeFreeText: ReturnType<typeof vi.fn>;
   };
 
   async function createPage(
@@ -62,6 +65,7 @@ describe('TrainingDetailsPage', () => {
     api = {
       getById: vi.fn(loader),
       deleteTraining: vi.fn(() => of(void 0)),
+      completeFreeText: vi.fn(() => of({ id: 12 })),
     };
     await TestBed.configureTestingModule({
       imports: [TrainingDetailsPage],
@@ -122,6 +126,30 @@ describe('TrainingDetailsPage', () => {
     expect(text).toContain('Jan Kowalski');
   });
 
+  it('displays FREE_TEXT sections, uses the matching edit flow, and supports completion', async () => {
+    const freeText: TrainingDetails = {
+      ...training,
+      trainingType: 'FREE_TEXT',
+      definitions: [],
+      sections: [
+        { id: 31, title: 'Rozgrzewka', content: 'Trucht 10 minut', sequenceNumber: 1 },
+        { id: 32, title: 'Część główna', content: 'Skip A', sequenceNumber: 2 },
+      ],
+    };
+    await createPage(() => of(freeText));
+
+    expect(fixture.nativeElement.textContent).toContain('1. Rozgrzewka');
+    expect(fixture.nativeElement.textContent).toContain('Trucht 10 minut');
+    expect(fixture.nativeElement.textContent).toContain('2. Część główna');
+    expect(fixture.nativeElement.querySelector('a[href="/trainings/12/free-text/edit"]')).toBeTruthy();
+    expect(fixture.nativeElement.querySelector('a[href="/trainings/12/complete"]')).toBeNull();
+    expect(fixture.nativeElement.textContent).toContain('Oznacz jako zakończony');
+
+    fixture.componentInstance.completeFreeTextTraining();
+    await fixture.whenStable();
+    expect(api.completeFreeText).toHaveBeenCalledWith(12);
+  });
+
   it('displays rest in minutes, seconds and an empty marker', async () => {
     await createPage(() => of({
       ...training,
@@ -180,6 +208,7 @@ describe('TrainingDetailsPage', () => {
           }],
         }],
       }],
+      trainingType: 'TEMPO',
     };
     await createPage(() => of(pendingTraining));
     const resultCells = [...fixture.nativeElement.querySelectorAll('.executions-table tbody td')] as HTMLElement[];
@@ -193,6 +222,7 @@ describe('TrainingDetailsPage', () => {
     api = {
       getById: vi.fn(() => pending.asObservable()),
       deleteTraining: vi.fn(() => of(void 0)),
+      completeFreeText: vi.fn(() => of({ id: 12 })),
     };
     await TestBed.configureTestingModule({
       imports: [TrainingDetailsPage],

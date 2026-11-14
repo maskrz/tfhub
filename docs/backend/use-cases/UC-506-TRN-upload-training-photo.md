@@ -2,7 +2,7 @@
 
 ## 1. Purpose
 
-Provide a backend operation for uploading a training result sheet photo and creating a training import.
+Provide a backend operation for uploading a training sheet photo and creating a typed training import.
 
 The operation must validate the uploaded file, enforce group-based authorization and create an import record that can be processed asynchronously.
 
@@ -32,7 +32,13 @@ Uploading a photo must not create or modify a persisted training session.
 - The selected group defines the scope for subsequent athlete recognition and matching.
 - The group assigned to an import is immutable throughout its processing, review and finalization lifecycle.
 
-### 4.2 Photo Upload
+### 4.2 Training Type
+
+- Every import has exactly one training type: `TEMPO` or `FREE_TEXT`.
+- The caller may select the type when uploading. Requests that omit `trainingType` default to `TEMPO` for compatibility with existing clients.
+- The selected type is immutable throughout processing, review and finalization; it selects the type-specific recognition and draft behavior.
+
+### 4.3 Photo Upload
 
 - One upload request must contain exactly one image.
 - The system must reject files that are not supported image formats.
@@ -46,7 +52,7 @@ Uploading a photo must not create or modify a persisted training session.
 - The system must generate a unique identifier for each accepted import.
 - The upload operation must not create a persisted training session, training definitions, segments, athlete participations or execution results.
 
-### 4.3 Import Creation
+### 4.4 Import Creation
 
 - A successful upload creates a new training import record.
 - The import must be associated with:
@@ -55,10 +61,11 @@ Uploading a photo must not create or modify a persisted training session.
     - The optimized JPEG source image.
     - The import creation timestamp.
 - A newly created import must enter a state indicating that processing is pending.
+- The import must retain the selected training type.
 - The import must be eligible for asynchronous processing by UC-507 immediately after upload succeeds.
 - The import must remain separate from persisted training session data until explicitly accepted through UC-509.
 
-### 4.4 Duplicate Photo Detection
+### 4.5 Duplicate Photo Detection
 
 - The system should detect whether the optimized JPEG has already been submitted, using its SHA-256 hash.
 - Duplicate detection must not block the upload.
@@ -67,7 +74,7 @@ Uploading a photo must not create or modify a persisted training session.
 - Duplicate detection must not automatically merge imports or reuse previous OCR results.
 - Duplicate hashes are non-unique: every upload creates a distinct import even when the optimized image is identical to an earlier one.
 
-### 4.5 Import Isolation
+### 4.6 Import Isolation
 
 - Uploaded photos and import drafts must remain isolated from ordinary training session data.
 - A pending import must not appear in the standard training list (UC-501).
@@ -104,7 +111,7 @@ A failed upload must not leave an import record that references a missing or inc
 
 ## 7. Output
 
-A successful `POST /api/training-imports` accepts multipart fields `trainingGroupId` and one `image`, creates the import in `PENDING`, and returns `202 Accepted`. The asynchronous processor starts without waiting for OCR in the upload request. Clients retrieve status using `GET /api/training-imports/{importId}`.
+A successful `POST /api/training-imports` accepts multipart fields `trainingGroupId`, optional `trainingType` (default `TEMPO`) and one `image`, creates the import in `PENDING`, and returns `202 Accepted`. The asynchronous processor starts without waiting for OCR in the upload request. Clients retrieve status using `GET /api/training-imports/{importId}`.
 
 `GET /api/training-imports` returns active import summaries for the current ADMIN or COACH. ADMIN sees all groups; COACH sees only currently assigned groups. The list includes `PENDING`, `PROCESSING`, `REVIEW_REQUIRED` and `FAILED`, excludes `ACCEPTED` and `REJECTED`, and is ordered by creation time and ID descending. Each item contains `id`, `trainingGroupId`, `trainingGroupName`, `status`, `nextRetryAt`, `createdAt`, `possibleDuplicate`, nullable draft `name` and `trainingDate`, and the latest attempt's safe nullable `failureMessage`. No source path or raw model response is exposed. These summaries remain separate from UC-501 persisted training sessions.
 
@@ -114,6 +121,7 @@ The response must include at least:
 - Selected training group identifier.
 - Current import status.
 - Whether the uploaded image was detected as a possible duplicate.
+- The selected training type.
 
 The response must not expose internal file storage paths, API credentials or other sensitive implementation details.
 
@@ -159,3 +167,4 @@ The response must not expose internal file storage paths, API credentials or oth
 15. A successful upload returns the import identifier, group identifier, status and duplicate indication.
 16. A failed upload does not leave an incomplete import or orphaned source image.
 17. Unauthorized users cannot upload training photos.
+18. The selected training type is stored immutably; omitted types preserve legacy `TEMPO` behavior.

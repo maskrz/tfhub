@@ -8,6 +8,7 @@ import { TrainingImportsApiService } from './training-imports-api.service';
 const draft: TrainingImportDraft = {
   importId: 21,
   status: 'REVIEW_REQUIRED',
+  trainingType: 'TEMPO',
   trainingGroup: { id: 7, name: 'Grupa A' },
   name: 'Interwały',
   trainingDate: '2026-11-10',
@@ -34,6 +35,7 @@ const draft: TrainingImportDraft = {
       ],
     }],
   }],
+  sections: [],
   validation: { readyForAcceptance: false, issues: [
     { code: 'SEGMENT_DISTANCE_UNRESOLVED', path: 'definitions/10/segments/1/distanceM', message: 'Distance required' },
   ] },

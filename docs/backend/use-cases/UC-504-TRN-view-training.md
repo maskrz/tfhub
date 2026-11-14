@@ -2,7 +2,7 @@
 
 ## 1. Purpose
 
-Provide a backend operation for retrieving complete details of an existing training session, including its training definitions, segments, athlete participation and execution data.
+Provide a backend operation for retrieving complete details of an existing training session, including its training type-specific content and, for tempo sessions, athlete participation and execution data.
 
 The operation must enforce role-based access and training group visibility rules.
 
@@ -38,12 +38,10 @@ The operation must enforce role-based access and training group visibility rules
 
 The operation must return the complete structure of the training session, including:
 
-- Training identifier, name, date and status.
+- Training identifier, name, date, type and status.
 - Assigned training group.
-- All training definitions.
-- All segments belonging to each definition.
-- All athlete participations.
-- Execution data for participating athletes and their segments.
+- For `TEMPO`, all training definitions/segments, athlete participations and execution data.
+- For `FREE_TEXT`, all sections in sequence order, with title and content; no athlete participation or execution data is created or returned.
 
 The response must represent the persisted state of the training session.
 
@@ -73,6 +71,7 @@ The response must represent the persisted state of the training session.
 - A training session may have participants without any recorded execution data.
 - The operation must return the training session and its complete planned structure even when no execution data exists.
 - Empty collections must be returned where applicable rather than treating missing related records as an error.
+- `FREE_TEXT` training details are available to authorized ADMIN/COACH users only and must not be exposed through athlete-facing views or APIs.
 
 ## 5. Authorization Rules
 
@@ -102,6 +101,7 @@ The response must include at least:
 - Training identifier.
 - Training name.
 - Training date.
+- Training type (`TEMPO` or `FREE_TEXT`).
 - Training status.
 - Assigned training group identifier and name.
 - Training definitions.
@@ -109,6 +109,7 @@ The response must include at least:
 - Participating athletes.
 - Athlete identifiers and identifying information required to distinguish participants.
 - Execution data for each participant and segment, including status, measured result where available and spike usage.
+- For FREE_TEXT, ordered sections with their titles and content instead of tempo definitions and execution data.
 
 The exact response structure and field types will be defined during API design.
 

@@ -41,6 +41,15 @@ Reviewing or modifying a draft must not create or modify persisted training sess
 - The optimized JPEG retained by UC-506 must remain available for comparison with recognized data.
 - The draft must preserve the relationship between definitions, segments, athletes and execution data.
 - The review operation must not modify the optimized JPEG or persisted training data.
+- The immutable import type determines the draft shape. A `FREE_TEXT` draft contains ordered sections and no definitions, athlete rows or executions; a `TEMPO` draft follows the existing definition/athlete review flow.
+
+### 4.1.1 FREE_TEXT Sections
+
+- The authorized user can edit the training name/date and add, edit, remove and reorder sections.
+- Each section has a free-text title and content; titles are not selected from a fixed category list.
+- Recognition uncertainty and incomplete OCR remain reviewable and do not make a draft invalid for retrieval or saving. The backend reports outstanding review/readiness issues; the coach can correct the data before acceptance.
+- A FREE_TEXT draft must contain at least one section with a title and content before it is ready for acceptance. Uncertain fields must be explicitly confirmed or corrected.
+- Athlete candidate search and matching are not applicable to FREE_TEXT imports.
 
 ### 4.2 Editable Training Information
 
@@ -130,6 +139,7 @@ The corrected draft must satisfy the plan rules defined in UC-502 and the athlet
 - Recognition uncertainty flags may remain as historical information after the user has manually corrected the corresponding values.
 - The backend must distinguish between unresolved recognition issues and corrected data.
 - The import must not become ready for acceptance while any mandatory validation issue remains.
+- For `FREE_TEXT`, readiness is evaluated against the section content and required review confirmations, not tempo definitions or athlete rows.
 
 ### 4.8 Review Lifecycle
 
@@ -240,3 +250,4 @@ Use `GET /api/training-imports/{importId}/draft` to retrieve the draft and `PUT 
 19. Draft modifications are persisted atomically.
 20. The optimized JPEG remains available after review and subsequent acceptance or rejection.
 21. Unauthorized users cannot retrieve or modify training import drafts.
+22. FREE_TEXT review displays and saves ordered editable sections; it does not request athlete matching and does not create persisted training data.

@@ -34,6 +34,7 @@ describe('TrainingsApiService', () => {
       definitionCount: 1,
       participantCount: 4,
       status: 'PLANNED',
+      trainingType: 'TEMPO',
     }];
     let actual: typeof response | undefined;
 
@@ -84,6 +85,8 @@ describe('TrainingsApiService', () => {
       status: 'PLANNED',
       trainingGroup: { id: 3, name: 'Sprint' },
       definitions: [],
+      trainingType: 'TEMPO',
+      sections: [],
     };
     let actual: TrainingDetails | undefined;
 

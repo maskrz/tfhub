@@ -2,7 +2,7 @@
 
 ## 1. Purpose
 
-Display complete training details, including the immutable training group, plan, athlete assignments and execution data, with navigation to the separate plan-editing and training-completion tasks.
+Display complete training details, including type, immutable training group and type-specific content. TEMPO details include athlete assignments and execution data; FREE_TEXT details show ordered sections and do not expose athlete participation.
 
 ## 2. Actors and Preconditions
 
@@ -14,8 +14,8 @@ Display complete training details, including the immutable training group, plan,
 
 1. The user opens a training from the list.
 2. The frontend retrieves complete details using UC-504.
-3. The view displays training name, date, status, group, ordered definitions/segments, participants and each participant's executions.
-4. For a planned or completed training, the user may select **Edytuj trening** (FE-TRAINING-003) or **Uzupełnij trening** (FE-TRAINING-009).
+3. The view displays training name, date, type, status and group, then either ordered TEMPO definitions/segments and executions or ordered FREE_TEXT sections.
+4. TEMPO users may select **Edytuj trening** (FE-TRAINING-003) or **Uzupełnij trening** (FE-TRAINING-009). FREE_TEXT users may edit sections and mark a planned training completed through `PATCH /api/trainings/{trainingId}/complete`.
 5. Planned and completed trainings remain editable by authorized users. They can permanently delete the training from this view (FE-TRAINING-005).
 
 ## 4. Display and Navigation Requirements
@@ -25,6 +25,7 @@ Display complete training details, including the immutable training group, plan,
 - Display rest in minutes and remaining seconds (for example `4m 10s`); show a dash when no rest was specified.
 - Empty collections must render normally.
 - The group is read-only.
+- FREE_TEXT sections are displayed in their saved order and no athlete-participation controls are shown.
 - Provide separate actions for plan editing and assigning/recording athlete participation. Do not combine them into one edit action.
 - Offer **Usuń trening** for planned and completed sessions with explicit confirmation (FE-TRAINING-005).
 - Backend authorization remains authoritative.
@@ -46,3 +47,4 @@ Follow existing TFHub view, loading, empty, error, and responsive patterns. All 
 3. Planned and completed trainings expose distinct **Edytuj trening** and **Uzupełnij trening** actions.
 4. Planned and completed trainings can be deleted after confirmation.
 5. The view handles empty, loading and error states and remains usable on mobile.
+6. FREE_TEXT details are visible only to authorized staff and display ordered sections without athlete data.

@@ -1,3 +1,5 @@
+import { TrainingType } from '../trainings/training.model';
+
 export type TrainingImportStatus =
   | 'PENDING'
   | 'PROCESSING'
@@ -17,6 +19,7 @@ export interface TrainingImportListItem {
   id: number;
   trainingGroupId: number;
   trainingGroupName: string;
+  trainingType: TrainingType;
   status: TrainingImportStatus;
   nextRetryAt: string | null;
   createdAt: string;
@@ -98,12 +101,21 @@ export interface ImportDefinition {
 export interface TrainingImportDraft {
   importId: number;
   status: TrainingImportStatus;
+  trainingType: TrainingType;
   trainingGroup: { id: number; name: string };
   name: string;
   trainingDate: string;
   recognitionMetadata: Record<string, unknown>;
   recognitionReviewed: boolean;
   definitions: ImportDefinition[];
+  sections: {
+    id: number;
+    sequenceNumber: number;
+    title: string;
+    content: string;
+    recognitionMetadata: Record<string, unknown>;
+    recognitionReviewed: boolean;
+  }[];
   validation: { readyForAcceptance: boolean; issues: { code: string; path: string; message: string }[] };
 }
 
@@ -125,5 +137,12 @@ export interface TrainingImportDraftUpdate {
       executions: { id: number | null; segmentSequenceNumber: number; status: ImportExecutionStatus;
         measuredResult: number | null; usesSpikes: boolean | null; recognitionReviewed: boolean }[];
     }[];
+  }[];
+  sections: {
+    id: number | null;
+    sequenceNumber: number;
+    title: string;
+    content: string;
+    recognitionReviewed: boolean;
   }[];
 }

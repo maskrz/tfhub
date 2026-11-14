@@ -84,6 +84,20 @@
         <option value="COMPLETED">Zakończone</option>
       </select>
     </label>
+
+    <label class="filter-field type-filter">
+      <span>Rodzaj treningu</span>
+      <select
+        class="field-control select-with-arrow"
+        aria-label="Filtruj według rodzaju treningu"
+        [value]="trainingTypeFilter()"
+        (change)="onTrainingTypeChange($event)"
+      >
+        <option value="">Wszystkie rodzaje</option>
+        <option value="TEMPO">Trening tempowy</option>
+        <option value="FREE_TEXT">Trening ogólny</option>
+      </select>
+    </label>
   </div>
 
   @if (importsLoading() && imports().length === 0) {
@@ -160,6 +174,9 @@
               <td data-label="Trening">
                 <strong>{{ item.name || 'Import ze zdjęcia' }}</strong>
                 <span class="import-detail">Import nr {{ item.id }}</span>
+                <span class="import-detail">
+                  {{ item.trainingType === 'TEMPO' ? 'Trening tempowy' : 'Trening ogólny' }}
+                </span>
                 @if (item.possibleDuplicate) {
                   <span class="import-warning">Możliwy duplikat</span>
                 }
@@ -177,22 +194,24 @@
                 }
               </td>
               <td data-label="Akcje" class="training-actions">
-                @if (item.status === 'FAILED') {
-                  <button type="button" class="button button--secondary"
-                    [disabled]="retryingImportIds().includes(item.id)"
-                    (click)="retryImport(item)">
-                    {{ retryingImportIds().includes(item.id) ? 'Ponawianie...' : 'Ponów przetwarzanie' }}
-                  </button>
-                  @if (importRetryErrors()[item.id]; as message) {
-                    <span class="import-error" role="alert">{{ message }}</span>
+                <div class="training-action-buttons">
+                  @if (item.status === 'FAILED') {
+                    <button type="button" class="button button--secondary"
+                      [disabled]="retryingImportIds().includes(item.id)"
+                      (click)="retryImport(item)">
+                      {{ retryingImportIds().includes(item.id) ? 'Ponawianie...' : 'Ponów przetwarzanie' }}
+                    </button>
+                    @if (importRetryErrors()[item.id]; as message) {
+                      <span class="import-error" role="alert">{{ message }}</span>
+                    }
+                  } @else if (item.status === 'REVIEW_REQUIRED') {
+                    <a class="button button--secondary" [routerLink]="['/training-imports', item.id, 'review']">
+                      Zweryfikuj import
+                    </a>
+                  } @else {
+                    <span class="import-detail">Przetwarzanie w toku.</span>
                   }
-                } @else if (item.status === 'REVIEW_REQUIRED') {
-                  <a class="button button--secondary" [routerLink]="['/training-imports', item.id, 'review']">
-                    Zweryfikuj import
-                  </a>
-                } @else {
-                  <span class="import-detail">Przetwarzanie w toku.</span>
-                }
+                </div>
               </td>
             </tr>
           }
@@ -202,32 +221,41 @@
                 <a class="training-link" [routerLink]="['/trainings', training.id]">
                   <strong>{{ training.name }}</strong>
                 </a>
+                <span class="training-type-badge">
+                  {{ training.trainingType === 'TEMPO' ? 'Trening tempowy' : 'Trening ogólny' }}
+                </span>
               </td>
               <td data-label="Data">{{ formatDate(training.trainingDate) }}</td>
               <td data-label="Grupa treningowa">{{ training.trainingGroup.name }}</td>
-              <td data-label="Liczba uczestników">{{ training.participantCount }}</td>
+              <td data-label="Liczba uczestników">{{ training.trainingType === 'TEMPO' ? training.participantCount : '—' }}</td>
               <td data-label="Status">
                 <span class="status-badge" [class.status-badge--completed]="training.status === 'COMPLETED'">
                   {{ training.status === 'COMPLETED' ? 'Zakończony' : 'Planowany' }}
                 </span>
               </td>
               <td data-label="Akcje" class="training-actions">
-                <a
-                  class="button button--secondary edit-training-link"
-                  [routerLink]="['/trainings', training.id, 'edit']"
-                  [attr.aria-label]="'Edytuj trening: ' + training.name"
-                >Edytuj</a>
-                <a
-                  class="button button--primary complete-training-link"
-                  [routerLink]="['/trainings', training.id, 'complete']"
-                  [attr.aria-label]="'Uzupełnij trening: ' + training.name"
-                >Uzupełnij trening</a>
-                <button
-                  type="button"
-                  class="button button--danger delete-training-button"
-                  [attr.aria-label]="'Usuń trening: ' + training.name"
-                  (click)="openDeletionConfirmation(training)"
-                >Usuń</button>
+                <div class="training-action-buttons">
+                  <a
+                    class="button button--secondary edit-training-link"
+                    [routerLink]="training.trainingType === 'TEMPO'
+                      ? ['/trainings', training.id, 'edit']
+                      : ['/trainings', training.id, 'free-text', 'edit']"
+                    [attr.aria-label]="'Edytuj trening: ' + training.name"
+                  >Edytuj</a>
+                  @if (training.trainingType === 'TEMPO') {
+                    <a
+                      class="button button--primary complete-training-link"
+                      [routerLink]="['/trainings', training.id, 'complete']"
+                      [attr.aria-label]="'Uzupełnij trening: ' + training.name"
+                    >Uzupełnij trening</a>
+                  }
+                  <button
+                    type="button"
+                    class="button button--danger delete-training-button"
+                    [attr.aria-label]="'Usuń trening: ' + training.name"
+                    (click)="openDeletionConfirmation(training)"
+                  >Usuń</button>
+                </div>
               </td>
             </tr>
           }

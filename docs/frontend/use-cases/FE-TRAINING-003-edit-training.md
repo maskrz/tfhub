@@ -4,6 +4,8 @@
 
 Allow an authorized user to edit the plan of an existing planned or completed training: its name, date, definitions and segments. Athlete assignments and execution data are managed separately through FE-TRAINING-009 – Complete Training.
 
+This flow is for TEMPO trainings. FREE_TEXT trainings use the same name/date editing pattern with ordered section management on `/trainings/:id/free-text/edit`.
+
 ## 2. Actors and Preconditions
 
 - **ADMIN** – can edit any training.
@@ -55,6 +57,7 @@ Follow FE-TRAINING-002 form patterns and existing TFHub controls, validation and
 - Editing execution statuses, results or spike usage.
 - Viewing or deleting trainings (FE-TRAINING-005).
 - OCR and imports.
+- Editing FREE_TEXT sections (handled by the type-specific editor).
 
 ## 9. Acceptance Criteria
 

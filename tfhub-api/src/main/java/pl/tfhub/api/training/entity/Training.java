@@ -17,6 +17,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import pl.tfhub.api.training.enums.TrainingStatus;
+import pl.tfhub.api.training.enums.TrainingType;
 import pl.tfhub.api.traininggroup.entity.TrainingGroup;
 
 import java.time.LocalDate;
@@ -53,13 +54,27 @@ public class Training {
     @Column(nullable = false, length = 20)
     private TrainingStatus status = TrainingStatus.PLANNED;
 
+    @NotNull
+    @Enumerated(EnumType.STRING)
+    @Column(name = "training_type", nullable = false, length = 20)
+    private TrainingType trainingType = TrainingType.TEMPO;
+
     protected Training() {
     }
 
     public Training(String name, LocalDate trainingDate, TrainingGroup trainingGroup) {
+        this(name, trainingDate, trainingGroup, TrainingType.TEMPO);
+    }
+
+    public Training(
+            String name,
+            LocalDate trainingDate,
+            TrainingGroup trainingGroup,
+            TrainingType trainingType) {
         setName(name);
         this.trainingDate = Objects.requireNonNull(trainingDate);
         this.trainingGroup = Objects.requireNonNull(trainingGroup);
+        this.trainingType = Objects.requireNonNull(trainingType);
     }
 
     public void updateDetails(String name, LocalDate trainingDate) {
@@ -96,5 +111,9 @@ public class Training {
 
     public TrainingStatus getStatus() {
         return status;
+    }
+
+    public TrainingType getTrainingType() {
+        return trainingType;
     }
 }

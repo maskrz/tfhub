@@ -4,6 +4,7 @@ export interface TrainingGroupSummary {
 }
 
 export type TrainingStatus = 'PLANNED' | 'COMPLETED';
+export type TrainingType = 'TEMPO' | 'FREE_TEXT';
 
 export interface TrainingListItem {
   id: number;
@@ -13,6 +14,7 @@ export interface TrainingListItem {
   definitionCount: number;
   participantCount: number;
   status: TrainingStatus;
+  trainingType: TrainingType;
 }
 
 export interface CreateTrainingSegmentRequest {
@@ -32,6 +34,29 @@ export interface CreateTrainingRequest {
   trainingDate: string;
   trainingGroupId: number;
   definitions: CreateTrainingDefinitionRequest[];
+}
+
+export interface CreateTrainingSectionRequest {
+  title: string;
+  content: string;
+  sequenceNumber: number;
+}
+
+export interface EditTrainingSectionRequest extends CreateTrainingSectionRequest {
+  id: number | null;
+}
+
+export interface CreateFreeTextTrainingRequest {
+  name: string;
+  trainingDate: string;
+  trainingGroupId: number;
+  sections: CreateTrainingSectionRequest[];
+}
+
+export interface EditFreeTextTrainingRequest {
+  name: string;
+  trainingDate: string;
+  sections: EditTrainingSectionRequest[];
 }
 
 export interface CreateTrainingResponse {
@@ -76,6 +101,13 @@ export interface TrainingDefinitionDetails {
   participations: TrainingParticipationDetails[];
 }
 
+export interface TrainingSectionDetails {
+  id: number;
+  title: string;
+  content: string;
+  sequenceNumber: number;
+}
+
 export interface TrainingDetails {
   id: number;
   name: string;
@@ -83,6 +115,8 @@ export interface TrainingDetails {
   status: TrainingStatus;
   trainingGroup: TrainingGroupSummary;
   definitions: TrainingDefinitionDetails[];
+  trainingType: TrainingType;
+  sections: TrainingSectionDetails[];
 }
 
 export interface EditTrainingExecutionRequest {

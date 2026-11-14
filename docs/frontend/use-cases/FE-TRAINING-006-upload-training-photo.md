@@ -15,8 +15,8 @@ Allow an authorized user to upload one training-sheet photo and start an asynchr
 
 1. The user selects **Importuj ze zdjęcia** from the training list.
 2. The frontend loads available groups using the existing accessible-groups API.
-3. The user selects one group and one training-sheet image.
-4. The frontend submits `trainingGroupId` and the image as multipart form data to `POST /api/training-imports`.
+3. The user selects the training type, one group and one training-sheet image.
+4. The frontend submits `trainingType`, `trainingGroupId` and the image as multipart form data to `POST /api/training-imports`.
 5. On success, the modal closes and the training list refreshes active import rows, showing a duplicate warning when indicated.
 6. The training list polls `GET /api/training-imports` every five seconds while an import is `PENDING`, `PROCESSING`, or `FAILED` with a scheduled automatic retry.
 7. A `REVIEW_REQUIRED` row links to draft review. A `FAILED` row displays the safe processing error and offers retry on the training list.
@@ -24,6 +24,7 @@ Allow an authorized user to upload one training-sheet photo and start an asynchr
 ## 4. Group and Image Selection
 
 - Require exactly one existing group and one image.
+- Require a type selection: TEMPO or FREE_TEXT. The backend's omitted-type default of TEMPO is for backward-compatible clients, not the new UI.
 - ADMIN may select any existing group; COACH may select only currently assigned groups.
 - Display the selected group in the resulting import as read-only; it cannot be changed later.
 - Allow the user to select a supported image from the device. Client-side checks are for usability only; the backend validates actual content, size and dimensions.
@@ -66,3 +67,4 @@ The frontend must not display raw model responses or internal storage paths. Acc
 7. Upload or retry failure does not display success or create a misleading UI state.
 8. The selected group is read-only after upload.
 9. The UI follows existing TFHUB visual and responsive conventions, with Polish user-facing text.
+10. The selected type appears on the import and cannot be changed during review or acceptance.

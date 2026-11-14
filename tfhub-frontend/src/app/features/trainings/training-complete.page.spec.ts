@@ -39,6 +39,8 @@ const training: TrainingDetails = {
     segments: [{ id: 18, sequenceNumber: 1, distanceM: 100, restAfterSeconds: null }],
     participations: [],
   }],
+  trainingType: 'TEMPO',
+  sections: [],
 };
 
 const athletes: AthleteResponse[] = [

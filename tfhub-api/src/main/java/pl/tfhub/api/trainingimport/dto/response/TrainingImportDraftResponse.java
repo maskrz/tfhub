@@ -5,6 +5,7 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 import pl.tfhub.api.training.enums.TrainingExecutionStatus;
+import pl.tfhub.api.training.enums.TrainingType;
 import pl.tfhub.api.traininggroup.dto.response.TrainingGroupResponse;
 import pl.tfhub.api.trainingimport.enums.TrainingImportAthleteMatchStatus;
 import pl.tfhub.api.trainingimport.enums.TrainingImportStatus;
@@ -12,13 +13,29 @@ import pl.tfhub.api.trainingimport.enums.TrainingImportStatus;
 public record TrainingImportDraftResponse(
 		long importId,
 		TrainingImportStatus status,
+		TrainingType trainingType,
 		TrainingGroupResponse trainingGroup,
 		String name,
 		LocalDate trainingDate,
 		Map<String, Object> recognitionMetadata,
 		boolean recognitionReviewed,
 		List<Definition> definitions,
+		List<Section> sections,
 		Validation validation) {
+
+	public TrainingImportDraftResponse(
+			long importId,
+			TrainingImportStatus status,
+			TrainingGroupResponse trainingGroup,
+			String name,
+			LocalDate trainingDate,
+			Map<String, Object> recognitionMetadata,
+			boolean recognitionReviewed,
+			List<Definition> definitions,
+			Validation validation) {
+		this(importId, status, TrainingType.TEMPO, trainingGroup, name, trainingDate,
+				recognitionMetadata, recognitionReviewed, definitions, List.of(), validation);
+	}
 
 	public record Definition(
 			long id,
@@ -26,6 +43,15 @@ public record TrainingImportDraftResponse(
 			int sequenceNumber,
 			List<Segment> segments,
 			List<AthleteRow> athleteRows) {
+	}
+
+	public record Section(
+			long id,
+			int sequenceNumber,
+			String title,
+			String content,
+			Map<String, Object> recognitionMetadata,
+			boolean recognitionReviewed) {
 	}
 
 	public record Segment(

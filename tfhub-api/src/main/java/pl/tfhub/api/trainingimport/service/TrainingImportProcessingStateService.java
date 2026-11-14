@@ -18,6 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
 import pl.tfhub.api.athlete.entity.Athlete;
 import pl.tfhub.api.athlete.repository.AthleteRepository;
 import pl.tfhub.api.athlete.service.AthleteService;
+import pl.tfhub.api.training.enums.TrainingType;
 import pl.tfhub.api.trainingimport.dto.response.TrainingImportStatusResponse;
 import pl.tfhub.api.trainingimport.entity.TrainingImport;
 import pl.tfhub.api.trainingimport.entity.TrainingImportAttempt;
@@ -26,6 +27,7 @@ import pl.tfhub.api.trainingimport.entity.TrainingImportDraftAthleteRow;
 import pl.tfhub.api.trainingimport.entity.TrainingImportDraftDefinition;
 import pl.tfhub.api.trainingimport.entity.TrainingImportDraftExecution;
 import pl.tfhub.api.trainingimport.entity.TrainingImportDraftSegment;
+import pl.tfhub.api.trainingimport.entity.TrainingImportDraftSection;
 import pl.tfhub.api.trainingimport.entity.TrainingImportSourceImage;
 import pl.tfhub.api.trainingimport.enums.TrainingImportAttemptStatus;
 import pl.tfhub.api.trainingimport.enums.TrainingImportAthleteMatchStatus;
@@ -38,6 +40,7 @@ import pl.tfhub.api.trainingimport.repository.TrainingImportDraftDefinitionRepos
 import pl.tfhub.api.trainingimport.repository.TrainingImportDraftExecutionRepository;
 import pl.tfhub.api.trainingimport.repository.TrainingImportDraftRepository;
 import pl.tfhub.api.trainingimport.repository.TrainingImportDraftSegmentRepository;
+import pl.tfhub.api.trainingimport.repository.TrainingImportDraftSectionRepository;
 import pl.tfhub.api.trainingimport.repository.TrainingImportRepository;
 import pl.tfhub.api.trainingimport.repository.TrainingImportSourceImageRepository;
 import pl.tfhub.api.user.entity.User;
@@ -60,6 +63,7 @@ public class TrainingImportProcessingStateService {
 	private final TrainingImportDraftRepository draftRepository;
 	private final TrainingImportDraftDefinitionRepository definitionRepository;
 	private final TrainingImportDraftSegmentRepository segmentRepository;
+	private final TrainingImportDraftSectionRepository sectionRepository;
 	private final TrainingImportDraftAthleteRowRepository athleteRowRepository;
 	private final TrainingImportDraftExecutionRepository executionRepository;
 	private final AthleteRepository athleteRepository;
@@ -81,6 +85,7 @@ public class TrainingImportProcessingStateService {
 			TrainingImportDraftRepository draftRepository,
 			TrainingImportDraftDefinitionRepository definitionRepository,
 			TrainingImportDraftSegmentRepository segmentRepository,
+			TrainingImportDraftSectionRepository sectionRepository,
 			TrainingImportDraftAthleteRowRepository athleteRowRepository,
 			TrainingImportDraftExecutionRepository executionRepository,
 			AthleteRepository athleteRepository,
@@ -97,6 +102,7 @@ public class TrainingImportProcessingStateService {
 		this.draftRepository = draftRepository;
 		this.definitionRepository = definitionRepository;
 		this.segmentRepository = segmentRepository;
+		this.sectionRepository = sectionRepository;
 		this.athleteRowRepository = athleteRowRepository;
 		this.executionRepository = executionRepository;
 		this.athleteRepository = athleteRepository;
@@ -179,6 +185,7 @@ public class TrainingImportProcessingStateService {
 					attemptId,
 					trainingImport.getId(),
 					trainingImport.getTrainingGroup().getId(),
+					trainingImport.getTrainingType(),
 					imageStorage.load(sourceImage.getStorageKey()));
 		} catch (RuntimeException exception) {
 			throw new TrainingImportProcessingException(
@@ -199,6 +206,10 @@ public class TrainingImportProcessingStateService {
 		TrainingImport trainingImport = locked.trainingImport();
 		if (!isCurrentProcessingAttempt(trainingImport, attempt)) {
 			return;
+		}
+		if (recognizedDraft.trainingType() != trainingImport.getTrainingType()) {
+			throw new TrainingImportProcessingException(
+					"TRAINING_TYPE_MISMATCH", "Recognized training type does not match the import");
 		}
 
 		TrainingImportDraft draft = draftRepository.findByTrainingImport_Id(trainingImport.getId())
@@ -367,6 +378,8 @@ public class TrainingImportProcessingStateService {
 	}
 
 	private void deleteDraftChildren(TrainingImportDraft draft) {
+		sectionRepository.deleteAll(sectionRepository.findByDraft_IdOrderBySequenceNumberAsc(draft.getId()));
+		sectionRepository.flush();
 		List<TrainingImportDraftDefinition> definitions =
 				definitionRepository.findByDraft_IdOrderBySequenceNumberAsc(draft.getId());
 		List<TrainingImportDraftSegment> segments = new ArrayList<>();
@@ -391,6 +404,18 @@ public class TrainingImportProcessingStateService {
 			TrainingImportDraft draft,
 			TrainingImport trainingImport,
 			TrainingImportRecognizedDraft recognizedDraft) {
+		if (recognizedDraft.trainingType() == TrainingType.FREE_TEXT) {
+			List<TrainingImportDraftSection> sections = recognizedDraft.sections().stream()
+					.map(section -> new TrainingImportDraftSection(
+							draft,
+							section.sequenceNumber(),
+							section.title(),
+							section.content(),
+							section.recognitionMetadata()))
+					.toList();
+			sectionRepository.saveAllAndFlush(sections);
+			return;
+		}
 		List<TrainingImportDraftDefinition> definitions = new ArrayList<>();
 		Map<Integer, TrainingImportDraftDefinition> definitionsBySequence = new HashMap<>();
 		for (TrainingImportRecognizedDraft.Definition definitionData : recognizedDraft.definitions()) {
@@ -498,7 +523,12 @@ public class TrainingImportProcessingStateService {
 		return OffsetDateTime.now(ZoneOffset.UTC);
 	}
 
-	public record ProcessingInput(long attemptId, long importId, long trainingGroupId, byte[] image) {
+	public record ProcessingInput(
+			long attemptId,
+			long importId,
+			long trainingGroupId,
+			TrainingType trainingType,
+			byte[] image) {
 	}
 
 	private record SequenceKey(int definitionSequence, int segmentSequence) {

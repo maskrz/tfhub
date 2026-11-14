@@ -6,13 +6,20 @@ public record TrainingImportRecognitionData(
 		RecognizedField name,
 		RecognizedField trainingDate,
 		String recognizedGroupName,
-		List<Definition> definitions) {
+		List<Definition> definitions,
+		List<Section> sections) {
 
 	public record RecognizedField(
 			String value,
 			String originalText,
 			Boolean uncertain,
 			String uncertaintyReason) {
+	}
+
+	public record Section(
+			Integer sequenceNumber,
+			RecognizedField title,
+			RecognizedField content) {
 	}
 
 	public record Definition(

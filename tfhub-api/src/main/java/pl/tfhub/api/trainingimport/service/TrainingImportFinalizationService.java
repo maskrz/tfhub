@@ -10,11 +10,15 @@ import pl.tfhub.api.training.dto.request.AddTrainingParticipationRequest;
 import pl.tfhub.api.training.dto.request.CompleteTrainingRequest;
 import pl.tfhub.api.training.dto.request.CreateTrainingDefinitionRequest;
 import pl.tfhub.api.training.dto.request.CreateTrainingRequest;
+import pl.tfhub.api.training.dto.request.CreateFreeTextTrainingRequest;
+import pl.tfhub.api.training.dto.request.CreateTrainingSectionRequest;
 import pl.tfhub.api.training.dto.request.CreateTrainingSegmentRequest;
 import pl.tfhub.api.training.dto.request.NewTrainingExecutionRequest;
 import pl.tfhub.api.training.dto.response.CreateTrainingResponse;
 import pl.tfhub.api.training.dto.response.TrainingDetailsResponse;
 import pl.tfhub.api.training.service.TrainingCompletionService;
+import pl.tfhub.api.training.service.FreeTextTrainingService;
+import pl.tfhub.api.training.enums.TrainingType;
 import pl.tfhub.api.training.service.TrainingCreationService;
 import pl.tfhub.api.training.service.TrainingDetailsService;
 import pl.tfhub.api.trainingimport.dto.response.TrainingImportAcceptanceResponse;
@@ -36,6 +40,7 @@ public class TrainingImportFinalizationService {
 	private final TrainingCreationService trainingCreationService;
 	private final TrainingDetailsService trainingDetailsService;
 	private final TrainingCompletionService trainingCompletionService;
+	private final FreeTextTrainingService freeTextTrainingService;
 
 	public TrainingImportFinalizationService(
 			TrainingImportAccessService accessService,
@@ -43,13 +48,15 @@ public class TrainingImportFinalizationService {
 			TrainingImportDraftService draftService,
 			TrainingCreationService trainingCreationService,
 			TrainingDetailsService trainingDetailsService,
-			TrainingCompletionService trainingCompletionService) {
+			TrainingCompletionService trainingCompletionService,
+			FreeTextTrainingService freeTextTrainingService) {
 		this.accessService = accessService;
 		this.importRepository = importRepository;
 		this.draftService = draftService;
 		this.trainingCreationService = trainingCreationService;
 		this.trainingDetailsService = trainingDetailsService;
 		this.trainingCompletionService = trainingCompletionService;
+		this.freeTextTrainingService = freeTextTrainingService;
 	}
 
 	@Transactional
@@ -65,6 +72,23 @@ public class TrainingImportFinalizationService {
 			}
 			throw new InvalidTrainingImportDraftException(
 					"Training import draft contains unresolved validation issues");
+		}
+
+		if (trainingImport.getTrainingType() == TrainingType.FREE_TEXT) {
+			List<CreateTrainingSectionRequest> sections = draft.sections().stream()
+					.map(section -> new CreateTrainingSectionRequest(
+							section.title(), section.content(), section.sequenceNumber()))
+					.toList();
+			CreateTrainingResponse created = freeTextTrainingService.create(new CreateFreeTextTrainingRequest(
+					draft.name(),
+					draft.trainingDate(),
+					trainingImport.getTrainingGroup().getId(),
+					sections));
+			freeTextTrainingService.markCompleted(created.id());
+			trainingImport.accept(created.id());
+			importRepository.saveAndFlush(trainingImport);
+			return new TrainingImportAcceptanceResponse(
+					importId, TrainingImportStatus.ACCEPTED, created.id());
 		}
 
 		CreateTrainingRequest createRequest = toCreateRequest(trainingImport, draft);

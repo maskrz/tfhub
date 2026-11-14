@@ -1,6 +1,7 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
+import { TrainingType } from '../trainings/training.model';
 import {
   TrainingImportListItem,
   TrainingImportStatusResponse,
@@ -18,9 +19,14 @@ export class TrainingImportsApiService {
     return this.http.get<TrainingImportListItem[]>('/api/training-imports');
   }
 
-  upload(trainingGroupId: number, image: File): Observable<TrainingImportUploadResponse> {
+  upload(
+    trainingGroupId: number,
+    image: File,
+    trainingType: TrainingType = 'TEMPO',
+  ): Observable<TrainingImportUploadResponse> {
     const formData = new FormData();
     formData.append('trainingGroupId', String(trainingGroupId));
+    formData.append('trainingType', trainingType);
     formData.append('image', image, image.name);
     return this.http.post<TrainingImportUploadResponse>('/api/training-imports', formData);
   }

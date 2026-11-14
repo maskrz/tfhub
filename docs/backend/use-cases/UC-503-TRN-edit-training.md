@@ -6,6 +6,8 @@ Allow an authorized user to edit the plan of an existing training session, regar
 
 The operation preserves the training session's identity, group and historical execution associations.
 
+For `FREE_TEXT` trainings, the same authorized service boundary supports editing the name, date and ordered free-text sections; tempo definitions and execution data are not accepted by that operation.
+
 ## 2. Actors and Preconditions
 
 - **ADMIN** – can edit any training session.
@@ -57,6 +59,14 @@ The operation preserves the training session's identity, group and historical ex
 - Existing participants remain valid after their current training group changes.
 - Any rejected modification must leave the entire training unchanged.
 
+### 3.6 FREE_TEXT Training
+
+- A FREE_TEXT training has at least one section. Each section has a user-editable title and content and a unique positive sequence number.
+- Sections can be added, edited, removed and reordered. Section IDs belonging to the training are retained when the section remains.
+- A FREE_TEXT training has no definitions, athlete participations or execution data; this operation cannot add any.
+- The training group and lifecycle status cannot be changed through the edit request.
+- An authorized user can mark a planned FREE_TEXT training completed through `PATCH /api/trainings/{trainingId}/complete`; this does not add athlete participation or change the training's type.
+
 ## 4. API Contract
 
 - **Method and path:** `PUT /api/trainings/{trainingId}`
@@ -66,6 +76,8 @@ The operation preserves the training session's identity, group and historical ex
 - **Response:** at least the updated training `id`.
 
 The exact JSON DTO and error representation follow the backend API conventions.
+
+FREE_TEXT uses `PUT /api/trainings/{trainingId}/free-text`; the request contains name, date and the complete ordered sections collection. Section IDs are nullable for new sections and existing IDs must belong to this training. Its completion transition uses the separate `PATCH /api/trainings/{trainingId}/complete` endpoint.
 
 ## 5. Validation and Error Scenarios
 

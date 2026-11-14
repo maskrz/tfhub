@@ -16,7 +16,7 @@ public interface TrainingImportRepository extends JpaRepository<TrainingImport, 
 
 	@Query("""
 			SELECT new pl.tfhub.api.trainingimport.dto.response.TrainingImportListItemResponse(
-				i.id, g.id, g.name, i.status, i.nextRetryAt, i.createdAt, i.possibleDuplicate,
+				i.id, g.id, g.name, i.trainingType, i.status, i.nextRetryAt, i.createdAt, i.possibleDuplicate,
 				d.name, d.trainingDate, a.failureMessage)
 			FROM TrainingImport i
 			JOIN i.trainingGroup g

@@ -5,7 +5,7 @@ import { RouterLink } from '@angular/router';
 import { EMPTY, catchError, finalize } from 'rxjs';
 import { AuthService } from '../../core/auth/auth.service';
 import { MultiSelectDropdownComponent, MultiSelectOption } from '../../shared/multi-select-dropdown.component';
-import { TrainingListItem, TrainingStatus } from './training.model';
+import { TrainingListItem, TrainingStatus, TrainingType } from './training.model';
 import { TrainingsApiService } from './trainings-api.service';
 import { TrainingDeleteConfirmationComponent } from './training-delete-confirmation.component';
 import { TrainingImportUploadModalComponent } from '../training-imports/training-import-upload-modal.component';
@@ -38,6 +38,7 @@ export class TrainingsPage implements OnInit {
   readonly query = signal('');
   readonly selectedGroupIds = signal<number[]>([]);
   readonly statusFilter = signal<'' | TrainingStatus>('');
+  readonly trainingTypeFilter = signal<'' | TrainingType>('');
   readonly trainingDateFrom = signal('');
   readonly trainingDateTo = signal('');
   readonly sortColumn = signal<'name' | 'date' | 'group' | 'participants'>('date');
@@ -58,12 +59,14 @@ export class TrainingsPage implements OnInit {
     const terms = this.query().trim().toLocaleLowerCase('pl').split(/\s+/).filter(Boolean);
     const groupIds = this.selectedGroupIds();
     const status = this.statusFilter();
+    const trainingType = this.trainingTypeFilter();
     const dateFrom = this.trainingDateFrom();
     const dateTo = this.trainingDateTo();
     const direction = this.sortDirection() === 'asc' ? 1 : -1;
     return this.allTrainings()
       .filter((training) => {
         if (status && training.status !== status) return false;
+        if (trainingType && training.trainingType !== trainingType) return false;
         if (groupIds.length > 0 && !groupIds.includes(training.trainingGroup.id)) return false;
         if (dateFrom && training.trainingDate < dateFrom) return false;
         if (dateTo && training.trainingDate > dateTo) return false;
@@ -121,6 +124,15 @@ export class TrainingsPage implements OnInit {
     }
   }
 
+  onTrainingTypeChange(event: Event): void {
+    const select = event.target;
+    if (!(select instanceof HTMLSelectElement)) return;
+    const value = select.value;
+    if (value === '' || value === 'TEMPO' || value === 'FREE_TEXT') {
+      this.trainingTypeFilter.set(value);
+    }
+  }
+
   onTrainingDateChange(event: Event, bound: 'from' | 'to'): void {
     const input = event.target;
     if (input instanceof HTMLInputElement) {
@@ -146,7 +158,8 @@ export class TrainingsPage implements OnInit {
       this.selectedGroupIds().length > 0 ||
       this.trainingDateFrom().length > 0 ||
       this.trainingDateTo().length > 0 ||
-      this.statusFilter() !== '';
+      this.statusFilter() !== '' ||
+      this.trainingTypeFilter() !== '';
   }
 
   retry(): void {

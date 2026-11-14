@@ -21,6 +21,7 @@ import tools.jackson.databind.node.ObjectNode;
 import org.springframework.stereotype.Component;
 import org.springframework.beans.factory.annotation.Qualifier;
 import pl.tfhub.api.trainingimport.config.TrainingImportProperties;
+import pl.tfhub.api.training.enums.TrainingType;
 
 @Component
 public class GeminiTrainingRecognitionClient {
@@ -29,12 +30,14 @@ public class GeminiTrainingRecognitionClient {
 	private static final String API_ENDPOINT =
 			"https://generativelanguage.googleapis.com/v1beta/models/";
 	private static final Pattern MODEL_ID = Pattern.compile("[A-Za-z0-9._-]{1,100}");
-	private static final String PROMPT_RESOURCE = "prompts/training-import-recognition.txt";
+	private static final String TEMPO_PROMPT_RESOURCE = "prompts/training-import-recognition.txt";
+	private static final String FREE_TEXT_PROMPT_RESOURCE = "prompts/free-text-training-import-recognition.txt";
 
 	private final HttpClient httpClient;
 	private final ObjectMapper objectMapper;
 	private final TrainingImportProperties properties;
-	private final String prompt;
+	private final String tempoPrompt;
+	private final String freeTextPrompt;
 
 	public GeminiTrainingRecognitionClient(
 			ObjectMapper objectMapper,
@@ -43,10 +46,15 @@ public class GeminiTrainingRecognitionClient {
 		this.objectMapper = objectMapper;
 		this.properties = properties;
 		this.httpClient = httpClient;
-		this.prompt = loadPrompt();
+		this.tempoPrompt = loadPrompt(TEMPO_PROMPT_RESOURCE);
+		this.freeTextPrompt = loadPrompt(FREE_TEXT_PROMPT_RESOURCE);
 	}
 
 	public GeminiRecognitionResponse recognize(byte[] optimizedJpeg) {
+		return recognize(optimizedJpeg, TrainingType.TEMPO);
+	}
+
+	public GeminiRecognitionResponse recognize(byte[] optimizedJpeg, TrainingType trainingType) {
 		String model = properties.getGeminiModel() == null ? "" : properties.getGeminiModel().strip();
 		String apiKey = properties.getGeminiApiKey() == null ? "" : properties.getGeminiApiKey().strip();
 		if (!MODEL_ID.matcher(model).matches() || apiKey.isEmpty()) {
@@ -56,7 +64,11 @@ public class GeminiTrainingRecognitionClient {
 		}
 
 		try {
-			String requestBody = objectMapper.writeValueAsString(createRequest(optimizedJpeg));
+			String prompt = switch (trainingType) {
+				case TEMPO -> tempoPrompt;
+				case FREE_TEXT -> freeTextPrompt;
+			};
+			String requestBody = objectMapper.writeValueAsString(createRequest(optimizedJpeg, prompt));
 			String diagnosticId = properties.isGeminiDiagnosticLoggingEnabled()
 					? UUID.randomUUID().toString() : null;
 			HttpRequest request = HttpRequest.newBuilder()
@@ -104,7 +116,7 @@ public class GeminiTrainingRecognitionClient {
 		return body.replace(apiKey, "[REDACTED]").replace(escapedKey, "[REDACTED]");
 	}
 
-	private ObjectNode createRequest(byte[] image) {
+	private ObjectNode createRequest(byte[] image, String prompt) {
 		ObjectNode request = objectMapper.createObjectNode();
 		ArrayNode contents = request.putArray("contents");
 		ArrayNode parts = contents.addObject().putArray("parts");
@@ -119,14 +131,14 @@ public class GeminiTrainingRecognitionClient {
 		return request;
 	}
 
-	private String loadPrompt() {
-		try (InputStream input = getClass().getClassLoader().getResourceAsStream(PROMPT_RESOURCE)) {
+	private String loadPrompt(String resource) {
+		try (InputStream input = getClass().getClassLoader().getResourceAsStream(resource)) {
 			if (input == null) {
-				throw new IllegalStateException("Gemini training recognition prompt is missing");
+				throw new IllegalStateException("Gemini recognition prompt is missing: " + resource);
 			}
 			return new String(input.readAllBytes(), StandardCharsets.UTF_8);
 		} catch (IOException exception) {
-			throw new IllegalStateException("Gemini training recognition prompt could not be read", exception);
+			throw new IllegalStateException("Gemini recognition prompt could not be read: " + resource, exception);
 		}
 	}
 

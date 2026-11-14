@@ -12,6 +12,7 @@ import pl.tfhub.api.training.dto.response.TrainingDetailsResponse;
 import pl.tfhub.api.training.dto.response.TrainingExecutionDetailsResponse;
 import pl.tfhub.api.training.dto.response.TrainingParticipationDetailsResponse;
 import pl.tfhub.api.training.dto.response.TrainingSegmentDetailsResponse;
+import pl.tfhub.api.training.dto.response.TrainingSectionDetailsResponse;
 import pl.tfhub.api.training.entity.AthleteTrainingParticipation;
 import pl.tfhub.api.training.entity.Training;
 import pl.tfhub.api.training.entity.TrainingDefinition;
@@ -24,6 +25,7 @@ import pl.tfhub.api.training.repository.TrainingDefinitionRepository;
 import pl.tfhub.api.training.repository.TrainingRepository;
 import pl.tfhub.api.training.repository.TrainingSegmentExecutionRepository;
 import pl.tfhub.api.training.repository.TrainingSegmentRepository;
+import pl.tfhub.api.training.repository.TrainingSectionRepository;
 import pl.tfhub.api.traininggroup.dto.response.TrainingGroupResponse;
 import pl.tfhub.api.user.enums.UserRole;
 
@@ -35,6 +37,7 @@ public class TrainingDetailsService {
     private final TrainingSegmentRepository segmentRepository;
     private final AthleteTrainingParticipationRepository participationRepository;
     private final TrainingSegmentExecutionRepository executionRepository;
+    private final TrainingSectionRepository sectionRepository;
     private final AccessScopeService accessScopeService;
 
     public TrainingDetailsService(
@@ -43,12 +46,14 @@ public class TrainingDetailsService {
             TrainingSegmentRepository segmentRepository,
             AthleteTrainingParticipationRepository participationRepository,
             TrainingSegmentExecutionRepository executionRepository,
+            TrainingSectionRepository sectionRepository,
             AccessScopeService accessScopeService) {
         this.trainingRepository = trainingRepository;
         this.definitionRepository = definitionRepository;
         this.segmentRepository = segmentRepository;
         this.participationRepository = participationRepository;
         this.executionRepository = executionRepository;
+        this.sectionRepository = sectionRepository;
         this.accessScopeService = accessScopeService;
     }
 
@@ -82,8 +87,16 @@ public class TrainingDetailsService {
         List<TrainingSegmentExecution> executions = participationIds.isEmpty()
                 ? List.of()
                 : executionRepository.findAllByParticipation_IdIn(participationIds);
+        List<TrainingSectionDetailsResponse> sections = sectionRepository
+                .findAllByTraining_IdOrderBySequenceNumberAsc(trainingId).stream()
+                .map(section -> new TrainingSectionDetailsResponse(
+                        section.getId(),
+                        section.getTitle(),
+                        section.getContent(),
+                        section.getSequenceNumber()))
+                .toList();
 
-        return toResponse(training, definitions, segments, participations, executions);
+        return toResponse(training, definitions, segments, participations, executions, sections);
     }
 
     private TrainingDetailsResponse toResponse(
@@ -91,7 +104,8 @@ public class TrainingDetailsService {
             List<TrainingDefinition> definitions,
             List<TrainingSegment> segments,
             List<AthleteTrainingParticipation> participations,
-            List<TrainingSegmentExecution> executions) {
+            List<TrainingSegmentExecution> executions,
+            List<TrainingSectionDetailsResponse> sections) {
         Map<Long, List<TrainingSegmentDetailsResponse>> segmentsByDefinition = new HashMap<>();
         Map<Long, TrainingSegmentDetailsResponse> segmentDetailsById = new HashMap<>();
         for (TrainingSegment segment : segments) {
@@ -158,6 +172,8 @@ public class TrainingDetailsService {
                 new TrainingGroupResponse(
                         training.getTrainingGroup().getId(),
                         training.getTrainingGroup().getName()),
-                definitionResponses);
+                definitionResponses,
+                training.getTrainingType(),
+                sections);
     }
 }

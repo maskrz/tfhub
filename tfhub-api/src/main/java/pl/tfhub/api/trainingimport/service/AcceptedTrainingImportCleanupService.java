@@ -54,6 +54,7 @@ public class AcceptedTrainingImportCleanupService implements AcceptedTrainingImp
 		deleteByDraftId("training_import_draft_athlete_rows", importId);
 		deleteByDraftId("training_import_draft_segments", importId);
 		deleteByDraftId("training_import_draft_definitions", importId);
+		deleteByDraftId("training_import_draft_sections", importId);
 		deleteByImportId("training_import_drafts", importId);
 		deleteByImportId("training_import_attempts", importId);
 		deleteByImportId("training_import_source_images", importId);

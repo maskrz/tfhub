@@ -19,7 +19,24 @@ public record TrainingImportDraftUpdateRequest(
 		@NotBlank @Size(max = 255) String name,
 		@NotNull LocalDate trainingDate,
 		boolean recognitionReviewed,
-		@NotEmpty List<@Valid Definition> definitions) {
+		@NotNull List<@Valid Definition> definitions,
+		List<@Valid Section> sections) {
+
+	public TrainingImportDraftUpdateRequest(
+			String name,
+			LocalDate trainingDate,
+			boolean recognitionReviewed,
+			List<Definition> definitions) {
+		this(name, trainingDate, recognitionReviewed, definitions, List.of());
+	}
+
+	public record Section(
+			Long id,
+			@Positive int sequenceNumber,
+			@NotBlank @Size(max = 255) String title,
+			@NotBlank String content,
+			boolean recognitionReviewed) {
+	}
 
 	public record Definition(
 			Long id,

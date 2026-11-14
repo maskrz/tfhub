@@ -2,7 +2,7 @@
 
 ## 1. Purpose
 
-Provide a backend operation for creating a new training session with its plan: training name, date, group, definitions and segments. Athlete participation and execution data are managed separately through UC-510 – Complete Training.
+Provide a backend operation for creating a new training session of type `TEMPO` or `FREE_TEXT`. Both types share name, date, group, type and lifecycle status; tempo plans and free-text sections are type-specific. Athlete participation and execution data are managed separately through UC-510 – Complete Training.
 
 The operation must enforce role-based access and training group assignment rules.
 
@@ -58,9 +58,16 @@ The operation must enforce role-based access and training group assignment rules
 ### 4.5 Initial Training State
 
 - A newly created training session has status `PLANNED`.
-- Creation does not assign athletes or accept execution data. The newly created training has no athlete participations until UC-510 or an accepted import creates them.
+- A `TEMPO` creation does not assign athletes or accept execution data. The newly created training has no athlete participations until UC-510 or an accepted import creates them.
 - All supplied definitions and segments belong to the newly created training session.
 - The training session must not be partially created if any part of the submitted data is invalid.
+
+### 4.6 FREE_TEXT Training
+
+- A FREE_TEXT training has a non-empty name, valid date, exactly one group, and at least one ordered section.
+- Each section has a user-editable non-empty title and content and a unique positive sequence number.
+- FREE_TEXT creation does not create definitions, athlete participations or execution data.
+- The training remains `PLANNED` until an authorized coach or administrator marks it completed.
 
 ## 5. Authorization Rules
 
@@ -79,6 +86,7 @@ The operation must enforce role-based access and training group assignment rules
 - **Missing or blank training name:** creation is rejected.
 - **Missing or invalid training date:** creation is rejected.
 - **No training definitions supplied:** creation is rejected.
+- **FREE_TEXT training without sections or with blank section title/content:** creation is rejected.
 - **Training definition with blank name:** creation is rejected.
 - **Training definition without segments:** creation is rejected.
 - **Segment with invalid or non-positive distance:** creation is rejected.
@@ -93,7 +101,9 @@ The operation returns information identifying the newly created training session
 
 The response must include at least the training identifier.
 
-The exact response structure and field types will be defined during API design.
+- TEMPO uses `POST /api/trainings`.
+- FREE_TEXT uses `POST /api/trainings/free-text`.
+- Both return `201 Created` with the created training identifier.
 
 ## 8. Transactional Consistency
 
@@ -129,3 +139,4 @@ The exact response structure and field types will be defined during API design.
 11. Validation or persistence failure leaves no partially created training data.
 12. The operation returns the identifier of the newly created training session.
 13. Unauthorized users cannot create training sessions.
+14. FREE_TEXT creation persists ordered sections, remains `PLANNED`, and creates no athlete participation or tempo data.

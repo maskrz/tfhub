@@ -40,6 +40,12 @@ export const routes: Routes = [
     title: 'Szczegóły treningu',
   },
   {
+    path: 'trainings/:id/free-text/edit',
+    loadComponent: () => import('./features/trainings/free-text-training-edit.page').then((module) => module.FreeTextTrainingEditPage),
+    canActivate: [staffGuard],
+    title: 'Edytuj trening ogólny',
+  },
+  {
     path: 'trainings/:id/edit',
     loadComponent: () => import('./features/trainings/training-edit.page').then((module) => module.TrainingEditPage),
     canActivate: [staffGuard],

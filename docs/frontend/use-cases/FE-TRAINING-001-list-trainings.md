@@ -23,7 +23,7 @@ The view must follow the existing TFHUB visual design and interaction patterns.
 3. The view displays the available trainings.
 4. The user can browse the list and use the available search and filtering controls.
 5. The user selects a training to open its details (FE-TRAINING-004).
-6. For any training, the user can navigate directly to **Edytuj trening** (FE-TRAINING-003) or **Uzupełnij trening** (FE-TRAINING-009).
+6. The user opens the type-appropriate details view; only TEMPO trainings offer the tempo edit/completion flows, while FREE_TEXT trainings offer section editing and completion.
 7. The user can initiate permanent deletion of a training from its row (FE-TRAINING-005).
 8. The user can initiate training creation (FE-TRAINING-002), subject to the existing role permissions.
 9. The user can start an OCR import by selecting **Importuj ze zdjęcia** (FE-TRAINING-006).
@@ -36,7 +36,8 @@ Each training list item must display:
 - Training name.
 - Training date.
 - Training group.
-- Number of participants.
+- Training type.
+- Number of participants for TEMPO; FREE_TEXT has no participant count.
 
 Use the actual response DTO returned by the implemented UC-501 endpoint. Do not invent or duplicate data that is not provided by the backend.
 
@@ -52,6 +53,7 @@ Retrieve active import summaries separately from `GET /api/training-imports`. Sh
 - Do not implement filtering that requires unsupported backend functionality. If filtering is performed locally, it must operate on the data actually loaded by the endpoint.
 - Follow existing list sorting conventions where applicable.
 - Provide a status filter with **Planowane**, **Zakończone**, and **Wszystkie statusy** options, following existing TFHUB status-filter patterns.
+- Provide a training-type filter for **Wszystkie typy**, **Trening tempowy**, and **Trening ogólny**.
 - Load completed trainings through UC-501's `includeCompleted` option; apply the selected status filter to the returned data.
 - Training search, filters and sorting do not hide or reorder active import rows.
 
@@ -60,7 +62,7 @@ Retrieve active import summaries separately from `GET /api/training-imports`. Sh
 - Selecting a training opens its details view (FE-TRAINING-004).
 - Provide an action to create a new training (FE-TRAINING-002) for authorized users.
 - Provide **Importuj ze zdjęcia** to start FE-TRAINING-006 for ADMIN and COACH users.
-- Provide separate **Edytuj trening** and **Uzupełnij trening** links for all list items. These links only navigate to FE-TRAINING-003 and FE-TRAINING-009; authorization remains backend-enforced.
+- Provide **Edytuj trening** and **Uzupełnij trening** only for TEMPO records; FREE_TEXT records navigate to their section editor and expose completion only while planned. Authorization remains backend-enforced.
 - Display the planned/completed state as a read-only status label.
 - Provide **Usuń** for all items (FE-TRAINING-005), requiring explicit confirmation before permanent deletion.
 - Use a blank, accessible actions-column header rather than displaying the text **Akcje**.
@@ -118,6 +120,7 @@ The view must be mobile-first and consistent with the existing TFHUB application
 - Selecting a training navigates to its details.
 - Each listed training provides distinct links to edit its plan and complete its athlete participation/results.
 - Users can filter planned, completed, or all returned trainings; the default is all statuses.
+- Users can filter both training types together or by type without changing the existing status behavior.
 - Planned and completed list items display their status and offer edit/completion actions; both statuses can be deleted after confirmation.
 - Authorized users can initiate training creation.
 - Loading, empty, and error states are handled.

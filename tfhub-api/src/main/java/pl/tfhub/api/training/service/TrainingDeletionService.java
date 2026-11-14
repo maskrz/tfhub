@@ -16,6 +16,7 @@ import pl.tfhub.api.training.repository.TrainingDefinitionRepository;
 import pl.tfhub.api.training.repository.TrainingRepository;
 import pl.tfhub.api.training.repository.TrainingSegmentExecutionRepository;
 import pl.tfhub.api.training.repository.TrainingSegmentRepository;
+import pl.tfhub.api.training.repository.TrainingSectionRepository;
 import pl.tfhub.api.user.enums.UserRole;
 
 @Service
@@ -26,6 +27,7 @@ public class TrainingDeletionService {
     private final TrainingSegmentRepository segmentRepository;
     private final AthleteTrainingParticipationRepository participationRepository;
     private final TrainingSegmentExecutionRepository executionRepository;
+    private final TrainingSectionRepository sectionRepository;
     private final AccessScopeService accessScopeService;
     private final AcceptedTrainingImportCleanup acceptedTrainingImportCleanup;
 
@@ -35,6 +37,7 @@ public class TrainingDeletionService {
             TrainingSegmentRepository segmentRepository,
             AthleteTrainingParticipationRepository participationRepository,
             TrainingSegmentExecutionRepository executionRepository,
+            TrainingSectionRepository sectionRepository,
             AccessScopeService accessScopeService,
             AcceptedTrainingImportCleanup acceptedTrainingImportCleanup) {
         this.trainingRepository = trainingRepository;
@@ -42,6 +45,7 @@ public class TrainingDeletionService {
         this.segmentRepository = segmentRepository;
         this.participationRepository = participationRepository;
         this.executionRepository = executionRepository;
+        this.sectionRepository = sectionRepository;
         this.accessScopeService = accessScopeService;
         this.acceptedTrainingImportCleanup = acceptedTrainingImportCleanup;
     }
@@ -85,6 +89,9 @@ public class TrainingDeletionService {
         segmentRepository.flush();
         definitionRepository.deleteAll(definitions);
         definitionRepository.flush();
+        sectionRepository.deleteAll(
+                sectionRepository.findAllByTraining_IdOrderBySequenceNumberAsc(trainingId));
+        sectionRepository.flush();
         acceptedTrainingImportCleanup.deleteForTraining(trainingId);
         trainingRepository.delete(training);
         trainingRepository.flush();

@@ -17,13 +17,19 @@ const groups: TrainingGroup[] = [
 describe('TrainingCreatePage', () => {
   let fixture: ComponentFixture<TrainingCreatePage>;
   let groupsApi: { getAccessible: ReturnType<typeof vi.fn> };
-  let trainingsApi: { create: ReturnType<typeof vi.fn> };
+  let trainingsApi: {
+    create: ReturnType<typeof vi.fn>;
+    createFreeText: ReturnType<typeof vi.fn>;
+  };
 
   async function createPage(
     createLoader: (request: CreateTrainingRequest) => Observable<CreateTrainingResponse> = () => of({ id: 77 }),
   ): Promise<void> {
     groupsApi = { getAccessible: vi.fn(() => of(groups)) };
-    trainingsApi = { create: vi.fn(createLoader) };
+    trainingsApi = {
+      create: vi.fn(createLoader),
+      createFreeText: vi.fn(() => of({ id: 77 })),
+    };
     await TestBed.configureTestingModule({
       imports: [TrainingCreatePage],
       providers: [
@@ -60,6 +66,13 @@ describe('TrainingCreatePage', () => {
   function selectGroup(groupId: number): void {
     const select = fixture.nativeElement.querySelector('#training-group') as HTMLSelectElement;
     select.value = String(groupId);
+    select.dispatchEvent(new Event('change'));
+    fixture.detectChanges();
+  }
+
+  function selectTrainingType(trainingType: 'TEMPO' | 'FREE_TEXT'): void {
+    const select = fixture.nativeElement.querySelector('#training-type') as HTMLSelectElement;
+    select.value = trainingType;
     select.dispatchEvent(new Event('change'));
     fixture.detectChanges();
   }
@@ -179,6 +192,34 @@ describe('TrainingCreatePage', () => {
 
     const request = trainingsApi.create.mock.calls[0][0] as CreateTrainingRequest;
     expect(request.definitions[0].segments.map((segment) => segment.restAfterSeconds)).toEqual([300, 45]);
+  });
+
+  it('creates ordered FREE_TEXT sections without requiring tempo definitions', async () => {
+    await createPage();
+    const navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+    fillRequiredFields();
+    selectTrainingType('FREE_TEXT');
+    const page = fixture.componentInstance;
+    page.sections.at(0).controls.title.setValue('Rozgrzewka');
+    page.sections.at(0).controls.content.setValue('Trucht 10 minut');
+    page.addSection();
+    page.sections.at(1).controls.title.setValue('Część główna');
+    page.sections.at(1).controls.content.setValue('Skip A 3 × 30 m');
+    page.moveSection(1, -1);
+    page.submit();
+    await fixture.whenStable();
+
+    expect(trainingsApi.create).not.toHaveBeenCalled();
+    expect(trainingsApi.createFreeText).toHaveBeenCalledWith({
+      name: 'Trening szybkościowy',
+      trainingDate: '2026-11-11',
+      trainingGroupId: 1,
+      sections: [
+        { title: 'Część główna', content: 'Skip A 3 × 30 m', sequenceNumber: 1 },
+        { title: 'Rozgrzewka', content: 'Trucht 10 minut', sequenceNumber: 2 },
+      ],
+    });
+    expect(navigate).toHaveBeenCalledWith(['/trainings', 77]);
   });
 
   it('preserves entered form data and reports failed creation', async () => {

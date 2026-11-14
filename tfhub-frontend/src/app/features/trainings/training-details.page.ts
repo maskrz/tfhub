@@ -24,6 +24,8 @@ export class TrainingDetailsPage implements OnInit {
   readonly loading = signal(true);
   readonly errorMessage = signal<string | null>(null);
   readonly deletionDialogOpen = signal(false);
+  readonly completing = signal(false);
+  readonly actionError = signal<string | null>(null);
 
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
@@ -52,6 +54,22 @@ export class TrainingDetailsPage implements OnInit {
 
   closeDeletionConfirmation(): void {
     this.deletionDialogOpen.set(false);
+  }
+
+  completeFreeTextTraining(): void {
+    const training = this.training();
+    if (!training || training.trainingType !== 'FREE_TEXT' || training.status !== 'PLANNED' || this.completing()) return;
+    this.completing.set(true);
+    this.actionError.set(null);
+    this.trainingsApi.completeFreeText(training.id).pipe(
+      take(1),
+      catchError((error: unknown) => {
+        this.actionError.set(this.getErrorMessage(error));
+        return EMPTY;
+      }),
+      finalize(() => this.completing.set(false)),
+      takeUntilDestroyed(this.destroyRef),
+    ).subscribe(() => this.loadTraining());
   }
 
   onTrainingDeleted(trainingId: number): void {

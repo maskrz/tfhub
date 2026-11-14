@@ -4,6 +4,8 @@
 
 Allow an authorized user to assign athletes to a training's definitions and record or correct their execution statuses, results and spike usage. This is the **Uzupełnij trening** task and is separate from editing the plan.
 
+This flow applies only to TEMPO trainings. FREE_TEXT trainings have no athlete participation or individual execution controls; their planned/completed transition is available from their details view.
+
 ## 2. Actors and Preconditions
 
 - **ADMIN** – can complete any training.
@@ -79,3 +81,4 @@ Follow existing TFHub form, athlete-selector, validation, loading/error and resp
 9. After success, the user remains on the completion view and can dismiss the success notice or allow it to close after five seconds.
 10. The UI is consistent with TFHub and usable on mobile devices.
 11. A successful save marks a planned training as completed; failed saves leave its status unchanged.
+12. FREE_TEXT trainings are not offered this participation/execution flow.

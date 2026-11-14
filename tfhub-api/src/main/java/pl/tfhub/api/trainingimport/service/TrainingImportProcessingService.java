@@ -78,14 +78,19 @@ public class TrainingImportProcessingService {
 				return;
 			}
 			GeminiTrainingRecognitionClient.GeminiRecognitionResponse response =
-					geminiClient.recognize(input.image());
+					input.trainingType() == pl.tfhub.api.training.enums.TrainingType.TEMPO
+							? geminiClient.recognize(input.image())
+							: geminiClient.recognize(input.image(), input.trainingType());
 			rawModelResponse = response.rawResponse();
 			if (response.candidateText() == null) {
 				throw new TrainingImportProcessingException(
 						"INVALID_MODEL_RESPONSE", "Gemini returned an invalid response");
 			}
 			TrainingImportRecognizedDraft draft =
-					recognitionMapper.validateAndMap(response.candidateText(), input.trainingGroupId());
+					input.trainingType() == pl.tfhub.api.training.enums.TrainingType.TEMPO
+							? recognitionMapper.validateAndMap(response.candidateText(), input.trainingGroupId())
+							: recognitionMapper.validateAndMap(
+									response.candidateText(), input.trainingGroupId(), input.trainingType());
 			stateService.complete(attemptId, rawModelResponse, draft);
 		} catch (TrainingImportProcessingException exception) {
 			stateService.fail(

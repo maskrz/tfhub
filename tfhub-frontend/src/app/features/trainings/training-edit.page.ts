@@ -202,6 +202,10 @@ export class TrainingEditPage implements OnInit {
       finalize(() => this.loading.set(false)),
       takeUntilDestroyed(this.destroyRef),
     ).subscribe((training) => {
+      if (training.trainingType === 'FREE_TEXT') {
+        void this.router.navigate(['/trainings', training.id, 'free-text', 'edit'], { replaceUrl: true });
+        return;
+      }
       this.training.set(training);
       this.populateForm(training);
     });

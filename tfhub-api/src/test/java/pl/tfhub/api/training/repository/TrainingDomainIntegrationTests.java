@@ -28,26 +28,33 @@ import pl.tfhub.api.athlete.enums.Gender;
 import pl.tfhub.api.athlete.exception.AthleteNotFoundException;
 import pl.tfhub.api.athlete.repository.AthleteRepository;
 import pl.tfhub.api.training.dto.request.CreateTrainingDefinitionRequest;
+import pl.tfhub.api.training.dto.request.CreateFreeTextTrainingRequest;
 import pl.tfhub.api.training.dto.request.CreateTrainingRequest;
 import pl.tfhub.api.training.dto.request.CreateTrainingSegmentRequest;
+import pl.tfhub.api.training.dto.request.CreateTrainingSectionRequest;
 import pl.tfhub.api.training.dto.request.EditTrainingDefinitionRequest;
 import pl.tfhub.api.training.dto.request.EditTrainingExecutionRequest;
 import pl.tfhub.api.training.dto.request.EditTrainingParticipationRequest;
 import pl.tfhub.api.training.dto.request.EditTrainingRequest;
 import pl.tfhub.api.training.dto.request.EditTrainingSegmentRequest;
+import pl.tfhub.api.training.dto.request.EditFreeTextTrainingRequest;
+import pl.tfhub.api.training.dto.request.EditTrainingSectionRequest;
 import pl.tfhub.api.training.dto.request.AddTrainingParticipationRequest;
 import pl.tfhub.api.training.dto.request.CompleteTrainingRequest;
 import pl.tfhub.api.training.dto.request.NewTrainingExecutionRequest;
 import pl.tfhub.api.training.dto.request.UpdateTrainingParticipationRequest;
 import pl.tfhub.api.training.dto.response.TrainingDetailsResponse;
 import pl.tfhub.api.training.service.TrainingDeletionService;
+import pl.tfhub.api.training.service.FreeTextTrainingService;
 import pl.tfhub.api.training.entity.AthleteTrainingParticipation;
 import pl.tfhub.api.training.entity.Training;
 import pl.tfhub.api.training.entity.TrainingDefinition;
+import pl.tfhub.api.training.entity.TrainingSection;
 import pl.tfhub.api.training.entity.TrainingSegment;
 import pl.tfhub.api.training.entity.TrainingSegmentExecution;
 import pl.tfhub.api.training.enums.TrainingExecutionStatus;
 import pl.tfhub.api.training.enums.TrainingStatus;
+import pl.tfhub.api.training.enums.TrainingType;
 import pl.tfhub.api.training.exception.InvalidTrainingRequestException;
 import pl.tfhub.api.training.exception.TrainingNotFoundException;
 import pl.tfhub.api.training.service.TrainingCreationService;
@@ -59,6 +66,7 @@ import pl.tfhub.api.training.service.AthleteTrainingHistoryService;
 import pl.tfhub.api.traininggroup.entity.TrainingGroup;
 import pl.tfhub.api.traininggroup.exception.TrainingGroupNotFoundException;
 import pl.tfhub.api.traininggroup.repository.TrainingGroupRepository;
+import pl.tfhub.api.training.repository.TrainingSectionRepository;
 import pl.tfhub.api.user.enums.UserRole;
 import pl.tfhub.api.user.service.AuthenticatedUser;
 
@@ -130,6 +138,12 @@ class TrainingDomainIntegrationTests {
     private TrainingDeletionService trainingDeletionService;
 
     @Autowired
+    private FreeTextTrainingService freeTextTrainingService;
+
+    @Autowired
+    private TrainingSectionRepository sectionRepository;
+
+    @Autowired
     private AthleteTrainingHistoryService athleteTrainingHistoryService;
 
     @Autowired
@@ -144,7 +158,7 @@ class TrainingDomainIntegrationTests {
                 UsernamePasswordAuthenticationToken.authenticated(
                         new AuthenticatedUser(1, "test-admin", "", UserRole.ADMIN, true), null, java.util.List.of()));
         jdbcTemplate.execute("""
-                TRUNCATE TABLE training_segment_executions, training_athlete_participations,
+                TRUNCATE TABLE training_segment_executions, training_athlete_participations, training_sections,
                     training_segments, training_definitions, training_sessions,
                     athletes, training_groups, users RESTART IDENTITY CASCADE
                 """);
@@ -292,7 +306,7 @@ class TrainingDomainIntegrationTests {
         insertParticipation(newerFirst, firstDefinition, 2);
         insertExecution(participationId, segmentId, firstDefinition, "PENDING");
 
-        var trainings = trainingQueryService.listTrainings(false);
+        var trainings = trainingQueryService.listTrainings(false, null);
         assertEquals(java.util.List.of(newerSecond, newerFirst, older),
                 trainings.stream().map(item -> item.id()).toList());
         var newer = trainings.get(1);
@@ -303,12 +317,73 @@ class TrainingDomainIntegrationTests {
         assertEquals(2L, newer.definitionCount());
         assertEquals(2L, newer.participantCount());
         assertEquals(TrainingStatus.PLANNED, newer.status());
+        assertEquals(TrainingType.TEMPO, newer.trainingType());
         assertEquals(0L, trainings.get(0).definitionCount());
         assertEquals(0L, trainings.get(0).participantCount());
-        var allTrainings = trainingQueryService.listTrainings(true);
+        var allTrainings = trainingQueryService.listTrainings(true, null);
         assertEquals(java.util.List.of(completed, newerSecond, newerFirst, older),
                 allTrainings.stream().map(item -> item.id()).toList());
         assertEquals(TrainingStatus.COMPLETED, allTrainings.get(0).status());
+    }
+
+    @Test
+    void filtersByTypeAndDefaultsPersistedRowsToTempo() {
+        long tempoTraining = insertTraining("Tempo", 1, LocalDate.parse("2026-03-01"));
+        long freeTextTraining = insertTraining("General", 1, LocalDate.parse("2026-04-01"));
+        jdbcTemplate.update(
+                "UPDATE training_sessions SET training_type = 'FREE_TEXT' WHERE id = ?", freeTextTraining);
+
+        assertEquals(List.of(freeTextTraining), trainingQueryService.listTrainings(true, TrainingType.FREE_TEXT)
+                .stream().map(item -> item.id()).toList());
+        assertEquals(List.of(tempoTraining), trainingQueryService.listTrainings(true, TrainingType.TEMPO)
+                .stream().map(item -> item.id()).toList());
+        assertEquals(TrainingType.TEMPO, trainingRepository.findById(tempoTraining).orElseThrow().getTrainingType());
+        assertEquals(List.of(freeTextTraining, tempoTraining), trainingQueryService.listTrainings(true, null)
+                .stream().map(item -> item.id()).toList());
+    }
+
+    @Test
+    void managesFreeTextSectionsAndCompletesWithoutAthleteParticipation() {
+        var created = freeTextTrainingService.create(new CreateFreeTextTrainingRequest(
+                "General session",
+                LocalDate.parse("2026-03-02"),
+                1L,
+                List.of(
+                        new CreateTrainingSectionRequest("Warm-up", "Easy run", 1),
+                        new CreateTrainingSectionRequest("Main part", "Running drills", 2))));
+
+        Training training = trainingRepository.findById(created.id()).orElseThrow();
+        assertEquals(TrainingType.FREE_TEXT, training.getTrainingType());
+        assertEquals(TrainingStatus.PLANNED, training.getStatus());
+        assertEquals(0, participationRepository.findAllByTraining_IdOrderByTrainingDefinition_IdAscIdAsc(
+                created.id()).size());
+        List<TrainingSection> sections = sectionRepository
+                .findAllByTraining_IdOrderBySequenceNumberAsc(created.id());
+        assertEquals(List.of("Warm-up", "Main part"), sections.stream().map(TrainingSection::getTitle).toList());
+        Long firstSectionId = sections.get(0).getId();
+        Long secondSectionId = sections.get(1).getId();
+
+        freeTextTrainingService.update(created.id(), new EditFreeTextTrainingRequest(
+                "General session updated",
+                LocalDate.parse("2026-03-03"),
+                List.of(
+                        new EditTrainingSectionRequest(secondSectionId, "Main part", "Updated drills", 1),
+                        new EditTrainingSectionRequest(firstSectionId, "Warm-up", "Easy run", 2))));
+
+        List<TrainingSection> reordered = sectionRepository
+                .findAllByTraining_IdOrderBySequenceNumberAsc(created.id());
+        assertEquals(List.of(secondSectionId, firstSectionId), reordered.stream().map(TrainingSection::getId).toList());
+        assertEquals("Updated drills", reordered.get(0).getContent());
+        assertEquals("General session updated", trainingRepository.findById(created.id()).orElseThrow().getName());
+
+        freeTextTrainingService.markCompleted(created.id());
+        assertEquals(TrainingStatus.COMPLETED, trainingRepository.findById(created.id()).orElseThrow().getStatus());
+        assertThrows(InvalidTrainingRequestException.class, () ->
+                trainingCompletionService.completeTraining(created.id(), new CompleteTrainingRequest(
+                        List.of(), List.of(), List.of())));
+
+        trainingDeletionService.deleteTraining(created.id());
+        assertEquals(0, sectionRepository.findAllByTraining_IdOrderBySequenceNumberAsc(created.id()).size());
     }
 
     @Test
@@ -336,14 +411,14 @@ class TrainingDomainIntegrationTests {
         jdbcTemplate.update("UPDATE athletes SET training_group_id = ? WHERE id = 1", unassignedGroup);
 
         authenticate(1, UserRole.COACH, "coach-one");
-        var trainings = trainingQueryService.listTrainings(false);
+        var trainings = trainingQueryService.listTrainings(false, null);
 
         assertEquals(java.util.List.of(firstTraining, secondTraining),
                 trainings.stream().map(item -> item.id()).toList());
         assertEquals(2L, trainings.get(0).participantCount());
         assertEquals(1L, trainings.get(0).definitionCount());
         assertEquals(assignedGroup, trainings.get(0).trainingGroup().id());
-        var allTrainings = trainingQueryService.listTrainings(true);
+        var allTrainings = trainingQueryService.listTrainings(true, null);
         assertEquals(java.util.List.of(completedTraining, firstTraining, secondTraining),
                 allTrainings.stream().map(item -> item.id()).toList());
     }
@@ -352,7 +427,7 @@ class TrainingDomainIntegrationTests {
     void rejectsAuthenticatedUsersWithoutCoachOrAdminRole() {
         authenticate(1, UserRole.ATHLETE, "athlete-one");
 
-        assertThrows(AccessDeniedException.class, () -> trainingQueryService.listTrainings(false));
+        assertThrows(AccessDeniedException.class, () -> trainingQueryService.listTrainings(false, null));
         assertThrows(AccessDeniedException.class, () ->
                 trainingCreationService.createTraining(basicTrainingRequest(1, List.of())));
         assertThrows(AccessDeniedException.class, () ->
@@ -1021,7 +1096,7 @@ class TrainingDomainIntegrationTests {
                 "SELECT COUNT(*) FROM training_groups WHERE id = 1", Integer.class));
         assertEquals(1, jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM athletes WHERE id = 1", Integer.class));
-        assertEquals(0, trainingQueryService.listTrainings(true).stream()
+        assertEquals(0, trainingQueryService.listTrainings(true, null).stream()
                 .filter(item -> item.id() == trainingId).count());
         assertThrows(TrainingNotFoundException.class, () ->
                 trainingDetailsService.getTraining(trainingId));

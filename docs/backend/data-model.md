@@ -289,13 +289,15 @@ No separate Competition entity is required initially.
 
 ## 7 Training Session Status
 
-Each persisted training session has a required `status` column stored as `VARCHAR(20)`, defaulting to `PLANNED` and constrained to `PLANNED` or `COMPLETED`. The Java enum values match. Sessions created directly start as `PLANNED`; accepting an import atomically creates a `COMPLETED` session. The first successful UC-510 save changes the status to `COMPLETED`, even when some segment executions remain `PENDING`; failed saves do not change it.
+Each persisted training session has a required `training_type` column stored as `VARCHAR(20)`, constrained to `TEMPO` or `FREE_TEXT`. The Java enum values match. V13 defaults and backfills existing sessions to `TEMPO`; training type is immutable after creation.
+
+Each persisted training session also has a required `status` column stored as `VARCHAR(20)`, defaulting to `PLANNED` and constrained to `PLANNED` or `COMPLETED`. The Java enum values match. Sessions created directly start as `PLANNED`; accepting an import atomically creates a `COMPLETED` session. The first successful UC-510 save changes a TEMPO session to `COMPLETED`, even when some segment executions remain `PENDING`; failed saves do not change it. A FREE_TEXT session may be marked completed without creating athlete participation records.
 
 The status describes workflow progress, not availability or authorization. Both planned and completed sessions remain accessible to authorized users and may be edited or corrected. There is no inactive training status; sessions are removed through the hard-delete operation.
 
 Migration V5 replaces the legacy training-session `active` flag with `status`. The old flag cannot reliably identify whether UC-510 was previously saved, so existing sessions migrate to `PLANNED`.
 
-The training list index is `(training_group_id, status, training_date DESC, id)`.
+The training list index is `(training_group_id, status, training_date DESC, id)`. Add an index for type filtering only if query-plan evidence shows it is needed.
 
 ## 8. Relationships
 

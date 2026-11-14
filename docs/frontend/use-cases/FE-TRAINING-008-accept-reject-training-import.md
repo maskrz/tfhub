@@ -24,7 +24,7 @@ Allow an authorized user to explicitly accept the complete reviewed draft into o
 ## 4. Confirmation and Data Integrity
 
 - Acceptance and rejection are separate, explicit whole-import operations; never automatically finalize based on OCR confidence or draft validity.
-- Acceptance uses the latest saved draft. The backend revalidates it and atomically creates the training with status `COMPLETED`, definitions, segments, matched participations and execution data, even if some executions remain `PENDING`.
+- Acceptance uses the latest saved draft. The backend revalidates it and atomically creates the training with status `COMPLETED`. TEMPO imports create definitions, segments, matched participations and executions; FREE_TEXT imports create ordered sections only, with no athlete records.
 - Skipped athlete rows do not create persisted participation or execution records.
 - Rejection does not create a training.
 - The optimized JPEG, current draft and processing attempts remain retained after either outcome. The UI must not imply that individual draft-edit history is stored.
@@ -56,3 +56,4 @@ Allow an authorized user to explicitly accept the complete reviewed draft into o
 6. Backend errors do not change the UI to a success/finalized state.
 7. The import's optimized JPEG and current draft remain retained after finalization.
 8. The UI follows existing TFHUB dialog, notification, Polish-language and responsive conventions.
+9. Accepted FREE_TEXT imports open a completed section-based training, with no participations or tempo execution data.

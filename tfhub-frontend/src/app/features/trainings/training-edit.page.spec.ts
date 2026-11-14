@@ -22,6 +22,8 @@ const training: TrainingDetails = {
     ],
     participations: [],
   }],
+  trainingType: 'TEMPO',
+  sections: [],
 };
 
 describe('TrainingEditPage', () => {

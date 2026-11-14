@@ -6,6 +6,7 @@ import { EMPTY, catchError, finalize, take } from 'rxjs';
 import { TrainingGroup, TrainingGroupsApiService } from '../training-groups/training-groups-api.service';
 import { TrainingImportUploadResponse } from './training-import.model';
 import { TrainingImportsApiService } from './training-imports-api.service';
+import { TrainingType } from '../trainings/training.model';
 
 const SUPPORTED_IMAGE_TYPES = new Set(['image/jpeg', 'image/png']);
 const SUPPORTED_IMAGE_EXTENSIONS = /\.(jpe?g|png)$/i;
@@ -29,6 +30,7 @@ export class TrainingImportUploadModalComponent implements AfterViewInit {
   readonly groupsError = signal<string | null>(null);
   readonly imageError = signal<string | null>(null);
   readonly selectedImage = signal<File | null>(null);
+  readonly trainingType = signal<TrainingType>('TEMPO');
   readonly trainingGroupId = new FormControl<number | null>(null, Validators.required);
 
   private readonly groupsApi = inject(TrainingGroupsApiService);
@@ -57,6 +59,14 @@ export class TrainingImportUploadModalComponent implements AfterViewInit {
     if (groupId !== null && !this.groups().some((group) => group.id === groupId)) return;
     this.trainingGroupId.setValue(groupId);
     this.errorMessage.set(null);
+  }
+
+  onTrainingTypeChange(event: Event): void {
+    const select = event.target;
+    if (!(select instanceof HTMLSelectElement)) return;
+    if (select.value === 'TEMPO' || select.value === 'FREE_TEXT') {
+      this.trainingType.set(select.value);
+    }
   }
 
   onImageChange(event: Event): void {
@@ -104,7 +114,7 @@ export class TrainingImportUploadModalComponent implements AfterViewInit {
     if (groupId === null || image === null) return;
 
     this.uploading.set(true);
-    this.importsApi.upload(groupId, image).pipe(
+    this.importsApi.upload(groupId, image, this.trainingType()).pipe(
       take(1),
       catchError((error: unknown) => {
         this.errorMessage.set(this.getUploadErrorMessage(error));

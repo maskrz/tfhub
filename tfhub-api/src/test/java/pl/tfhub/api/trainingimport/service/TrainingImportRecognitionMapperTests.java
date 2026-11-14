@@ -8,10 +8,12 @@ import pl.tfhub.api.athlete.repository.AthleteRepository;
 import pl.tfhub.api.athlete.service.AthleteService;
 import pl.tfhub.api.training.enums.TrainingExecutionStatus;
 import pl.tfhub.api.trainingimport.enums.TrainingImportAthleteMatchStatus;
+import pl.tfhub.api.training.enums.TrainingType;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -29,6 +31,90 @@ class TrainingImportRecognitionMapperTests {
 								(athlete.getFirstName() + " " + athlete.getLastName()).toLowerCase(java.util.Locale.ROOT),
 								List.of())).toList());
 		return new TrainingImportRecognitionMapper(new ObjectMapper(), service, new TrainingImportAthleteMatcher(service));
+	}
+
+	@Test
+	void mapsFreeTextSectionsInOrderAndRetainsUncertaintyForReview() {
+		var mapper = mapper(mock(AthleteRepository.class));
+		String input = """
+				{
+				  "name":{"value":"Trening","originalText":"Trening","uncertain":false},
+				  "trainingDate":{"value":"2026-11-10","originalText":"10.11.2026","uncertain":false},
+				  "sections":[
+				    {
+				      "sequenceNumber":1,
+				      "title":{"value":"Rozgrzewka","originalText":"Rozgrzewka","uncertain":false},
+				      "content":{"value":"Trucht 10 minut","originalText":"Trucht 10'","uncertain":false}
+				    },
+				    {
+				      "sequenceNumber":2,
+				      "title":{"value":"Część główna","originalText":null,"uncertain":true,
+				               "uncertaintyReason":"Nagłówek nieczytelny"},
+				      "content":{"value":"Skip A 3 x 30 m","originalText":"Skip A 3 x 30 m","uncertain":true,
+				                 "uncertaintyReason":"Liczba powtórzeń niepewna"}
+				    }
+				  ]
+				}
+				""";
+
+		var draft = mapper.validateAndMap(input, 7L, TrainingType.FREE_TEXT);
+
+		assertEquals(TrainingType.FREE_TEXT, draft.trainingType());
+		assertEquals("Trening", draft.name());
+		assertEquals(2, draft.sections().size());
+		assertEquals(1, draft.sections().getFirst().sequenceNumber());
+		assertEquals("Rozgrzewka", draft.sections().getFirst().title());
+		assertEquals("Trucht 10 minut", draft.sections().getFirst().content());
+		assertEquals(2, draft.sections().get(1).sequenceNumber());
+		assertEquals("Część główna", draft.sections().get(1).title());
+		assertEquals("Skip A 3 x 30 m", draft.sections().get(1).content());
+		assertEquals(Boolean.TRUE, draft.sections().get(1).recognitionMetadata().get("uncertain"));
+		assertTrue(draft.definitions().isEmpty());
+	}
+
+	@Test
+	void usesReviewableSingleSectionFallbackWhenNoUsefulSectionsAreReturned() {
+		var mapper = mapper(mock(AthleteRepository.class));
+		String input = """
+				{
+				  "name":{"value":"Session","originalText":"Session","uncertain":false},
+				  "trainingDate":{"value":"2026-11-10","originalText":"10.11.2026","uncertain":false}
+				}
+				""";
+
+		var draft = mapper.validateAndMap(input, 7L, TrainingType.FREE_TEXT);
+
+		assertEquals(1, draft.sections().size());
+		assertEquals(1, draft.sections().getFirst().sequenceNumber());
+		assertEquals("Trening", draft.sections().getFirst().title());
+		assertEquals("", draft.sections().getFirst().content());
+		assertEquals(Boolean.TRUE, draft.sections().getFirst().recognitionMetadata().get("uncertain"));
+		assertTrue(draft.definitions().isEmpty());
+	}
+
+	@Test
+	void rejectsMalformedFreeTextDateOrDuplicateSectionOrderAsUnusable() {
+		var mapper = mapper(mock(AthleteRepository.class));
+		String input = """
+				{
+				  "trainingDate":{"value":"not-a-date","originalText":"??","uncertain":true},
+				  "sections":[]
+				}
+				""";
+		assertThrows(TrainingImportProcessingException.class,
+				() -> mapper.validateAndMap(input, 7L, TrainingType.FREE_TEXT));
+
+		String duplicateOrder = """
+				{
+				  "trainingDate":{"value":"2026-11-10","originalText":"10.11.2026","uncertain":false},
+				  "sections":[
+				    {"sequenceNumber":1,"title":{"value":"A"},"content":{"value":"One"}},
+				    {"sequenceNumber":1,"title":{"value":"B"},"content":{"value":"Two"}}
+				  ]
+				}
+				""";
+		assertThrows(TrainingImportProcessingException.class,
+				() -> mapper.validateAndMap(duplicateOrder, 7L, TrainingType.FREE_TEXT));
 	}
 
 	@Test

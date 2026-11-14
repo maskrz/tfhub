@@ -12,6 +12,7 @@ import org.springframework.web.multipart.MultipartFile;
 import pl.tfhub.api.common.authorization.AccessScopeService;
 import pl.tfhub.api.traininggroup.entity.TrainingGroup;
 import pl.tfhub.api.traininggroup.service.TrainingGroupService;
+import pl.tfhub.api.training.enums.TrainingType;
 import pl.tfhub.api.trainingimport.dto.response.TrainingImportUploadResponse;
 import pl.tfhub.api.trainingimport.entity.TrainingImport;
 import pl.tfhub.api.trainingimport.entity.TrainingImportSourceImage;
@@ -55,8 +56,19 @@ public class TrainingImportUploadService {
 
 	@Transactional
 	public TrainingImportUploadResponse upload(long trainingGroupId, MultipartFile upload) {
+		return upload(trainingGroupId, TrainingType.TEMPO, upload);
+	}
+
+	@Transactional
+	public TrainingImportUploadResponse upload(
+			long trainingGroupId,
+			TrainingType trainingType,
+			MultipartFile upload) {
 		if (trainingGroupId <= 0) {
 			throw new InvalidTrainingImportUploadException("Training group ID must be positive");
+		}
+		if (trainingType == null) {
+			throw new InvalidTrainingImportUploadException("Training type is required");
 		}
 		accessScopeService.requireCoachOrAdmin();
 		AuthenticatedUser authenticatedUser = accessScopeService.currentUser();
@@ -71,7 +83,7 @@ public class TrainingImportUploadService {
 		registerRollbackCleanup(storageKey);
 
 		TrainingImport trainingImport = trainingImportRepository.saveAndFlush(new TrainingImport(
-				group, initiator, OffsetDateTime.now(ZoneOffset.UTC), possibleDuplicate));
+				group, initiator, OffsetDateTime.now(ZoneOffset.UTC), possibleDuplicate, trainingType));
 		sourceImageRepository.saveAndFlush(new TrainingImportSourceImage(
 				trainingImport,
 				storageKey,

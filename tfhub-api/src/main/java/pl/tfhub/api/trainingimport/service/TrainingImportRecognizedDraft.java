@@ -5,13 +5,23 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 import pl.tfhub.api.training.enums.TrainingExecutionStatus;
+import pl.tfhub.api.training.enums.TrainingType;
 import pl.tfhub.api.trainingimport.enums.TrainingImportAthleteMatchStatus;
 
 record TrainingImportRecognizedDraft(
+		TrainingType trainingType,
 		String name,
 		LocalDate trainingDate,
 		Map<String, Object> recognitionMetadata,
-		List<Definition> definitions) {
+		List<Definition> definitions,
+		List<Section> sections) {
+
+	record Section(
+			String title,
+			String content,
+			int sequenceNumber,
+			Map<String, Object> recognitionMetadata) {
+	}
 
 	record Definition(
 			String name,

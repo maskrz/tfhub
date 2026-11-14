@@ -19,6 +19,7 @@ const trainings: TrainingListItem[] = [
     definitionCount: 2,
     participantCount: 5,
     status: 'PLANNED',
+    trainingType: 'TEMPO',
   },
   {
     id: 2,
@@ -28,6 +29,7 @@ const trainings: TrainingListItem[] = [
     definitionCount: 1,
     participantCount: 0,
     status: 'PLANNED',
+    trainingType: 'TEMPO',
   },
 ];
 
@@ -39,12 +41,25 @@ const completedTraining: TrainingListItem = {
   definitionCount: 1,
   participantCount: 2,
   status: 'COMPLETED',
+  trainingType: 'TEMPO',
+};
+
+const freeTextTraining: TrainingListItem = {
+  id: 4,
+  name: 'Trening techniczny',
+  trainingDate: '2026-11-13',
+  trainingGroup: { id: 1, name: 'Sprint' },
+  definitionCount: 0,
+  participantCount: 0,
+  status: 'PLANNED',
+  trainingType: 'FREE_TEXT',
 };
 
 const pendingImport: TrainingImportListItem = {
   id: 21,
   trainingGroupId: 1,
   trainingGroupName: 'Sprint',
+  trainingType: 'TEMPO',
   status: 'PENDING',
   nextRetryAt: null,
   createdAt: '2026-11-12T10:00:00Z',
@@ -208,6 +223,28 @@ describe('TrainingsPage', () => {
     expect(visibleNames()).toHaveLength(3);
   });
 
+  it('displays both training types and filters the unified diary by type', async () => {
+    await createPage(() => of([...trainings, freeTextTraining]));
+
+    expect(visibleNames()).toHaveLength(3);
+    expect(fixture.nativeElement.textContent).toContain('Trening ogólny');
+    const typeFilter = fixture.nativeElement.querySelector('[aria-label="Filtruj według rodzaju treningu"]') as HTMLSelectElement;
+    typeFilter.value = 'FREE_TEXT';
+    typeFilter.dispatchEvent(new Event('change'));
+    fixture.detectChanges();
+
+    expect(visibleNames()).toEqual(['Trening techniczny']);
+    expect(fixture.nativeElement.querySelector('.edit-training-link')?.getAttribute('href'))
+      .toBe('/trainings/4/free-text/edit');
+    expect(fixture.nativeElement.querySelector('.complete-training-link')).toBeNull();
+    expect(fixture.nativeElement.querySelector('[data-label="Liczba uczestników"]')?.textContent?.trim()).toBe('—');
+
+    typeFilter.value = '';
+    typeFilter.dispatchEvent(new Event('change'));
+    fixture.detectChanges();
+    expect(visibleNames()).toHaveLength(3);
+  });
+
   it('requires explicit confirmation and leaves a training unchanged when cancelled', async () => {
     await createPage(() => of([...trainings, completedTraining]));
     const statusFilter = fixture.nativeElement.querySelector('[aria-label="Filtruj według statusu"]') as HTMLSelectElement;
@@ -363,6 +400,19 @@ describe('TrainingsPage', () => {
     expect(rows[0].querySelector('a')?.getAttribute('href')).toContain('/training-imports/22/review');
     expect(rows[1].textContent).toContain('Możliwy duplikat');
     expect(rows[1].textContent).toContain('Oczekuje na przetworzenie');
+  });
+
+  it('keeps import and training actions inside table cells with separate button containers', async () => {
+    const review = { ...pendingImport, status: 'REVIEW_REQUIRED' as const };
+    await createPage(() => of(trainings), true, () => of([review]));
+
+    const cells = fixture.nativeElement.querySelectorAll('td.training-actions') as NodeListOf<HTMLTableCellElement>;
+    expect(cells.length).toBeGreaterThan(1);
+    for (const cell of cells) {
+      expect(cell.querySelector(':scope > .training-action-buttons')).toBeTruthy();
+    }
+    expect(cells[0].querySelector('.training-action-buttons a')).toBeTruthy();
+    expect(cells[1].querySelectorAll('.training-action-buttons .button').length).toBeGreaterThan(1);
   });
 
   it('refreshes only imports every five seconds until processing finishes', async () => {

@@ -102,7 +102,7 @@ describe('TrainingImportUploadModalComponent', () => {
     submitForm();
     submitForm();
     expect(importsApi.upload).toHaveBeenCalledOnce();
-    expect(importsApi.upload).toHaveBeenCalledWith(7, image);
+    expect(importsApi.upload).toHaveBeenCalledWith(7, image, 'TEMPO');
     expect(submitButton().disabled).toBe(true);
     expect((fixture.nativeElement.querySelector('.modal-footer .button--secondary') as HTMLButtonElement).disabled)
       .toBe(true);

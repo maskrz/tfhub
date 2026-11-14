@@ -12,6 +12,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 import pl.tfhub.api.athlete.repository.AthleteRepository;
 import pl.tfhub.api.common.authorization.AccessScopeService;
 import pl.tfhub.api.traininggroup.entity.TrainingGroup;
+import pl.tfhub.api.training.enums.TrainingType;
 import pl.tfhub.api.trainingimport.entity.TrainingImport;
 import pl.tfhub.api.trainingimport.entity.TrainingImportAttempt;
 import pl.tfhub.api.trainingimport.enums.TrainingImportAttemptStatus;
@@ -22,6 +23,7 @@ import pl.tfhub.api.trainingimport.repository.TrainingImportDraftDefinitionRepos
 import pl.tfhub.api.trainingimport.repository.TrainingImportDraftExecutionRepository;
 import pl.tfhub.api.trainingimport.repository.TrainingImportDraftRepository;
 import pl.tfhub.api.trainingimport.repository.TrainingImportDraftSegmentRepository;
+import pl.tfhub.api.trainingimport.repository.TrainingImportDraftSectionRepository;
 import pl.tfhub.api.trainingimport.repository.TrainingImportRepository;
 import pl.tfhub.api.trainingimport.repository.TrainingImportSourceImageRepository;
 import pl.tfhub.api.trainingimport.config.TrainingImportProperties;
@@ -68,7 +70,8 @@ class TrainingImportAutomaticRetryTests {
 		GeminiTrainingRecognitionClient geminiClient = mock(GeminiTrainingRecognitionClient.class);
 		ThreadPoolTaskExecutor taskExecutor = mock(ThreadPoolTaskExecutor.class);
 		when(stateService.loadProcessingInput(9L)).thenReturn(
-				new TrainingImportProcessingStateService.ProcessingInput(9L, 1L, 7L, new byte[] {1}));
+				new TrainingImportProcessingStateService.ProcessingInput(
+						9L, 1L, 7L, TrainingType.TEMPO, new byte[] {1}));
 		when(geminiClient.recognize(any())).thenThrow(
 				new TrainingImportProcessingException(
 						"GEMINI_UNAVAILABLE", "Gemini is temporarily unavailable", true));
@@ -172,6 +175,7 @@ class TrainingImportAutomaticRetryTests {
 				mock(TrainingImportDraftRepository.class),
 				mock(TrainingImportDraftDefinitionRepository.class),
 				mock(TrainingImportDraftSegmentRepository.class),
+				mock(TrainingImportDraftSectionRepository.class),
 				mock(TrainingImportDraftAthleteRowRepository.class),
 				mock(TrainingImportDraftExecutionRepository.class),
 				mock(AthleteRepository.class),

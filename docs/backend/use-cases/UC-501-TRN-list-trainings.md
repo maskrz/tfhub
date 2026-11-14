@@ -4,7 +4,7 @@
 
 Provide a backend operation for retrieving training sessions accessible to the requesting user.
 
-The operation must enforce role-based access and training group visibility rules. By default it returns planned sessions; callers may explicitly request completed sessions as well.
+The operation must enforce role-based access and training group visibility rules. It returns both training types in one diary; callers may filter by type. By default it returns planned sessions; callers may explicitly request completed sessions as well.
 
 ## 2. Actors
 
@@ -29,6 +29,7 @@ The operation must enforce role-based access and training group visibility rules
 
 - COACH can retrieve a training session only if its assigned training group is currently assigned to that coach.
 - By default, only planned training sessions are returned. When `includeCompleted=true`, completed sessions in assigned groups are also returned.
+- Trainings have type `TEMPO` or `FREE_TEXT`; omitting the type filter returns both.
 - A training session belongs to exactly one training group.
 - A training session without an assigned group is not possible.
 - Visibility does not depend on whether the training session has any participants.
@@ -72,8 +73,9 @@ The response must include at least:
 - Assigned training group, including its identifier and name.
 - Number of training definitions.
 - Number of participating athletes.
+- Training type (`TEMPO` or `FREE_TEXT`).
 
-The number of participating athletes must include all athletes assigned to the training session, regardless of their current training group.
+The number of participating athletes must include all athletes assigned to the training session, regardless of their current training group. FREE_TEXT sessions have zero definitions and participants; they must not create synthetic participation rows.
 
 The response must not expose data belonging to unrelated modules or sensitive information.
 
@@ -82,10 +84,11 @@ The response includes the session's status in addition to the identifying and su
 ## 6. API Contract
 
 - **Method and path:** `GET /api/trainings`
-- **Query parameter:** optional `includeCompleted` boolean, default `false`.
+- **Query parameters:** optional `includeCompleted` boolean, default `false`; optional `trainingType` enum (`TEMPO` or `FREE_TEXT`).
 - When `includeCompleted=false` or omitted, return only `PLANNED` sessions.
 - When `includeCompleted=true`, return both `PLANNED` and `COMPLETED` sessions.
-- The response item includes `status` so clients can filter or label it.
+- When `trainingType` is omitted, return both types; when provided, return only matching records.
+- The response item includes `status` and `trainingType` so clients can filter or label it.
 
 ## 7. Sorting
 
@@ -107,13 +110,14 @@ The response includes the session's status in addition to the identifying and su
 - **Unauthenticated request:** access is rejected.
 - **User without ADMIN or COACH role:** access is rejected.
 - **Invalid `includeCompleted` value:** the request is rejected as an invalid query parameter.
+- **Invalid `trainingType` value:** the request is rejected as an invalid query parameter.
 - **Unexpected server error:** the system reports an appropriate error without exposing internal implementation details.
 
 An empty result is a valid response and must not be treated as an error.
 
 ## 10. Output
 
-The operation returns a collection of training sessions accessible to the requesting user, filtered by the `includeCompleted` parameter.
+The operation returns a collection of training sessions accessible to the requesting user, filtered by the `includeCompleted` and optional `trainingType` parameters.
 
 If the user has no sessions matching the requested status, the operation returns an empty collection.
 
@@ -124,13 +128,13 @@ If the user has no sessions matching the requested status, the operation returns
 - Group visibility must be evaluated using the current coach-to-group relationships.
 - A coach who is no longer assigned to a training's group must no longer see that training in the standard list.
 - The backend must return each training session only once.
-- The number of participants and definitions must reflect the persisted state of the training session.
+- The number of participants and definitions must reflect the persisted state of the training session (both are zero for FREE_TEXT).
 
 ## 12. Out of Scope
 
 - Creating, editing or deleting training sessions (UC-505).
 - Retrieving full training details.
-- Searching and filtering by fields other than training status.
+- Searching and filtering by fields other than training status and training type.
 - Pagination.
 - Reviewing or accepting OCR imports.
 - Training statistics and athlete training history.
@@ -149,5 +153,6 @@ If the user has no sessions matching the requested status, the operation returns
 9. Training import drafts and pending OCR imports are excluded.
 10. Training sessions are sorted by date, newest first, with deterministic ordering for equal dates.
 11. No duplicate training sessions are returned.
-12. Each returned item includes its status, and an empty collection is returned when no sessions match the requested status.
-13. Unauthorized users cannot retrieve the training list.
+12. Each returned item includes its status and type; the optional type filter returns only the selected type, while omission returns both.
+13. An empty collection is returned when no sessions match the requested status and type.
+14. Unauthorized users cannot retrieve the training list.

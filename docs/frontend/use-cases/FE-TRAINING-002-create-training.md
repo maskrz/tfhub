@@ -2,7 +2,7 @@
 
 ## 1. Purpose
 
-Allow an authorized user to create a training session and define its training variants and segments. Athlete assignments and execution data are added later through FE-TRAINING-009 – Complete Training.
+Allow an authorized user to create either a TEMPO training with definitions and segments or a FREE_TEXT training with ordered sections. Athlete assignments and execution data are added later only for TEMPO through FE-TRAINING-009 – Complete Training.
 
 The view must follow the existing TFHUB visual design and interaction patterns.
 
@@ -23,14 +23,14 @@ The view must follow the existing TFHUB visual design and interaction patterns.
 2. The frontend opens the training creation form.
 3. The user enters the training name and date.
 4. The user selects exactly one training group.
-5. The user adds one or more TrainingDefinitions.
-6. For each definition, the user:
+5. The user selects the training type.
+6. For TEMPO, the user adds one or more TrainingDefinitions. For each definition, the user:
     - Enters its name.
     - Adds one or more training segments.
     - Configures the distance and rest after each segment.
-7. The user reviews the complete training structure.
-8. The user submits the form.
-9. The frontend sends the training plan to the backend UC-502 endpoint.
+7. For FREE_TEXT, the user adds one or more sections with editable titles and content and can reorder them.
+8. The user reviews the complete training structure.
+9. The user submits the selected type to its UC-502 endpoint.
 10. On success, the user is redirected to the created training's details view.
 
 ## 5. Training Form
@@ -73,17 +73,25 @@ Rules:
 - The last segment may have no rest value if permitted by the backend rules.
 - Display segment order clearly.
 
+### FREE_TEXT Sections
+
+- Each section contains a free-text title and content; titles are not chosen from a fixed list.
+- Sections can be added, edited, removed and reordered. At least one section with a title and content is required.
+- A new FREE_TEXT training is `PLANNED` and has no athlete participation or execution records.
+
 ## 6. Validation
 
 Validate the form before submission:
 - Training name is required.
 - Date is required.
 - Group is required.
-- At least one definition is required.
+- Training type is required.
+- For TEMPO, at least one definition is required.
 - Every definition must have a name.
 - Every definition must contain at least one segment.
 - Segment distances must be positive.
 - Rest values must be valid.
+- For FREE_TEXT, at least one section is required and each section must have a title and content.
 
 Display validation errors next to the relevant fields using existing TFHUB validation patterns.
 
@@ -142,6 +150,7 @@ All user-facing text must be in Polish.
 - User can configure and reorder segments within each definition.
 - Form validation works correctly.
 - Successful submission creates a training plan without athlete participations through UC-502.
+- Successful FREE_TEXT submission creates an ordered section-based training without tempo or athlete records.
 - Successful creation redirects to training details.
 - Failed submission preserves entered data.
 - UI matches existing TFHUB forms and controls.

@@ -15,6 +15,18 @@
       <h2 id="training-details-heading">Dane treningu</h2>
       <div class="details-grid">
         <div class="field">
+          <label for="training-type">Rodzaj treningu <span aria-hidden="true">*</span></label>
+          <select
+            id="training-type"
+            class="field-control select-with-arrow"
+            [value]="trainingType()"
+            (change)="onTrainingTypeChange($event)"
+          >
+            <option value="TEMPO">Trening tempowy</option>
+            <option value="FREE_TEXT">Trening ogólny</option>
+          </select>
+        </div>
+        <div class="field">
           <label for="training-name">Nazwa <span aria-hidden="true">*</span></label>
           <input
             id="training-name"
@@ -81,6 +93,7 @@
       </div>
     </section>
 
+    @if (trainingType() === 'TEMPO') {
     <section class="form-section definitions-section" aria-labelledby="definitions-heading">
       <div class="section-heading">
         <div>
@@ -219,10 +232,82 @@
               </div>
             }
           </section>
-
         </article>
       }
     </section>
+    } @else {
+            <section class="form-section definitions-section" aria-labelledby="sections-heading">
+              <div class="section-heading">
+                <div>
+                  <h2 id="sections-heading">Sekcje treningu</h2>
+                  <p>Dodaj uporządkowane części treningu wraz z opisem.</p>
+                </div>
+                <button type="button" class="button button--secondary" (click)="addSection()">
+                  Dodaj sekcję
+                </button>
+              </div>
+
+              @if (sections.invalid && attemptedSubmit()) {
+                <p class="field-error" role="alert">Dodaj tytuł i treść każdej sekcji.</p>
+              }
+
+              @for (section of sections.controls; track section; let sectionIndex = $index) {
+                <article class="definition-card" [attr.aria-labelledby]="'training-section-heading-' + sectionIndex">
+                  <div class="definition-heading">
+                    <h3 [id]="'training-section-heading-' + sectionIndex">Sekcja {{ sectionIndex + 1 }}</h3>
+                    <div class="item-actions">
+                      <button
+                        type="button"
+                        class="button button--secondary segment-action-button"
+                        [attr.aria-label]="'Przenieś sekcję ' + (sectionIndex + 1) + ' w górę'"
+                        [disabled]="sectionIndex === 0"
+                        (click)="moveSection(sectionIndex, -1)"
+                      >↑</button>
+                      <button
+                        type="button"
+                        class="button button--secondary segment-action-button"
+                        [attr.aria-label]="'Przenieś sekcję ' + (sectionIndex + 1) + ' w dół'"
+                        [disabled]="sectionIndex === sections.length - 1"
+                        (click)="moveSection(sectionIndex, 1)"
+                      >↓</button>
+                      <button
+                        type="button"
+                        class="button button--secondary remove-button segment-action-button"
+                        [disabled]="sections.length === 1"
+                        (click)="removeSection(sectionIndex)"
+                      >Usuń</button>
+                    </div>
+                  </div>
+                  <div class="field">
+                    <label [for]="'section-title-' + sectionIndex">Tytuł <span aria-hidden="true">*</span></label>
+                    <input
+                      class="field-control"
+                      type="text"
+                      [id]="'section-title-' + sectionIndex"
+                      [formControl]="section.controls.title"
+                      [attr.aria-invalid]="fieldError(section.controls.title, 'Wpisz tytuł sekcji.', '') ? 'true' : null"
+                    />
+                    @if (fieldError(section.controls.title, 'Wpisz tytuł sekcji.', ''); as message) {
+                      <span class="field-error">{{ message }}</span>
+                    }
+                  </div>
+                  <div class="field">
+                    <label [for]="'section-content-' + sectionIndex">Opis <span aria-hidden="true">*</span></label>
+                    <textarea
+                      class="field-control"
+                      rows="4"
+                      [id]="'section-content-' + sectionIndex"
+                      [formControl]="section.controls.content"
+                      [attr.aria-invalid]="fieldError(section.controls.content, 'Wpisz opis sekcji.', '') ? 'true' : null"
+                    ></textarea>
+                    @if (fieldError(section.controls.content, 'Wpisz opis sekcji.', ''); as message) {
+                      <span class="field-error">{{ message }}</span>
+                    }
+                  </div>
+                </article>
+              }
+            </section>
+    }
 
     <footer class="form-actions">
       <a class="button button--secondary" routerLink="/trainings">Anuluj</a>

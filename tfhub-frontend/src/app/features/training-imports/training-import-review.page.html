@@ -56,16 +56,20 @@
             </div>
             <span class="status-badge">Do weryfikacji</span>
           </div>
+          <p>Rodzaj treningu: <strong>{{ current.trainingType === 'TEMPO' ? 'Trening tempowy' : 'Trening ogólny' }}</strong></p>
           <p>Grupa treningowa: <strong>{{ current.trainingGroup.name }}</strong></p>
           @if (isUncertain(current.recognitionMetadata)) {
             <label class="checkbox review-confirmation" [class.needs-review]="needsTrainingReview()">
               <input type="checkbox" formControlName="recognitionReviewed" />
-              Potwierdzam nazwę, datę i nazwy podgrup
+              {{ current.trainingType === 'TEMPO'
+                ? 'Potwierdzam nazwę, datę i nazwy podgrup'
+                : 'Potwierdzam nazwę i datę treningu' }}
               @if (needsTrainingReview()) { <span class="review-label">Wymaga weryfikacji</span> }
             </label>
           }
         </section>
 
+        @if (current.trainingType === 'TEMPO') {
         @for (definition of definitions.controls; track definition; let d = $index) {
           <section class="details-card definition-card" [formGroup]="definition" [attr.aria-labelledby]="'definition-' + d">
             <div class="section-heading">
@@ -228,8 +232,45 @@
             </section>
           </section>
         }
+        } @else {
+          @for (section of sections.controls; track section; let s = $index) {
+            <section class="details-card definition-card" [formGroup]="section"
+              [class.needs-review]="needsSectionReview(section)"
+              [attr.aria-labelledby]="'free-text-section-' + s">
+              <div class="section-heading">
+                <h2 [id]="'free-text-section-' + s">Sekcja {{ s + 1 }}</h2>
+                <div class="item-actions">
+                  <button type="button" class="button button--secondary" [disabled]="s === 0"
+                    (click)="moveSection(s, -1)" [attr.aria-label]="'Przenieś sekcję ' + (s + 1) + ' wyżej'">↑</button>
+                  <button type="button" class="button button--secondary" [disabled]="s === sections.length - 1"
+                    (click)="moveSection(s, 1)" [attr.aria-label]="'Przenieś sekcję ' + (s + 1) + ' niżej'">↓</button>
+                  <button type="button" class="button button--secondary" [disabled]="sections.length <= 1"
+                    (click)="removeSection(s)" [attr.aria-label]="'Usuń sekcję ' + (s + 1)">Usuń</button>
+                </div>
+              </div>
+              <label [class.needs-review]="section.controls.title.invalid || needsSectionReview(section)">
+                Tytuł sekcji
+                <input class="field-control" type="text" formControlName="title" maxlength="255" required />
+              </label>
+              <label [class.needs-review]="section.controls.content.invalid || needsSectionReview(section)">
+                Opis
+                <textarea class="field-control" formControlName="content" rows="5" required></textarea>
+              </label>
+              @if (isUncertain(section.controls.metadata.value)) {
+                <label class="checkbox" [class.needs-review]="needsSectionReview(section)">
+                  <input type="checkbox" formControlName="recognitionReviewed" />
+                  Potwierdzam lub poprawiłem/am tytuł i opis sekcji
+                </label>
+              }
+            </section>
+          }
+        }
         <div class="actions">
-          <button type="button" class="button button--secondary" (click)="addDefinition()">Dodaj podgrupę</button>
+          @if (current.trainingType === 'TEMPO') {
+            <button type="button" class="button button--secondary" (click)="addDefinition()">Dodaj podgrupę</button>
+          } @else {
+            <button type="button" class="button button--secondary" (click)="addSection()">Dodaj sekcję</button>
+          }
           <button type="submit" class="button button--secondary">{{ saving() ? 'Zapisywanie...' : 'Zapisz zmiany' }}</button>
           <button type="button" class="button button--secondary" (click)="confirmReject()">Odrzuć import</button>
           @if (current.validation.readyForAcceptance) {
