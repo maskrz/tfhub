@@ -56,6 +56,8 @@ Wspólny nagłówek zawiera:
 
 Aktywny element nawigacji musi być widoczny i rozpoznawalny również bez polegania wyłącznie na kolorze. Nagłówek jest częścią powłoki aplikacji, nie poszczególnych widoków.
 
+Główna nawigacja i przycisk „Menu” są widoczne tylko po zalogowaniu; marka i obszar logowania pozostają widoczne również dla niezalogowanych.
+
 Na wąskich ekranach przycisk „Menu” rozwija pionową nawigację z tymi samymi elementami zależnymi od roli, bez wymuszania poziomego przewijania strony. Wybór odnośnika, kliknięcie poza menu lub Escape zamyka nawigację; Escape przywraca fokus do przycisku.
 
 ## 4. Stopka

@@ -45,6 +45,25 @@ describe('HeaderComponent', () => {
     expect(image.getAttribute('alt')).toBe('TFHub');
   });
 
+  it('hides navigation while signed out and restores it closed after signing in', () => {
+    const coach = auth.currentUser();
+    fixture.nativeElement.querySelector('.navigation-toggle').click();
+    fixture.detectChanges();
+
+    auth.currentUser.set(null);
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('nav')).toBeNull();
+    expect(fixture.nativeElement.querySelector('.navigation-toggle')).toBeNull();
+    expect(fixture.nativeElement.querySelector('.brand img')).toBeTruthy();
+    expect(fixture.nativeElement.querySelector('.login-link')?.textContent).toContain('Zaloguj');
+    expect(fixture.nativeElement.textContent).not.toContain('Dashboard');
+
+    auth.currentUser.set(coach);
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('nav a[href="/dashboard"]')).toBeTruthy();
+    expect(fixture.nativeElement.querySelector('.navigation-toggle').getAttribute('aria-expanded')).toBe('false');
+  });
+
   it('opens and closes the account menu when the username is clicked', () => {
     const username = fixture.nativeElement.querySelector('.username') as HTMLButtonElement;
 

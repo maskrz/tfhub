@@ -1,5 +1,5 @@
 import { HttpErrorResponse } from '@angular/common/http';
-import { Component, ElementRef, HostListener, OnDestroy, ViewChild, inject, signal } from '@angular/core';
+import { Component, ElementRef, HostListener, OnDestroy, ViewChild, effect, inject, signal } from '@angular/core';
 import { Router, RouterLink, RouterLinkActive } from '@angular/router';
 import { EMPTY, catchError, finalize, take } from 'rxjs';
 import { AuthService } from '../auth/auth.service';
@@ -13,27 +13,29 @@ import { ChangePasswordModalComponent } from '../auth/change-password-modal.comp
       <a class="brand" [routerLink]="user()?.role === 'ATHLETE' ? ['/athletes', user()?.athleteId] : '/dashboard'" aria-label="TFHUB — strona główna">
         <img src="/tfhub-banner.png" alt="TFHub" />
       </a>
-      <button #navigationButton class="navigation-toggle" type="button" aria-controls="main-navigation"
-        [attr.aria-expanded]="navigationOpen()" (click)="toggleNavigation()">
-        Menu
-      </button>
-      <nav id="main-navigation" aria-label="Nawigacja główna"
-        [class.navigation-open]="navigationOpen()" (click)="onNavigationClick($event)">
-        @if (user()?.role !== 'ATHLETE') {
-          <a routerLink="/dashboard" routerLinkActive="active" ariaCurrentWhenActive="page">Dashboard</a>
-        }
-        @if (user()?.role === 'ADMIN') {
-          <a routerLink="/tests" routerLinkActive="active" ariaCurrentWhenActive="page">Sprawdziany</a>
-        }
-        @if (user()?.role === 'ADMIN' || user()?.role === 'COACH') {
-          <a routerLink="/athletes" routerLinkActive="active" ariaCurrentWhenActive="page">Zawodnicy</a>
-          <a routerLink="/trainings" routerLinkActive="active" ariaCurrentWhenActive="page">Treningi</a>
-          <a routerLink="/results" routerLinkActive="active" ariaCurrentWhenActive="page">Wyniki sprawdzianów</a>
-        }
-        @if (user()?.role === 'ATHLETE') {
-          <a [routerLink]="['/athletes', user()?.athleteId]" routerLinkActive="active" ariaCurrentWhenActive="page">Moje wyniki</a>
-        }
-      </nav>
+      @if (user(); as account) {
+        <button #navigationButton class="navigation-toggle" type="button" aria-controls="main-navigation"
+          [attr.aria-expanded]="navigationOpen()" (click)="toggleNavigation()">
+          Menu
+        </button>
+        <nav id="main-navigation" aria-label="Nawigacja główna"
+          [class.navigation-open]="navigationOpen()" (click)="onNavigationClick($event)">
+          @if (account.role !== 'ATHLETE') {
+            <a routerLink="/dashboard" routerLinkActive="active" ariaCurrentWhenActive="page">Dashboard</a>
+          }
+          @if (account.role === 'ADMIN') {
+            <a routerLink="/tests" routerLinkActive="active" ariaCurrentWhenActive="page">Sprawdziany</a>
+          }
+          @if (account.role === 'ADMIN' || account.role === 'COACH') {
+            <a routerLink="/athletes" routerLinkActive="active" ariaCurrentWhenActive="page">Zawodnicy</a>
+            <a routerLink="/trainings" routerLinkActive="active" ariaCurrentWhenActive="page">Treningi</a>
+            <a routerLink="/results" routerLinkActive="active" ariaCurrentWhenActive="page">Wyniki sprawdzianów</a>
+          }
+          @if (account.role === 'ATHLETE') {
+            <a [routerLink]="['/athletes', account.athleteId]" routerLinkActive="active" ariaCurrentWhenActive="page">Moje wyniki</a>
+          }
+        </nav>
+      }
       @if (user(); as account) {
         <div class="account-menu" (click)="$event.stopPropagation()">
           <button
@@ -193,6 +195,7 @@ import { ChangePasswordModalComponent } from '../auth/change-password-modal.comp
       padding: .5rem .7rem;
       text-decoration: none;
     }
+    .login-link { margin-left: auto; }
     .account svg {
       fill: none;
       height: 1.6rem;
@@ -262,6 +265,12 @@ export class HeaderComponent implements OnDestroy {
   readonly passwordChangeOpen = signal(false);
   readonly successMessage = signal<string | null>(null);
   private successTimeout: ReturnType<typeof setTimeout> | null = null;
+
+  constructor() {
+    effect(() => {
+      if (!this.user()) this.navigationOpen.set(false);
+    });
+  }
 
   @HostListener('document:click', ['$event'])
   closeMenuOnOutsideClick(event: MouseEvent): void {
