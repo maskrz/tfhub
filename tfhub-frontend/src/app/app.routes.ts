@@ -13,6 +13,12 @@ export const routes: Routes = [
   { path: 'dashboard', component: DashboardPage, canActivate: [staffGuard], title: 'Panel główny' },
   { path: 'tests', component: TestManagementPage, canActivate: [adminGuard], title: 'Testy' },
   {
+    path: 'competition-events',
+    loadComponent: () => import('./features/competition/competition-events.page').then((module) => module.CompetitionEventsPage),
+    canActivate: [adminGuard],
+    title: 'Konkurencje zawodów',
+  },
+  {
     path: 'accounts',
     loadComponent: () => import('./features/accounts/accounts.page').then((module) => module.AccountsPage),
     canActivate: [adminGuard],

@@ -18,8 +18,10 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import pl.tfhub.api.athlete.dto.request.ChangeAthleteStatusRequest;
 import pl.tfhub.api.athlete.dto.request.CreateAthleteRequest;
 import pl.tfhub.api.athlete.dto.request.UpdateAthleteRequest;
+import pl.tfhub.api.athlete.dto.request.UpdateAthletePzlaIdRequest;
 import pl.tfhub.api.athlete.enums.Gender;
 import pl.tfhub.api.athlete.exception.AthleteAliasConflictException;
+import pl.tfhub.api.athlete.exception.PzlaIdConflictException;
 import pl.tfhub.api.athlete.service.AthleteService;
 import pl.tfhub.api.common.authorization.AccessScopeService;
 import java.util.List;
@@ -127,6 +129,23 @@ class AthleteAliasIntegrationTests {
 				new UpdateAthleteRequest(second.firstName(), second.lastName(), second.birthYear(),
 						second.gender(), group, List.of("marcin k."))));
 		assertEquals(List.of("kowal"), athleteService.getAthlete(second.id()).aliases());
+	}
+
+	@Test
+	void pzlaIdentifiersAreOptionalUniqueAndCanBeCleared() {
+		var first = athleteService.createAthlete(new CreateAthleteRequest(
+				UUID.randomUUID().toString(), "PZLA", 2010, Gender.MALE));
+		var second = athleteService.createAthlete(new CreateAthleteRequest(
+				UUID.randomUUID().toString(), "PZLA", 2010, Gender.FEMALE));
+
+		assertEquals(null, first.pzlaId());
+		assertEquals("163067", athleteService.updatePzlaId(
+				first.id(), new UpdateAthletePzlaIdRequest("163067")).pzlaId());
+		assertThrows(PzlaIdConflictException.class, () -> athleteService.updatePzlaId(
+				second.id(), new UpdateAthletePzlaIdRequest("163067")));
+		assertEquals("163067", athleteService.getAthlete(first.id()).pzlaId());
+		assertEquals(null, athleteService.updatePzlaId(
+				first.id(), new UpdateAthletePzlaIdRequest(null)).pzlaId());
 	}
 
 	@Test

@@ -12,18 +12,18 @@ The view must follow the shared TFHUB application layout and the approved Test M
 
 ## 2. Actor
 
-Authenticated user.
+Administrator.
 
 ## 3. Preconditions
 
-- The user is authenticated.
+- The user is authenticated as ADMIN.
 - The application shell is loaded.
 - The Test Management route is accessible.
 - The backend API is available.
 
 ## 4. Trigger
 
-The user selects "Testy" from the main navigation or navigates directly to the Test Management route.
+The administrator selects "Sprawdziany" from the "Zarządzanie" navigation menu or navigates directly to the Test Management route.
 
 ## 5. Main flow
 

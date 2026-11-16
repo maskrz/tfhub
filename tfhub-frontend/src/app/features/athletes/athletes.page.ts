@@ -1,7 +1,7 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component, DestroyRef, OnInit, computed, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { EMPTY, catchError, finalize, take } from 'rxjs';
+import { EMPTY, catchError, finalize, forkJoin, interval, switchMap, take, takeWhile } from 'rxjs';
 import { RouterLink } from '@angular/router';
 import { AthleteFormMode, AthleteResponse, Gender } from './athlete.model';
 import { AthletesApiService } from './athletes-api.service';
@@ -9,6 +9,8 @@ import { AthleteFormModalComponent } from './athlete-form-modal.component';
 import { AuthService } from '../../core/auth/auth.service';
 import { MultiSelectDropdownComponent, MultiSelectOption } from '../../shared/multi-select-dropdown.component';
 import { TrainingGroup, TrainingGroupsApiService } from '../training-groups/training-groups-api.service';
+import { CompetitionApiService } from '../competition/competition-api.service';
+import { CompetitionSyncMode, CompetitionSyncStatus, GroupCompetitionSyncResponse } from '../competition/competition.model';
 
 @Component({
   imports: [AthleteFormModalComponent, MultiSelectDropdownComponent, RouterLink],
@@ -37,6 +39,11 @@ export class AthletesPage implements OnInit {
   readonly formMode = signal<AthleteFormMode>('CREATE');
   readonly selectedAthlete = signal<AthleteResponse | null>(null);
   readonly successMessage = signal<string | null>(null);
+  readonly groupSyncMode = signal<CompetitionSyncMode>('CURRENT_SEASON');
+  readonly groupSyncLoading = signal(false);
+  readonly groupSyncError = signal<string | null>(null);
+  readonly groupSyncStatuses = signal<CompetitionSyncStatus[]>([]);
+  readonly groupSyncSkipped = signal<GroupCompetitionSyncResponse['skipped']>([]);
   readonly visibleAthletes = computed(() => {
     const terms = this.query().trim().toLowerCase().split(/\s+/).filter(Boolean);
     const gender = this.selectedGender();
@@ -86,6 +93,7 @@ export class AthletesPage implements OnInit {
 
   private readonly api = inject(AthletesApiService);
   private readonly groupsApi = inject(TrainingGroupsApiService);
+  private readonly competitionApi = inject(CompetitionApiService);
   readonly auth = inject(AuthService);
   private readonly destroyRef = inject(DestroyRef);
   readonly groupOptions = computed<MultiSelectOption[]>(() => [
@@ -126,6 +134,71 @@ export class AthletesPage implements OnInit {
 
   onGroupIdsChange(groupIds: number[]): void {
     this.selectedGroupIds.set(groupIds);
+  }
+
+  setGroupSyncMode(event: Event): void {
+    const select = event.target;
+    if (!(select instanceof HTMLSelectElement)) return;
+    if (select.value === 'CURRENT_SEASON' || select.value === 'FULL_HISTORY') {
+      this.groupSyncMode.set(select.value);
+    }
+  }
+
+  startGroupSync(): void {
+    const [groupId] = this.selectedGroupIds();
+    if (this.auth.currentUser()?.role !== 'ADMIN' || !groupId || groupId <= 0 || this.groupSyncLoading()) return;
+    this.groupSyncError.set(null);
+    this.groupSyncStatuses.set([]);
+    this.groupSyncSkipped.set([]);
+    this.groupSyncLoading.set(true);
+    this.competitionApi.startGroupSync(groupId, this.groupSyncMode()).pipe(
+      take(1),
+      catchError((error: unknown) => {
+        this.groupSyncError.set(error instanceof HttpErrorResponse && error.status === 403
+          ? 'Brak uprawnień do synchronizacji grupy.'
+          : 'Nie udało się rozpocząć synchronizacji grupy.');
+        return EMPTY;
+      }),
+      finalize(() => this.groupSyncLoading.set(false)),
+    ).subscribe((response) => this.onGroupSyncStarted(response));
+  }
+
+  athleteName(athleteId: number): string {
+    const athlete = this.allAthletes().find((item) => item.id === athleteId);
+    return athlete ? `${athlete.firstName} ${athlete.lastName}` : `Zawodnik #${athleteId}`;
+  }
+
+  syncStatusLabel(status: CompetitionSyncStatus['status']): string {
+    switch (status) {
+      case 'QUEUED': return 'Oczekuje';
+      case 'RUNNING': return 'W trakcie';
+      case 'SUCCEEDED': return 'Zakończona';
+      case 'FAILED': return 'Błąd';
+      case 'NOT_SYNCHRONIZED': return 'Brak synchronizacji';
+    }
+  }
+
+  private onGroupSyncStarted(response: GroupCompetitionSyncResponse): void {
+    this.groupSyncStatuses.set(response.submitted);
+    this.groupSyncSkipped.set(response.skipped);
+    const runIds = response.submitted
+      .map((status) => status.runId)
+      .filter((runId): runId is number => runId !== null);
+    if (runIds.length > 0) this.watchGroupRuns(runIds);
+    else this.groupSyncLoading.set(false);
+  }
+
+  private watchGroupRuns(runIds: number[]): void {
+    interval(3000).pipe(
+      switchMap(() => forkJoin(runIds.map((runId) => this.competitionApi.getSyncStatus(runId)))),
+      takeWhile((statuses) => statuses.some((status) => status.status === 'QUEUED' || status.status === 'RUNNING'), true),
+      catchError(() => {
+        this.groupSyncError.set('Nie udało się odświeżyć statusów synchronizacji grupy.');
+        return EMPTY;
+      }),
+      finalize(() => this.groupSyncLoading.set(false)),
+      takeUntilDestroyed(this.destroyRef),
+    ).subscribe((statuses) => this.groupSyncStatuses.set(statuses));
   }
 
   groupName(athlete: AthleteResponse): string {

@@ -70,6 +70,18 @@
       <span class="field-error" id="athlete-gender-error">{{ message }}</span>
     }
   </div>
+  @if (mode === 'EDIT' && auth.currentUser()?.role === 'ADMIN') {
+    <div class="field">
+      <label for="athlete-pzla-id">Identyfikator PZLA</label>
+      <input id="athlete-pzla-id" class="field-control" type="text" inputmode="numeric"
+        autocomplete="off" maxlength="20" formControlName="pzlaId"
+        [attr.aria-invalid]="fieldError('pzlaId') ? 'true' : null"
+        aria-describedby="athlete-pzla-id-error" />
+      @if (fieldError('pzlaId'); as message) {
+        <span class="field-error" id="athlete-pzla-id-error">{{ message }}</span>
+      }
+    </div>
+  }
   @if (mode === 'CREATE' || mode === 'EDIT') {
     <div class="field">
       <label for="athlete-training-group">

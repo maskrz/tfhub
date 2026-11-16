@@ -298,6 +298,125 @@
       </div>
       }
     </section>
+    <section class="athlete-profile-section" aria-labelledby="competition-results-heading">
+      <button class="athlete-profile-section__toggle" type="button"
+        aria-controls="competition-results-content" [attr.aria-expanded]="competitionResultsExpanded()"
+        (click)="toggleCompetitionResultsSection()">
+        <span id="competition-results-heading">Wyniki zawodów</span>
+        <span class="athlete-profile-section__icon" aria-hidden="true"></span>
+      </button>
+      @if (competitionResultsExpanded()) {
+      <div id="competition-results-content" class="athlete-profile-section__content competition-results-card">
+      <div class="section-title competition-results-heading">
+        <div>
+          @if (competitionSyncStatus(); as sync) {
+            <p>
+              Ostatnia udana synchronizacja: {{ competitionDateTime(sync.lastSuccessfulSyncAt) }}
+              <span aria-hidden="true">·</span>
+              Ostatnia próba: {{ competitionSyncStatusLabel(sync.status) }}
+              @if (sync.finishedAt) { <span>({{ competitionDateTime(sync.finishedAt) }})</span> }
+            </p>
+            @if (sync.status === 'FAILED' && sync.errorMessage) {
+              <p class="feedback error" role="alert">{{ sync.errorMessage }}</p>
+            }
+          }
+        </div>
+        @if (canManageCompetition()) {
+          <div class="competition-admin-actions">
+            @if (athlete()?.pzlaId) {
+              <label class="filter-field">
+                <span>Zakres synchronizacji</span>
+                <select class="field-control select-with-arrow" [value]="competitionSyncMode()" (change)="setCompetitionSyncMode($event)">
+                  <option value="CURRENT_SEASON">Aktualny sezon</option>
+                  <option value="FULL_HISTORY">Pełna dostępna historia</option>
+                </select>
+              </label>
+              <button type="button" class="button button--primary"
+                [disabled]="competitionSyncLoading()"
+                [attr.aria-busy]="competitionSyncLoading()"
+                (click)="startCompetitionSync()">
+                {{ competitionSyncLoading() ? 'Synchronizowanie...' : 'Synchronizuj z PZLA' }}
+              </button>
+            } @else {
+              <p class="feedback">Uzupełnij identyfikator PZLA w edycji profilu, aby włączyć synchronizację.</p>
+            }
+            <button type="button" class="button button--secondary" (click)="openCompetitionResultForm()">Dodaj wynik</button>
+          </div>
+        }
+      </div>
+      @if (competitionSyncError(); as message) {
+        <p class="feedback error" role="alert">{{ message }}</p>
+      }
+      @if (competitionResultsLoading()) {
+        <p class="feedback" role="status">Ładowanie wyników zawodów...</p>
+      } @else if (competitionResultsError(); as message) {
+        <div class="feedback error" role="alert">
+          <p>{{ message }}</p>
+          <button type="button" class="button button--primary" (click)="retryCompetitionData()">Spróbuj ponownie</button>
+        </div>
+      } @else if (competitionResults().length === 0) {
+        <p class="feedback" role="status">Brak wyników zawodów do wyświetlenia.</p>
+      } @else {
+        <div class="competition-filters">
+          <label class="filter-field">
+            <span>Sezon</span>
+            <select class="field-control select-with-arrow" [value]="selectedCompetitionSeason()" (change)="setCompetitionFilter($event, 'season')">
+              <option value="" [selected]="!selectedCompetitionSeason()">Wszystkie sezony</option>
+              @for (season of competitionSeasonOptions(); track season.key) {
+                <option [value]="season.key" [selected]="selectedCompetitionSeason() === season.key">{{ season.season ?? 'Brak roku' }} · {{ competitionSeasonLabel(season.type) }}</option>
+              }
+            </select>
+          </label>
+          <label class="filter-field">
+            <span>Konkurencja</span>
+            <select class="field-control select-with-arrow" [value]="selectedCompetitionEvent()" (change)="setCompetitionFilter($event, 'event')">
+              <option value="" [selected]="!selectedCompetitionEvent()">Wszystkie konkurencje</option>
+              @for (event of competitionEventOptions(); track event.id) {
+                <option [value]="event.id" [selected]="selectedCompetitionEvent() === event.id.toString()">{{ event.name }}</option>
+              }
+            </select>
+          </label>
+          <button type="button" class="button button--secondary" (click)="clearCompetitionFilters()"
+            [disabled]="!selectedCompetitionSeason() && !selectedCompetitionEvent()">Wyczyść filtry</button>
+        </div>
+        @if (filteredCompetitionResults().length === 0) {
+          <p class="feedback" role="status">Brak wyników zawodów dla wybranych filtrów.</p>
+        } @else {
+        <div class="table-surface competition-results-table">
+          <table>
+            <thead>
+              <tr><th scope="col">Data</th><th scope="col">Konkurencja</th><th scope="col">Wynik</th><th scope="col">Wiatr</th><th scope="col">Sezon</th><th scope="col">Zawody / miejscowość</th><th scope="col">Źródło</th>
+                @if (canManageCompetition()) { <th scope="col">Akcje</th> }
+              </tr>
+            </thead>
+            <tbody>
+              @for (result of filteredCompetitionResults(); track result.id) {
+                <tr>
+                  <td>{{ formatDate(result.resultDate) }}</td>
+                  <td>{{ result.eventName }}</td>
+                  <td><strong>{{ result.originalMark }}</strong> {{ result.unit }}</td>
+                  <td>{{ result.wind === null ? '—' : formatWind(result.wind) }}</td>
+                  <td>{{ result.season ?? '—' }} · {{ competitionSeasonLabel(result.seasonType) }}</td>
+                  <td>{{ result.competitionName || '—' }}{{ result.location ? ' · ' + result.location : '' }}</td>
+                  <td>{{ competitionSourceLabel(result.source) }}</td>
+                  @if (canManageCompetition()) {
+                    <td class="action-cell">
+                      <button type="button" class="button button--secondary" (click)="openCompetitionResultForm(result)">Edytuj</button>
+                      <button type="button" class="button button--secondary"
+                        [disabled]="deletingCompetitionResultId() !== null"
+                        (click)="deleteCompetitionResult(result)">Usuń</button>
+                    </td>
+                  }
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+        }
+      }
+      </div>
+      }
+    </section>
     <app-athlete-training-history [athleteId]="athleteId" />
     @if (canOpenGeneralTrainings()) {
       <a class="button button--primary general-trainings-link" routerLink="/trainings">
@@ -325,4 +444,16 @@
     (saved)="onResultSaved($event)"
     (cancelled)="closeResultForm()"
   />
+}
+@if (canManageCompetition() && competitionResultFormOpen()) {
+  <div class="competition-modal-backdrop" role="presentation">
+    <section class="competition-modal-card" role="dialog" aria-modal="true" aria-labelledby="competition-result-form-title">
+      <app-competition-result-form
+        [athleteId]="athleteId"
+        [result]="selectedCompetitionResult()"
+        (saved)="onCompetitionResultSaved()"
+        (cancelled)="closeCompetitionResultForm()"
+      />
+    </section>
+  </div>
 }

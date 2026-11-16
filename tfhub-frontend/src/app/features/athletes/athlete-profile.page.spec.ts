@@ -1,7 +1,7 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
-import { ActivatedRoute, provideRouter } from '@angular/router';
+import { ActivatedRoute, ParamMap, provideRouter } from '@angular/router';
 import { convertToParamMap } from '@angular/router';
 import { Observable, Subject, of, throwError } from 'rxjs';
 import { signal } from '@angular/core';
@@ -12,6 +12,8 @@ import { AthleteProfilePage } from './athlete-profile.page';
 import { ResultFormModalComponent } from '../results/result-form-modal.component';
 import { TestsApiService } from '../tests/tests-api.service';
 import { AuthService } from '../../core/auth/auth.service';
+import { CompetitionApiService } from '../competition/competition-api.service';
+import { CompetitionResult, CompetitionSyncStatus } from '../competition/competition.model';
 
 const athlete: AthleteResponse = {
   id: 8,
@@ -23,6 +25,35 @@ const athlete: AthleteResponse = {
 };
 
 const inactiveAthlete: AthleteResponse = { ...athlete, active: false };
+const competitionResult: CompetitionResult = {
+  id: 21,
+  athleteId: 8,
+  eventId: 3,
+  eventName: '100 m',
+  resultDate: '2025-05-24',
+  originalMark: '14.18',
+  numericValue: 14.18,
+  unit: 's',
+  wind: -1.4,
+  season: 2025,
+  seasonType: 'OUTDOOR',
+  competitionName: 'Mistrzostwa',
+  location: 'Karpacz',
+  resultRound: '3 s',
+  source: 'PZLA',
+};
+const syncStatus: CompetitionSyncStatus = {
+  runId: null,
+  athleteId: 8,
+  mode: null,
+  status: 'NOT_SYNCHRONIZED',
+  requestedAt: null,
+  startedAt: null,
+  finishedAt: null,
+  lastSuccessfulSyncAt: null,
+  errorCode: null,
+  errorMessage: null,
+};
 
 const tests = [
   { id: 3, name: 'Bieg 100 m', unit: 's', category: 'TIME' as const, higherIsBetter: false, active: true },
@@ -45,12 +76,18 @@ describe('AthleteProfilePage', () => {
     updateAthlete: ReturnType<typeof vi.fn>;
   };
   let testsApi: { getAll: ReturnType<typeof vi.fn> };
+  let competitionApi: {
+    getAthleteResults: ReturnType<typeof vi.fn>;
+    getAthleteSyncStatus: ReturnType<typeof vi.fn>;
+    startAthleteSync: ReturnType<typeof vi.fn>;
+  };
   let setUserRole: (role: string) => void;
 
   async function createPage(
     requestedAthlete: AthleteResponse = athlete,
     historyRequest: () => Observable<AthleteProfileResult[]> = () => of(results),
     role = 'ADMIN',
+    paramMap: Observable<ParamMap> = of(convertToParamMap({ id: '8' })),
   ): Promise<void> {
     athletesApi = {
       getById: vi.fn(() => of(requestedAthlete)),
@@ -60,15 +97,21 @@ describe('AthleteProfilePage', () => {
       updateAthlete: vi.fn(),
     };
     testsApi = { getAll: vi.fn(() => of(tests)) };
+    competitionApi = {
+      getAthleteResults: vi.fn(() => of([competitionResult])),
+      getAthleteSyncStatus: vi.fn(() => of(syncStatus)),
+      startAthleteSync: vi.fn(() => of(syncStatus)),
+    };
     const currentUser = signal({ authenticated: true, userId: 1, username: 'user', role, athleteId: null });
     setUserRole = (nextRole) => currentUser.update((user) => ({ ...user, role: nextRole }));
     await TestBed.configureTestingModule({
       imports: [AthleteProfilePage],
       providers: [
         provideRouter([]),
-        { provide: ActivatedRoute, useValue: { paramMap: of(convertToParamMap({ id: '8' })) } },
+        { provide: ActivatedRoute, useValue: { paramMap } },
         { provide: AthletesApiService, useValue: athletesApi },
         { provide: TestsApiService, useValue: testsApi },
+        { provide: CompetitionApiService, useValue: competitionApi },
         {
           provide: AuthService,
           useValue: { currentUser },
@@ -87,6 +130,12 @@ describe('AthleteProfilePage', () => {
     fixture.detectChanges();
   }
 
+  function toggleCompetitionSection(): void {
+    const button = fixture.nativeElement.querySelector('[aria-controls="competition-results-content"]') as HTMLButtonElement;
+    button.click();
+    fixture.detectChanges();
+  }
+
   it('loads the athlete and includes their active state and profile details', async () => {
     await createPage();
     expect(athletesApi.getById).toHaveBeenCalledWith(8);
@@ -96,12 +145,137 @@ describe('AthleteProfilePage', () => {
     expect(fixture.nativeElement.textContent).toContain('Rocznik 2010');
     expect(athletesApi.getResultHistory).not.toHaveBeenCalled();
     const toggles = fixture.nativeElement.querySelectorAll('.athlete-profile-section__toggle') as NodeListOf<HTMLButtonElement>;
-    expect(toggles).toHaveLength(2);
-    expect([...toggles].map((button) => button.getAttribute('aria-expanded'))).toEqual(['false', 'false']);
+    expect(toggles).toHaveLength(3);
+    expect([...toggles].map((button) => button.getAttribute('aria-expanded'))).toEqual(['false', 'false', 'false']);
     expect(fixture.nativeElement.querySelector('#results-section-content')).toBeNull();
     expect(fixture.nativeElement.querySelector('#training-history-content')).toBeNull();
     expect(fixture.nativeElement.querySelector('.history-card')).toBeNull();
     expect(fixture.nativeElement.querySelector('.chart-card')).toBeNull();
+  });
+
+  it('displays separate official results and allows ADMIN to select and start synchronization', async () => {
+    await createPage({ ...athlete, pzlaId: '163067' });
+    toggleCompetitionSection();
+
+    expect(competitionApi.getAthleteResults).toHaveBeenCalledWith(8);
+    expect(competitionApi.getAthleteSyncStatus).toHaveBeenCalledWith(8);
+    expect(fixture.nativeElement.textContent).toContain('Wyniki zawodów');
+    expect(fixture.nativeElement.textContent).toContain('14.18');
+    expect(fixture.nativeElement.textContent).toContain('Mistrzostwa');
+    expect(fixture.nativeElement.textContent).toContain('-1,4 m/s');
+    expect(fixture.nativeElement.textContent).not.toContain('Miejsce');
+
+    const mode = fixture.nativeElement.querySelector('.competition-admin-actions select') as HTMLSelectElement;
+    mode.value = 'FULL_HISTORY';
+    mode.dispatchEvent(new Event('change'));
+    fixture.detectChanges();
+    (fixture.nativeElement.querySelector('.competition-admin-actions button') as HTMLButtonElement).click();
+
+    expect(competitionApi.startAthleteSync).toHaveBeenCalledWith(8, 'FULL_HISTORY');
+  });
+
+  it.each(['ADMIN', 'COACH', 'ATHLETE'])('filters official results by season and discipline for %s', async (role) => {
+    await createPage(athlete, () => of(results), role);
+    toggleCompetitionSection();
+    competitionApi.getAthleteResults.mockReturnValue(of([
+      competitionResult,
+      { ...competitionResult, id: 22, eventId: 5, eventName: 'Skok w dal', seasonType: 'INDOOR', originalMark: '5.10' },
+      { ...competitionResult, id: 23, season: 2024, originalMark: '13.50' },
+      { ...competitionResult, id: 24, season: null, seasonType: 'UNKNOWN', originalMark: 'DNS' },
+      { ...competitionResult, id: 25, seasonType: 'INDOOR', originalMark: '14.00' },
+    ]));
+    fixture.componentInstance.retryCompetitionData();
+    fixture.detectChanges();
+
+    const selects = fixture.nativeElement.querySelectorAll('.competition-filters select') as NodeListOf<HTMLSelectElement>;
+    const [season, event] = selects;
+    expect([...season.options].map((option) => option.textContent?.trim()))
+      .toEqual(['Wszystkie sezony', '2025 · Hala', '2025 · Stadion', '2024 · Stadion', 'Brak roku · Aktualny']);
+    expect([...event.options].map((option) => option.textContent?.trim()))
+      .toEqual(['Wszystkie konkurencje', '100 m', 'Skok w dal']);
+
+    season.value = '2025:INDOOR';
+    season.dispatchEvent(new Event('change'));
+    event.value = '3';
+    event.dispatchEvent(new Event('change'));
+    fixture.detectChanges();
+    const section = fixture.nativeElement.querySelector('.competition-results-card') as HTMLElement;
+    expect(section.textContent).toContain('14.00');
+    expect(section.textContent).not.toContain('14.18');
+    expect(section.textContent).not.toContain('5.10');
+    expect(section.textContent).not.toContain('13.50');
+
+    season.value = 'unknown:UNKNOWN';
+    season.dispatchEvent(new Event('change'));
+    fixture.detectChanges();
+    expect(section.textContent).toContain('DNS');
+    event.value = '5';
+    event.dispatchEvent(new Event('change'));
+    fixture.detectChanges();
+    expect(section.textContent).toContain('Brak wyników zawodów dla wybranych filtrów.');
+    expect(section.querySelector('table')).toBeNull();
+    (section.querySelector('.competition-filters button') as HTMLButtonElement).click();
+    fixture.detectChanges();
+    expect(section.textContent).toContain('14.18');
+    expect(section.textContent).toContain('5.10');
+    expect(competitionApi.getAthleteResults).toHaveBeenCalledTimes(2);
+  });
+
+  it('retains valid filters on refresh and clears filters whose options disappear', async () => {
+    await createPage();
+    toggleCompetitionSection();
+    const component = fixture.componentInstance;
+    component.selectedCompetitionSeason.set('2025:OUTDOOR');
+    component.selectedCompetitionEvent.set('3');
+    component.retryCompetitionData();
+    expect(component.selectedCompetitionSeason()).toBe('2025:OUTDOOR');
+    expect(component.selectedCompetitionEvent()).toBe('3');
+
+    competitionApi.getAthleteResults.mockReturnValue(of([
+      { ...competitionResult, id: 22, eventId: 5, eventName: 'Skok w dal', seasonType: 'INDOOR' },
+    ]));
+    component.retryCompetitionData();
+    fixture.detectChanges();
+    expect(component.selectedCompetitionSeason()).toBe('');
+    expect(component.selectedCompetitionEvent()).toBe('');
+    expect(fixture.nativeElement.querySelector('.competition-results-table').textContent).toContain('Skok w dal');
+  });
+
+  it('clears competition filters when navigating to another athlete', async () => {
+    const route = new Subject<ParamMap>();
+    await createPage(athlete, () => of(results), 'ADMIN', route);
+    route.next(convertToParamMap({ id: '8' }));
+    fixture.detectChanges();
+    toggleCompetitionSection();
+    fixture.componentInstance.selectedCompetitionSeason.set('2025:OUTDOOR');
+    fixture.componentInstance.selectedCompetitionEvent.set('3');
+    route.next(convertToParamMap({ id: '9' }));
+    fixture.detectChanges();
+    expect(fixture.componentInstance.selectedCompetitionSeason()).toBe('');
+    expect(fixture.componentInstance.selectedCompetitionEvent()).toBe('');
+    expect(fixture.componentInstance.competitionResultsExpanded()).toBe(false);
+  });
+
+  it('collapses competition results independently without losing filters or requesting data again', async () => {
+    await createPage({ ...athlete, pzlaId: '163067' });
+    const button = fixture.nativeElement.querySelector('[aria-controls="competition-results-content"]') as HTMLButtonElement;
+    expect(button.getAttribute('aria-expanded')).toBe('false');
+    expect(fixture.nativeElement.querySelector('#competition-results-content')).toBeNull();
+    toggleCompetitionSection();
+    expect(button.getAttribute('aria-expanded')).toBe('true');
+    expect(fixture.nativeElement.querySelector('#competition-results-content').textContent).toContain('14.18');
+    const season = fixture.nativeElement.querySelector('.competition-filters select') as HTMLSelectElement;
+    season.value = '2025:OUTDOOR';
+    season.dispatchEvent(new Event('change'));
+    toggleCompetitionSection();
+    expect(button.getAttribute('aria-expanded')).toBe('false');
+    expect(fixture.nativeElement.querySelector('#competition-results-content')).toBeNull();
+    expect(fixture.componentInstance.resultsExpanded()).toBe(false);
+    toggleCompetitionSection();
+    expect((fixture.nativeElement.querySelector('.competition-filters select') as HTMLSelectElement).value)
+      .toBe('2025:OUTDOOR');
+    expect(competitionApi.getAthleteResults).toHaveBeenCalledOnce();
+    expect(competitionApi.getAthleteSyncStatus).toHaveBeenCalledOnce();
   });
 
   it('shows the general trainings link only to athlete accounts', async () => {

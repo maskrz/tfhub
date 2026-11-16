@@ -9,6 +9,7 @@ export interface AthleteResponse {
   active: boolean;
   trainingGroupId?: number | null;
   aliases?: string[];
+  pzlaId?: string | null;
 }
 
 export interface ChangeAthleteStatusRequest {

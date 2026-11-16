@@ -26,8 +26,9 @@ The page consists of the following sections, in this order:
 
 1. Athlete information.
 2. **Wyniki sprawdzianów** — result filters, matrix and progress chart.
-3. **Wyniki treningów biegowych** — running training history.
-4. **Treningi ogólne** navigation action for ATHLETE accounts only.
+3. **Wyniki zawodów** — separately stored official and manually managed competition results.
+4. **Wyniki treningów biegowych** — running training history.
+5. **Treningi ogólne** navigation action for ATHLETE accounts only.
 
 Follow the existing TFHUB application layout, shared header, footer, typography, colors, spacing, and component guidelines.
 
@@ -271,7 +272,7 @@ Do not modify backend code as part of this frontend UC.
 - [ ] Each individual result can be edited.
 - [ ] Desktop editing uses double-click.
 - [ ] Mobile editing uses a single tap.
-- [ ] No delete action is available in the profile.
+- [ ] No delete action is available for TFHub test results in the profile.
 - [ ] The chart uses actual dates with proportional X-axis spacing.
 - [ ] Tests with the same unit share a scale by default.
 - [ ] Tests with different units use separate scales.
@@ -281,6 +282,24 @@ Do not modify backend code as part of this frontend UC.
 - [ ] Editing a result updates the matrix and chart.
 - [ ] Loading, empty, and error states are handled.
 - [ ] The view is responsive and consistent with existing TFHUB UI guidelines.
+- [ ] Official competition results are displayed separately from test results.
+- [ ] ADMIN can manage competition results and trigger athlete or group synchronization.
+- [ ] PZLA synchronization status and last successful synchronization time are visible.
+- [ ] ATHLETE and COACH result reads are restricted to their existing athlete access scope.
+
+## 5. Wyniki zawodów
+
+Display the athlete's official competition results separately from **Wyniki sprawdzianów**. Each row shows date, discipline, original result mark and unit, wind when available, season/indoor-outdoor classification, and competition/location. Do not display placing or field-event attempts.
+
+The **Wyniki zawodów** section is initially collapsed and can be expanded or collapsed independently of the other profile sections. Collapsing it preserves its filters and does not interrupt synchronization.
+
+Provide immediate, combinable filters for discipline and season (year together with indoor/outdoor classification). Include results with missing season metadata as explicit options. Populate filter choices from the athlete's loaded results and provide a clear-filters action and a distinct empty-filtered-results message.
+
+The ADMIN competition-event catalog is accessible from the “Zarządzanie” menu. Its list follows the test-management layout, with local name search, an inactive filter, sorting, a status switch and an edit action.
+
+Only ADMIN can create, edit, or delete competition results and trigger PZLA synchronization. The administrator enters an optional digits-only PZLA athlete ID in the athlete edit form. Provide **Aktualny sezon** and **Pełna dostępna historia** synchronization modes, latest-attempt status/error, and last successful synchronization timestamp. ATHLETE can read only their own competition results; COACH reads only results for athletes in assigned groups.
+
+Display loading, empty, retryable failure, and synchronization-in-progress states. Do not overwrite or otherwise modify TFHub test results. Group-wide synchronization is available to ADMIN from the athlete list after selecting one group.
 
 ## Out of scope
 
@@ -289,6 +308,6 @@ Do not modify backend code as part of this frontend UC.
 - Performance predictions.
 - Training plans and training session management.
 - Coach notes and athlete goals.
-- Result deletion from the profile.
+- Deleting TFHub test results from the profile.
 - Mathematical normalization or percentage-based comparison modes.
 - Exporting results to files.

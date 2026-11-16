@@ -51,7 +51,7 @@ Są to zakresy planowane; poza specyfikacją widoku Zarządzanie testami nie ozn
 Wspólny nagłówek zawiera:
 
 - markę/logo TFHUB;
-- główną nawigację: „Panel główny”, „Testy”, „Zawodnicy”, „Wyniki”;
+- główną nawigację z menu „Zarządzanie” dla administratora, zawierającym „Sprawdziany” i „Konkurencje”;
 - obszar użytkownika/konta.
 
 Aktywny element nawigacji musi być widoczny i rozpoznawalny również bez polegania wyłącznie na kolorze. Nagłówek jest częścią powłoki aplikacji, nie poszczególnych widoków.
@@ -59,6 +59,8 @@ Aktywny element nawigacji musi być widoczny i rozpoznawalny również bez poleg
 Główna nawigacja i przycisk „Menu” są widoczne tylko po zalogowaniu; marka i obszar logowania pozostają widoczne również dla niezalogowanych.
 
 Na wąskich ekranach przycisk „Menu” rozwija pionową nawigację z tymi samymi elementami zależnymi od roli, bez wymuszania poziomego przewijania strony. Wybór odnośnika, kliknięcie poza menu lub Escape zamyka nawigację; Escape przywraca fokus do przycisku.
+
+Menu „Zarządzanie” otwiera się przyciskiem zarówno na komputerze, jak i w nawigacji mobilnej. Wybranie odnośnika, kliknięcie poza menu lub Escape zamyka je; Escape przywraca fokus do jego przycisku. Dostęp do obu widoków pozostaje ograniczony do ADMIN.
 
 ## 4. Stopka
 

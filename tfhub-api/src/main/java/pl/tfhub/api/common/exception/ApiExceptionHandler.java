@@ -15,6 +15,16 @@ import pl.tfhub.api.athlete.exception.AthleteAlreadyExistsException;
 import pl.tfhub.api.athlete.exception.AthleteAliasConflictException;
 import pl.tfhub.api.athlete.exception.InvalidAthleteAliasException;
 import pl.tfhub.api.athlete.exception.AthleteNotFoundException;
+import pl.tfhub.api.athlete.exception.PzlaIdConflictException;
+import pl.tfhub.api.competition.exception.CompetitionEventAlreadyExistsException;
+import pl.tfhub.api.competition.exception.CompetitionEventHasResultsException;
+import pl.tfhub.api.competition.exception.CompetitionEventNotFoundException;
+import pl.tfhub.api.competition.exception.CompetitionResultNotFoundException;
+import pl.tfhub.api.competition.exception.InvalidCompetitionEventIdException;
+import pl.tfhub.api.competition.exception.InvalidCompetitionResultIdException;
+import pl.tfhub.api.competition.exception.CompetitionSyncAlreadyRunningException;
+import pl.tfhub.api.competition.exception.CompetitionSyncNotFoundException;
+import pl.tfhub.api.competition.exception.PzlaIdRequiredException;
 import pl.tfhub.api.athlete.exception.InvalidAthleteIdException;
 import pl.tfhub.api.athlete.exception.InvalidAthleteGroupException;
 import pl.tfhub.api.user.exception.AccountNotFoundException;
@@ -99,6 +109,62 @@ public class ApiExceptionHandler {
 	public ProblemDetail handleAliasConflict(AthleteAliasConflictException exception) {
 		ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, exception.getMessage());
 		problem.setTitle("Athlete alias conflict");
+		return problem;
+	}
+
+	@ExceptionHandler(PzlaIdConflictException.class)
+	public ProblemDetail handlePzlaIdConflict(PzlaIdConflictException exception) {
+		ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, exception.getMessage());
+		problem.setTitle("PZLA athlete ID conflict");
+		return problem;
+	}
+
+	@ExceptionHandler(CompetitionEventAlreadyExistsException.class)
+	public ProblemDetail handleCompetitionEventConflict(CompetitionEventAlreadyExistsException exception) {
+		ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, exception.getMessage());
+		problem.setTitle("Competition event already exists");
+		return problem;
+	}
+
+	@ExceptionHandler(CompetitionEventHasResultsException.class)
+	public ProblemDetail handleCompetitionEventHasResults(CompetitionEventHasResultsException exception) {
+		ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, exception.getMessage());
+		problem.setTitle("Competition event configuration cannot be changed");
+		return problem;
+	}
+
+	@ExceptionHandler({CompetitionEventNotFoundException.class, CompetitionResultNotFoundException.class})
+	public ProblemDetail handleCompetitionNotFound(RuntimeException exception) {
+		ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, exception.getMessage());
+		problem.setTitle("Competition data not found");
+		return problem;
+	}
+
+	@ExceptionHandler({InvalidCompetitionEventIdException.class, InvalidCompetitionResultIdException.class})
+	public ProblemDetail handleInvalidCompetitionId(RuntimeException exception) {
+		ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, exception.getMessage());
+		problem.setTitle("Invalid competition data ID");
+		return problem;
+	}
+
+	@ExceptionHandler(CompetitionSyncAlreadyRunningException.class)
+	public ProblemDetail handleCompetitionSyncAlreadyRunning(CompetitionSyncAlreadyRunningException exception) {
+		ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, exception.getMessage());
+		problem.setTitle("Competition synchronization already running");
+		return problem;
+	}
+
+	@ExceptionHandler(CompetitionSyncNotFoundException.class)
+	public ProblemDetail handleCompetitionSyncNotFound(CompetitionSyncNotFoundException exception) {
+		ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, exception.getMessage());
+		problem.setTitle("Competition synchronization not found");
+		return problem;
+	}
+
+	@ExceptionHandler(PzlaIdRequiredException.class)
+	public ProblemDetail handlePzlaIdRequired(PzlaIdRequiredException exception) {
+		ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, exception.getMessage());
+		problem.setTitle("PZLA ID required");
 		return problem;
 	}
 

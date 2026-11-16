@@ -58,6 +58,10 @@ export class AthletesApiService {
     return this.http.put<AthleteResponse>(`/api/athletes/${id}`, request);
   }
 
+  updatePzlaId(id: number, pzlaId: string | null): Observable<AthleteResponse> {
+    return this.http.patch<AthleteResponse>(`/api/athletes/${id}/pzla-id`, { pzlaId });
+  }
+
   changeStatus(id: number, request: ChangeAthleteStatusRequest): Observable<AthleteResponse> {
     return this.http.patch<AthleteResponse>(`/api/athletes/${id}/status`, request);
   }

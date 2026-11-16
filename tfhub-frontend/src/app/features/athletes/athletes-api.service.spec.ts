@@ -49,6 +49,17 @@ describe('AthletesApiService', () => {
     request.flush({ ...athlete, active: false });
   });
 
+  it('updates the optional PZLA athlete identifier through the dedicated endpoint', () => {
+    service.updatePzlaId(athlete.id, '155324').subscribe((actual) => {
+      expect(actual.pzlaId).toBe('155324');
+    });
+
+    const request = httpTesting.expectOne('/api/athletes/8/pzla-id');
+    expect(request.request.method).toBe('PATCH');
+    expect(request.request.body).toEqual({ pzlaId: '155324' });
+    request.flush({ ...athlete, pzlaId: '155324' });
+  });
+
   it('creates an athlete using the existing endpoint and request fields', () => {
     const body: CreateAthleteRequest = {
       firstName: 'Jan',

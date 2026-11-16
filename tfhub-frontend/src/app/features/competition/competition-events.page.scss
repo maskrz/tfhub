@@ -1,0 +1,4 @@
+@use '../tests/test-management.page';
+
+.modal-backdrop { align-items: center; background: rgb(16 24 40 / 48%); display: flex; inset: 0; justify-content: center; padding: 1rem; position: fixed; z-index: 100; }
+.modal-card { background: #fff; border-radius: .8rem; max-width: 32rem; padding: 1.5rem; width: 100%; }

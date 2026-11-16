@@ -20,6 +20,7 @@ import pl.tfhub.api.athlete.dto.request.ChangeAthleteStatusRequest;
 import pl.tfhub.api.athlete.dto.request.CreateAthleteRequest;
 import pl.tfhub.api.athlete.dto.request.SearchAthletesRequest;
 import pl.tfhub.api.athlete.dto.request.UpdateAthleteRequest;
+import pl.tfhub.api.athlete.dto.request.UpdateAthletePzlaIdRequest;
 import pl.tfhub.api.athlete.dto.response.AthleteResponse;
 import pl.tfhub.api.athlete.entity.Athlete;
 import pl.tfhub.api.athlete.entity.AthleteAlias;
@@ -27,6 +28,7 @@ import pl.tfhub.api.athlete.exception.AthleteAlreadyExistsException;
 import pl.tfhub.api.athlete.exception.AthleteAliasConflictException;
 import pl.tfhub.api.athlete.exception.AthleteNotFoundException;
 import pl.tfhub.api.athlete.exception.InvalidAthleteAliasException;
+import pl.tfhub.api.athlete.exception.PzlaIdConflictException;
 import pl.tfhub.api.athlete.repository.AthleteAliasRepository;
 import pl.tfhub.api.athlete.repository.AthleteRepository;
 import pl.tfhub.api.common.authorization.AccessScopeService;
@@ -94,6 +96,19 @@ public class AthleteService {
 		Athlete athlete = athleteRepository.findById(id)
 				.orElseThrow(() -> new AthleteNotFoundException(id));
 		return AthleteResponse.from(athlete, aliasesFor(List.of(athlete)).getOrDefault(id, List.of()));
+	}
+
+	@Transactional(readOnly = true)
+	public List<PzlaSyncTarget> getPzlaSyncTargetsForGroup(long groupId) {
+		accessScopeService.requireAdmin();
+		if (!trainingGroupRepository.existsById(groupId)) {
+			throw new TrainingGroupNotFoundException(groupId);
+		}
+		return athleteRepository
+				.findByTrainingGroup_IdOrderByLastNameAscFirstNameAscIdAsc(groupId)
+				.stream()
+				.map(athlete -> new PzlaSyncTarget(athlete.getId(), athlete.getPzlaId()))
+				.toList();
 	}
 
 	@Transactional
@@ -243,6 +258,9 @@ public class AthleteService {
 			String normalizedFullName, List<String> normalizedAliases) {
 	}
 
+	public record PzlaSyncTarget(long athleteId, String pzlaId) {
+	}
+
 	private List<String> validateAliases(List<String> aliases) {
 		if (aliases == null) {
 			return List.of();
@@ -267,6 +285,20 @@ public class AthleteService {
 		}
 	}
 
+	@Transactional
+	public AthleteResponse updatePzlaId(long id, UpdateAthletePzlaIdRequest request) {
+		accessScopeService.requireAdmin();
+		Athlete athlete = athleteRepository.findById(id)
+				.orElseThrow(() -> new AthleteNotFoundException(id));
+		athlete.changePzlaId(request.pzlaId());
+		try {
+			Athlete saved = athleteRepository.saveAndFlush(athlete);
+			return AthleteResponse.from(saved, aliasesFor(List.of(saved)).getOrDefault(id, List.of()));
+		} catch (DataIntegrityViolationException exception) {
+			throw translateConstraint(exception);
+		}
+	}
+
 	private RuntimeException translateConstraint(DataIntegrityViolationException exception) {
 		Throwable cause = exception;
 		while (cause != null) {
@@ -277,6 +309,9 @@ public class AthleteService {
 				}
 				if ("uq_athlete_alias_active_group".equals(name) || "uq_athlete_alias_athlete".equals(name)) {
 					return new AthleteAliasConflictException();
+				}
+				if ("uq_athletes_pzla_id".equals(name)) {
+					return new PzlaIdConflictException();
 				}
 			}
 			cause = cause.getCause();

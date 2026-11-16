@@ -162,6 +162,64 @@ describe('HeaderComponent', () => {
     expect(fixture.nativeElement.querySelector('nav a[href="/trainings"]')).toBeNull();
   });
 
+  it('shows competition discipline management only to administrators', () => {
+    expect(fixture.nativeElement.querySelector('nav a[href="/competition-events"]')).toBeNull();
+    auth.currentUser.set({
+      authenticated: true,
+      userId: 1,
+      username: 'admin',
+      role: 'ADMIN',
+      athleteId: null,
+    });
+    fixture.detectChanges();
+    const management = fixture.nativeElement.querySelector('.management-toggle') as HTMLButtonElement;
+    expect(management.textContent).toContain('Zarządzanie');
+    expect(management.getAttribute('aria-expanded')).toBe('false');
+    management.click();
+    fixture.detectChanges();
+    expect(management.getAttribute('aria-expanded')).toBe('true');
+    expect(fixture.nativeElement.querySelector('nav a[href="/tests"]')?.textContent).toContain('Sprawdziany');
+    expect(fixture.nativeElement.querySelector('nav a[href="/competition-events"]')?.textContent)
+      .toContain('Konkurencje');
+    const focus = vi.spyOn(management, 'focus');
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+    fixture.detectChanges();
+    expect(management.getAttribute('aria-expanded')).toBe('false');
+    expect(focus).toHaveBeenCalledOnce();
+    management.click();
+    fixture.detectChanges();
+    document.body.click();
+    fixture.detectChanges();
+    expect(management.getAttribute('aria-expanded')).toBe('false');
+
+    auth.currentUser.set({
+      authenticated: true,
+      userId: 1,
+      username: 'coach',
+      role: 'COACH',
+      athleteId: null,
+    });
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('nav a[href="/competition-events"]')).toBeNull();
+    expect(fixture.nativeElement.querySelector('.management-toggle')).toBeNull();
+  });
+
+  it('closes both navigation levels after selecting a management link on mobile', () => {
+    auth.currentUser.update((user) => user && { ...user, role: 'ADMIN' });
+    fixture.detectChanges();
+    const navigation = fixture.nativeElement.querySelector('.navigation-toggle') as HTMLButtonElement;
+    const management = fixture.nativeElement.querySelector('.management-toggle') as HTMLButtonElement;
+    navigation.click();
+    management.click();
+    fixture.detectChanges();
+    expect(navigation.getAttribute('aria-expanded')).toBe('true');
+    expect(management.getAttribute('aria-expanded')).toBe('true');
+    (fixture.nativeElement.querySelector('.management-links a[href="/tests"]') as HTMLAnchorElement).click();
+    fixture.detectChanges();
+    expect(navigation.getAttribute('aria-expanded')).toBe('false');
+    expect(management.getAttribute('aria-expanded')).toBe('false');
+  });
+
   it('closes the menu and opens the change-password dialog when selected', () => {
     fixture.nativeElement.querySelector('.username').click();
     fixture.detectChanges();

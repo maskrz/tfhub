@@ -116,6 +116,16 @@ pl.tfhub.api/
 │   ├── exception/
 │   ├── repository/
 │   └── service/
+├── competition/
+│   ├── controller/
+│   ├── dto/request/
+│   ├── dto/response/
+│   ├── entity/
+│   ├── enums/
+│   ├── exception/
+│   ├── pzla/
+│   ├── repository/
+│   └── service/
 ├── user/
 │   ├── controller/
 │   ├── dto/request/
@@ -281,9 +291,11 @@ src/app/
 │   │   └── services/
 │   │
 │   └── results/
-│       ├── pages/
-│       ├── components/
-│       └── services/
+│   ├── pages/
+│   ├── components/
+│   └── services/
+├── competition/
+│   └── ...              # official competition results and PZLA integration
 │
 └── app.routes.ts
 ```

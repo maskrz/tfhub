@@ -1,7 +1,7 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component, EventEmitter, Input, Output, inject, signal } from '@angular/core';
 import { FormArray, FormControl, FormGroup, ReactiveFormsModule, ValidatorFn, Validators } from '@angular/forms';
-import { EMPTY, catchError, finalize, take } from 'rxjs';
+import { EMPTY, catchError, finalize, of, switchMap, take } from 'rxjs';
 import {
   AthleteFormMode,
   AthleteResponse,
@@ -65,6 +65,10 @@ export class AthleteFormComponent {
       nonNullable: true,
       validators: [Validators.required],
     }),
+    pzlaId: new FormControl('', {
+      nonNullable: true,
+      validators: [Validators.maxLength(20), Validators.pattern(/^\d*$/)],
+    }),
     trainingGroupId: new FormControl<number | null>(null),
     aliases: new FormArray<FormControl<string>>([]),
   });
@@ -102,6 +106,7 @@ export class AthleteFormComponent {
         lastName: this.athlete.lastName,
         birthYear: this.athlete.birthYear,
         gender: this.athlete.gender,
+        pzlaId: this.athlete.pzlaId ?? '',
         trainingGroupId: this.athlete.trainingGroupId ?? null,
         aliases: this.athlete.aliases ?? [],
       });
@@ -119,7 +124,7 @@ export class AthleteFormComponent {
     this.form.controls.aliases.removeAt(index);
   }
 
-  fieldError(field: 'firstName' | 'lastName' | 'birthYear' | 'gender' | 'trainingGroupId'): string | null {
+  fieldError(field: 'firstName' | 'lastName' | 'birthYear' | 'gender' | 'trainingGroupId' | 'pzlaId'): string | null {
     const control = this.form.controls[field];
     if (control.invalid && (control.touched || control.dirty)) {
       if (control.hasError('required')) {
@@ -140,6 +145,12 @@ export class AthleteFormComponent {
       }
       if (control.hasError('integer')) {
         return 'Rok urodzenia musi być liczbą całkowitą.';
+      }
+      if (field === 'pzlaId' && control.hasError('pattern')) {
+        return 'Identyfikator PZLA może zawierać wyłącznie cyfry.';
+      }
+      if (field === 'pzlaId' && control.hasError('maxlength')) {
+        return 'Identyfikator PZLA może mieć maksymalnie 20 cyfr.';
       }
       if (field === 'trainingGroupId' && control.hasError('required')) {
         return 'Wybierz grupę treningową.';
@@ -187,10 +198,22 @@ export class AthleteFormComponent {
     };
 
     this.setSaving(true);
-    const saveRequest =
+    const athleteSaveRequest =
       this.mode === 'CREATE'
         ? this.api.createAthlete(request satisfies CreateAthleteRequest)
         : this.api.updateAthlete(this.athlete!.id, request satisfies UpdateAthleteRequest);
+    const saveRequest = this.mode === 'EDIT' && this.auth.currentUser()?.role === 'ADMIN'
+      ? athleteSaveRequest.pipe(switchMap((savedAthlete) => {
+        const pzlaId = this.form.controls.pzlaId.value.trim();
+        if (pzlaId === (this.athlete?.pzlaId ?? '')) return of(savedAthlete);
+        return this.api.updatePzlaId(savedAthlete.id, pzlaId || null).pipe(
+          catchError((error: unknown) => {
+            this.handlePzlaIdError(error);
+            return EMPTY;
+          }),
+        );
+      }))
+      : athleteSaveRequest;
 
     saveRequest
       .pipe(
@@ -228,6 +251,8 @@ export class AthleteFormComponent {
         fieldErrors[field] = `Wpisz rok urodzenia od 1900 do ${this.currentYear}.`;
       } else if (field === 'gender') {
         fieldErrors[field] = 'Wybierz prawidłową płeć.';
+      } else if (field === 'pzlaId') {
+        fieldErrors[field] = 'Identyfikator PZLA może zawierać wyłącznie cyfry.';
       }
     }
     this.serverFieldErrors.set(fieldErrors);
@@ -254,6 +279,16 @@ export class AthleteFormComponent {
           ? 'Nie udało się dodać zawodnika. Spróbuj ponownie.'
           : 'Nie udało się zapisać zmian zawodnika. Spróbuj ponownie.',
       );
+    }
+  }
+
+  private handlePzlaIdError(error: unknown): void {
+    if (error instanceof HttpErrorResponse && error.status === 409
+        && (error.error as { title?: string } | null)?.title === 'PZLA athlete ID conflict') {
+      this.serverFieldErrors.set({ pzlaId: 'Ten identyfikator PZLA jest już przypisany do innego zawodnika.' });
+      this.errorMessage.set('Pozostałe dane zawodnika zapisano, ale identyfikator PZLA jest już używany.');
+    } else {
+      this.errorMessage.set('Pozostałe dane zawodnika zapisano, ale nie udało się zapisać identyfikatora PZLA.');
     }
   }
 }

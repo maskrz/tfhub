@@ -8,6 +8,7 @@ import { AthletesApiService } from './athletes-api.service';
 import { AthletesPage } from './athletes.page';
 import { TrainingGroupsApiService } from '../training-groups/training-groups-api.service';
 import { AuthService } from '../../core/auth/auth.service';
+import { CompetitionApiService } from '../competition/competition-api.service';
 
 const activeAthlete: AthleteResponse = {
   id: 1,
@@ -75,6 +76,7 @@ describe('AthletesPage', () => {
         provideRouter([]),
         { provide: AthletesApiService, useValue: api },
         { provide: TrainingGroupsApiService, useValue: { getAccessible: () => of([]) } },
+        { provide: CompetitionApiService, useValue: { startGroupSync: vi.fn(() => of({ groupId: 1, submitted: [], skipped: [] })) } },
         {
           provide: AuthService,
           useValue: {

@@ -2,7 +2,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { Component, DestroyRef, OnInit, computed, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, RouterLink } from '@angular/router';
-import { EMPTY, catchError, finalize, forkJoin, take } from 'rxjs';
+import { EMPTY, Subscription, catchError, finalize, forkJoin, interval, switchMap, take, takeWhile } from 'rxjs';
 import { AthleteFormModalComponent } from './athlete-form-modal.component';
 import { AthleteResponse, Gender } from './athlete.model';
 import { AthleteProfileResult, AthleteResultHistoryFilters } from './athlete-profile.model';
@@ -13,6 +13,13 @@ import { ResultFormModalComponent } from '../results/result-form-modal.component
 import { ResultResponse } from '../results/result.model';
 import { AuthService } from '../../core/auth/auth.service';
 import { AthleteTrainingHistoryComponent } from './athlete-training-history.component';
+import { CompetitionApiService } from '../competition/competition-api.service';
+import { CompetitionResultFormComponent } from '../competition/competition-result-form.component';
+import {
+  CompetitionResult,
+  CompetitionSyncMode,
+  CompetitionSyncStatus,
+} from '../competition/competition.model';
 
 interface MatrixCell {
   result: AthleteProfileResult;
@@ -72,7 +79,13 @@ interface ProfileChart {
 const chartColors = ['#2585d8', '#159c68', '#db8a2f', '#8558c7', '#d55252', '#259da5', '#b64f9a', '#777f31'];
 
 @Component({
-  imports: [AthleteFormModalComponent, ResultFormModalComponent, AthleteTrainingHistoryComponent, RouterLink],
+  imports: [
+    AthleteFormModalComponent,
+    ResultFormModalComponent,
+    AthleteTrainingHistoryComponent,
+    CompetitionResultFormComponent,
+    RouterLink,
+  ],
   selector: 'app-athlete-profile-page',
   styleUrl: './athlete-profile.page.scss',
   templateUrl: './athlete-profile.page.html',
@@ -101,6 +114,40 @@ export class AthleteProfilePage implements OnInit {
   readonly lookupError = signal<string | null>(null);
   readonly selectedSeriesIds = signal<number[]>([]);
   readonly resultsExpanded = signal(false);
+  readonly competitionResultsExpanded = signal(false);
+  readonly competitionResults = signal<CompetitionResult[]>([]);
+  readonly selectedCompetitionSeason = signal('');
+  readonly selectedCompetitionEvent = signal('');
+  readonly competitionSeasonOptions = computed(() => {
+    const options = new Map<string, { key: string; season: number | null; type: CompetitionResult['seasonType'] }>();
+    for (const result of this.competitionResults()) {
+      const key = this.competitionSeasonKey(result);
+      options.set(key, { key, season: result.season, type: result.seasonType });
+    }
+    return [...options.values()].sort((left, right) =>
+      (right.season ?? -1) - (left.season ?? -1)
+      || this.competitionSeasonLabel(left.type).localeCompare(this.competitionSeasonLabel(right.type), 'pl'));
+  });
+  readonly competitionEventOptions = computed(() => {
+    const events = new Map<number, string>();
+    for (const result of this.competitionResults()) events.set(result.eventId, result.eventName);
+    return [...events.entries()]
+      .map(([id, name]) => ({ id, name }))
+      .sort((left, right) => left.name.localeCompare(right.name, 'pl') || left.id - right.id);
+  });
+  readonly filteredCompetitionResults = computed(() => this.competitionResults().filter((result) =>
+    (!this.selectedCompetitionSeason() || this.competitionSeasonKey(result) === this.selectedCompetitionSeason())
+    && (!this.selectedCompetitionEvent() || String(result.eventId) === this.selectedCompetitionEvent())));
+  readonly competitionResultsLoading = signal(false);
+  readonly competitionResultsError = signal<string | null>(null);
+  readonly competitionSyncStatus = signal<CompetitionSyncStatus | null>(null);
+  readonly competitionSyncLoading = signal(false);
+  readonly competitionSyncError = signal<string | null>(null);
+  readonly competitionSyncMode = signal<CompetitionSyncMode>('CURRENT_SEASON');
+  readonly competitionResultFormOpen = signal(false);
+  readonly selectedCompetitionResult = signal<CompetitionResult | null>(null);
+  readonly deletingCompetitionResultId = signal<number | null>(null);
+  readonly canManageCompetition = computed(() => this.auth.currentUser()?.role === 'ADMIN');
   readonly scaleGroupByTestId = signal<Map<number, number>>(new Map());
   readonly chart = computed(() => this.buildChart());
   readonly canEdit = computed(() => {
@@ -154,8 +201,12 @@ export class AthleteProfilePage implements OnInit {
   readonly auth = inject(AuthService);
   private readonly athletesApi = inject(AthletesApiService);
   private readonly testsApi = inject(TestsApiService);
+  private readonly competitionApi = inject(CompetitionApiService);
   private readonly destroyRef = inject(DestroyRef);
   private profileRequestId = 0;
+  private competitionRouteRequestId = 0;
+  private competitionResultsRequestId = 0;
+  private competitionSyncPoll: Subscription | null = null;
   private historyRequestId = 0;
   private appliedFilters: AthleteResultHistoryFilters | null = null;
   private athleteLookup: AthleteResponse[] | null = null;
@@ -175,10 +226,16 @@ export class AthleteProfilePage implements OnInit {
           return;
         }
         if (this.loadedAthleteId !== id) {
+          this.invalidateCompetitionRequests();
+          this.competitionResults.set([]);
+          this.selectedCompetitionSeason.set('');
+          this.selectedCompetitionEvent.set('');
+          this.competitionSyncStatus.set(null);
           this.selectedTestIds.set([]);
           this.fromDate.set('');
           this.toDate.set('');
           this.resultsExpanded.set(false);
+          this.competitionResultsExpanded.set(false);
           this.loadedAthleteId = id;
         }
         this.athleteId = id;
@@ -192,6 +249,10 @@ export class AthleteProfilePage implements OnInit {
 
   toggleResultsSection(): void {
     this.resultsExpanded.update((expanded) => !expanded);
+  }
+
+  toggleCompetitionResultsSection(): void {
+    this.competitionResultsExpanded.update((expanded) => !expanded);
   }
 
   setTestSelected(testId: number, event: Event): void {
@@ -267,6 +328,139 @@ export class AthleteProfilePage implements OnInit {
     this.athlete.set(athlete);
     this.isAthleteFormOpen.set(false);
     this.successMessage.set('Dane zawodnika zostały zapisane.');
+  }
+
+  setCompetitionSyncMode(event: Event): void {
+    const select = event.target;
+    if (!(select instanceof HTMLSelectElement)) return;
+    if (select.value === 'CURRENT_SEASON' || select.value === 'FULL_HISTORY') {
+      this.competitionSyncMode.set(select.value);
+    }
+  }
+
+  startCompetitionSync(): void {
+    const athlete = this.athlete();
+    if (!this.canManageCompetition() || !athlete?.pzlaId || this.competitionSyncLoading()) return;
+    this.competitionSyncError.set(null);
+    this.competitionSyncLoading.set(true);
+    this.competitionApi.startAthleteSync(this.athleteId, this.competitionSyncMode()).pipe(
+      take(1),
+      catchError((error: unknown) => {
+        this.competitionSyncError.set(error instanceof HttpErrorResponse && error.status === 409
+          ? 'Synchronizacja tego zawodnika już trwa.'
+          : 'Nie udało się rozpocząć synchronizacji PZLA.');
+        return EMPTY;
+      }),
+      finalize(() => this.competitionSyncLoading.set(false)),
+      takeUntilDestroyed(this.destroyRef),
+    ).subscribe((status) => {
+      this.competitionSyncStatus.set(status);
+      if (status.runId !== null) this.watchCompetitionSync(status.runId);
+    });
+  }
+
+  retryCompetitionData(): void {
+    this.loadCompetitionData();
+  }
+
+  openCompetitionResultForm(result: CompetitionResult | null = null): void {
+    if (!this.canManageCompetition()) return;
+    this.selectedCompetitionResult.set(result);
+    this.competitionResultFormOpen.set(true);
+  }
+
+  closeCompetitionResultForm(): void {
+    this.competitionResultFormOpen.set(false);
+    this.selectedCompetitionResult.set(null);
+  }
+
+  onCompetitionResultSaved(): void {
+    this.closeCompetitionResultForm();
+    this.successMessage.set('Wynik zawodów został zapisany.');
+    this.loadCompetitionResults();
+  }
+
+  deleteCompetitionResult(result: CompetitionResult): void {
+    if (!this.canManageCompetition() || this.deletingCompetitionResultId() !== null) return;
+    if (!globalThis.confirm(`Czy na pewno usunąć wynik zawodów „${result.originalMark}” z dnia ${this.formatDate(result.resultDate)}?`)) {
+      return;
+    }
+    this.deletingCompetitionResultId.set(result.id);
+    this.competitionResultsError.set(null);
+    this.competitionApi.deleteResult(result.id).pipe(
+      take(1),
+      catchError(() => {
+        this.competitionResultsError.set('Nie udało się usunąć wyniku zawodów.');
+        return EMPTY;
+      }),
+      finalize(() => this.deletingCompetitionResultId.set(null)),
+      takeUntilDestroyed(this.destroyRef),
+    ).subscribe(() => {
+      this.setCompetitionResults(this.competitionResults().filter((item) => item.id !== result.id));
+      this.successMessage.set('Wynik zawodów został usunięty.');
+    });
+  }
+
+  competitionSeasonLabel(type: CompetitionResult['seasonType']): string {
+    if (type === 'INDOOR') return 'Hala';
+    if (type === 'OUTDOOR') return 'Stadion';
+    return 'Aktualny';
+  }
+
+  competitionSeasonKey(result: CompetitionResult): string {
+    return `${result.season ?? 'unknown'}:${result.seasonType}`;
+  }
+
+  setCompetitionFilter(event: Event, filter: 'season' | 'event'): void {
+    const select = event.target;
+    if (!(select instanceof HTMLSelectElement)) return;
+    if (filter === 'season') this.selectedCompetitionSeason.set(select.value);
+    else this.selectedCompetitionEvent.set(select.value);
+  }
+
+  clearCompetitionFilters(): void {
+    this.selectedCompetitionSeason.set('');
+    this.selectedCompetitionEvent.set('');
+  }
+
+  private setCompetitionResults(results: CompetitionResult[]): void {
+    this.competitionResults.set(results);
+    if (this.selectedCompetitionSeason()
+        && !results.some((result) => this.competitionSeasonKey(result) === this.selectedCompetitionSeason())) {
+      this.selectedCompetitionSeason.set('');
+    }
+    if (this.selectedCompetitionEvent()
+        && !results.some((result) => String(result.eventId) === this.selectedCompetitionEvent())) {
+      this.selectedCompetitionEvent.set('');
+    }
+  }
+
+  competitionSourceLabel(source: CompetitionResult['source']): string {
+    return source === 'PZLA' ? 'PZLA' : 'TFHub';
+  }
+
+  formatWind(wind: number): string {
+    return `${new Intl.NumberFormat('pl-PL', { minimumFractionDigits: 1, maximumFractionDigits: 2 }).format(wind)} m/s`;
+  }
+
+  competitionSyncStatusLabel(status: CompetitionSyncStatus['status']): string {
+    switch (status) {
+      case 'QUEUED': return 'Oczekuje';
+      case 'RUNNING': return 'W trakcie';
+      case 'SUCCEEDED': return 'Zakończona powodzeniem';
+      case 'FAILED': return 'Niepowodzenie';
+      case 'NOT_SYNCHRONIZED': return 'Jeszcze nie synchronizowano';
+    }
+  }
+
+  competitionDateTime(value: string | null): string {
+    return value
+      ? new Intl.DateTimeFormat('pl-PL', {
+        dateStyle: 'medium',
+        timeStyle: 'short',
+        timeZone: 'Europe/Warsaw',
+      }).format(new Date(value))
+      : '—';
   }
 
   openAddResult(): void {
@@ -420,7 +614,98 @@ export class AthleteProfilePage implements OnInit {
         this.selectedTestIds.set(preservedSelection.length > 0
           ? preservedSelection
           : tests.map((test) => test.id));
+        this.loadCompetitionData();
       });
+  }
+
+  private loadCompetitionData(): void {
+    this.loadCompetitionResults();
+    this.loadCompetitionSyncStatus(this.competitionRouteRequestId);
+  }
+
+  private loadCompetitionResults(): void {
+    const routeRequestId = this.competitionRouteRequestId;
+    const resultsRequestId = ++this.competitionResultsRequestId;
+    this.competitionResultsLoading.set(true);
+    this.competitionResultsError.set(null);
+    this.competitionApi.getAthleteResults(this.athleteId).pipe(
+      take(1),
+      catchError((error: unknown) => {
+        if (routeRequestId === this.competitionRouteRequestId
+            && resultsRequestId === this.competitionResultsRequestId) {
+          this.competitionResultsError.set(error instanceof HttpErrorResponse && error.status === 403
+            ? 'Brak dostępu do wyników zawodów tego zawodnika.'
+            : 'Nie udało się pobrać wyników zawodów.');
+        }
+        return EMPTY;
+      }),
+      finalize(() => {
+        if (routeRequestId === this.competitionRouteRequestId
+            && resultsRequestId === this.competitionResultsRequestId) this.competitionResultsLoading.set(false);
+      }),
+      takeUntilDestroyed(this.destroyRef),
+    ).subscribe((results) => {
+      if (routeRequestId === this.competitionRouteRequestId
+          && resultsRequestId === this.competitionResultsRequestId) this.setCompetitionResults(results);
+    });
+  }
+
+  private loadCompetitionSyncStatus(routeRequestId: number): void {
+    this.competitionApi.getAthleteSyncStatus(this.athleteId).pipe(
+      take(1),
+      catchError((error: unknown) => {
+        if (routeRequestId === this.competitionRouteRequestId) {
+          this.competitionSyncError.set(error instanceof HttpErrorResponse && error.status === 403
+            ? 'Brak dostępu do statusu synchronizacji.'
+            : 'Nie udało się pobrać statusu synchronizacji.');
+        }
+        return EMPTY;
+      }),
+      takeUntilDestroyed(this.destroyRef),
+    ).subscribe((status) => {
+      if (routeRequestId !== this.competitionRouteRequestId) return;
+      this.competitionSyncStatus.set(status);
+      if ((status.status === 'QUEUED' || status.status === 'RUNNING') && status.runId !== null) {
+        this.watchCompetitionSync(status.runId);
+      }
+    });
+  }
+
+  private watchCompetitionSync(runId: number): void {
+    this.competitionSyncPoll?.unsubscribe();
+    const routeRequestId = this.competitionRouteRequestId;
+    this.competitionSyncLoading.set(true);
+    this.competitionSyncPoll = interval(3000).pipe(
+      switchMap(() => this.competitionApi.getSyncStatus(runId)),
+      takeWhile((status) => status.status === 'QUEUED' || status.status === 'RUNNING', true),
+      catchError(() => {
+        if (routeRequestId === this.competitionRouteRequestId) {
+          this.competitionSyncError.set('Nie udało się odświeżyć statusu synchronizacji.');
+        }
+        return EMPTY;
+      }),
+      finalize(() => {
+        if (routeRequestId === this.competitionRouteRequestId) this.competitionSyncLoading.set(false);
+      }),
+      takeUntilDestroyed(this.destroyRef),
+    ).subscribe((status) => {
+      if (routeRequestId !== this.competitionRouteRequestId) return;
+      this.competitionSyncStatus.set(status);
+      if (status.status !== 'QUEUED' && status.status !== 'RUNNING') {
+        this.competitionSyncLoading.set(false);
+        this.loadCompetitionData();
+      }
+    });
+  }
+
+  private invalidateCompetitionRequests(): void {
+    this.competitionRouteRequestId++;
+    this.competitionResultsRequestId++;
+    this.competitionSyncError.set(null);
+    this.competitionResultsError.set(null);
+    this.competitionSyncPoll?.unsubscribe();
+    this.competitionSyncPoll = null;
+    this.competitionSyncLoading.set(false);
   }
 
   private currentFilters(): AthleteResultHistoryFilters | null {

@@ -19,6 +19,7 @@ import pl.tfhub.api.athlete.dto.request.ChangeAthleteStatusRequest;
 import pl.tfhub.api.athlete.dto.request.CreateAthleteRequest;
 import pl.tfhub.api.athlete.dto.request.SearchAthletesRequest;
 import pl.tfhub.api.athlete.dto.request.UpdateAthleteRequest;
+import pl.tfhub.api.athlete.dto.request.UpdateAthletePzlaIdRequest;
 import pl.tfhub.api.athlete.dto.response.AthleteResponse;
 import pl.tfhub.api.athlete.exception.InvalidAthleteIdException;
 import pl.tfhub.api.athlete.service.AthleteService;
@@ -96,6 +97,16 @@ public class AthleteController {
 			throw new InvalidAthleteIdException();
 		}
 		return athleteService.changeAthleteStatus(id, request);
+	}
+
+	@PatchMapping("/{id}/pzla-id")
+	public AthleteResponse updatePzlaId(
+			@PathVariable Long id,
+			@Valid @RequestBody UpdateAthletePzlaIdRequest request) {
+		if (id <= 0) {
+			throw new InvalidAthleteIdException();
+		}
+		return athleteService.updatePzlaId(id, request);
 	}
 
 	private void validateAthleteId(Long id) {

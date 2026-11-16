@@ -24,7 +24,15 @@ import { ChangePasswordModalComponent } from '../auth/change-password-modal.comp
             <a routerLink="/dashboard" routerLinkActive="active" ariaCurrentWhenActive="page">Dashboard</a>
           }
           @if (account.role === 'ADMIN') {
-            <a routerLink="/tests" routerLinkActive="active" ariaCurrentWhenActive="page">Sprawdziany</a>
+            <div class="management-menu" routerLinkActive="active">
+              <button #managementButton type="button" class="management-toggle"
+                aria-controls="management-links" [attr.aria-expanded]="managementOpen()"
+                (click)="toggleManagement()">Zarządzanie <span aria-hidden="true">▾</span></button>
+              <div id="management-links" class="management-links" [hidden]="!managementOpen()">
+                <a routerLink="/tests" routerLinkActive="active" ariaCurrentWhenActive="page">Sprawdziany</a>
+                <a routerLink="/competition-events" routerLinkActive="active" ariaCurrentWhenActive="page">Konkurencje</a>
+              </div>
+            </div>
           }
           @if (account.role === 'ADMIN' || account.role === 'COACH') {
             <a routerLink="/athletes" routerLinkActive="active" ariaCurrentWhenActive="page">Zawodnicy</a>
@@ -131,6 +139,26 @@ import { ChangePasswordModalComponent } from '../auth/change-password-modal.comp
       border-bottom-color: #42c66f;
       color: #fff;
     }
+    .management-menu { position: relative; }
+    .management-toggle {
+      align-items: center; background: transparent; border: 0; border-bottom: 4px solid transparent;
+      color: #d3d8e0; cursor: pointer; display: flex; font: inherit; font-weight: 550;
+      gap: .35rem; height: 100%; padding: 0 .35rem; white-space: nowrap;
+    }
+    .management-menu.active .management-toggle { border-bottom-color: #42c66f; color: #fff; }
+    .management-toggle:focus-visible { outline: 2px solid #42c66f; outline-offset: -2px; }
+    .management-links {
+      background: #fff; border: 1px solid #dce1ea; border-radius: .55rem;
+      box-shadow: 0 .7rem 2rem rgb(15 23 42 / 20%); min-width: 12rem;
+      padding: .35rem; position: absolute; top: 100%; left: 0; z-index: 20;
+    }
+    .management-links[hidden] { display: none; }
+    nav .management-links a {
+      border: 0; border-radius: .35rem; color: #172033; display: block;
+      padding: .65rem .75rem; text-decoration: none;
+    }
+    nav .management-links a:hover, nav .management-links a:focus-visible,
+    nav .management-links a.active { background: #f2f4f8; color: #172033; }
     .account {
       align-items: center;
       background: #66707c;
@@ -248,6 +276,9 @@ import { ChangePasswordModalComponent } from '../auth/change-password-modal.comp
       nav.navigation-open { display: flex; }
       nav a { border-bottom: 0; border-left: 4px solid transparent; min-height: 2.75rem; padding: .5rem .75rem; white-space: normal; }
       nav a.active { border-left-color: #42c66f; background: #35404e; }
+      .management-toggle { border: 0; border-left: 4px solid transparent; min-height: 2.75rem; padding: .5rem .75rem; width: 100%; }
+      .management-menu.active .management-toggle { background: #35404e; border-left-color: #42c66f; }
+      .management-links { box-shadow: none; margin: .2rem .75rem .4rem; position: static; }
       .account-menu { min-width: 0; }
       .username { max-width: min(35vw, 12rem); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
       .account { flex-shrink: 0; }
@@ -256,18 +287,21 @@ import { ChangePasswordModalComponent } from '../auth/change-password-modal.comp
 })
 export class HeaderComponent implements OnDestroy {
   @ViewChild('navigationButton') private navigationButton?: ElementRef<HTMLButtonElement>;
+  @ViewChild('managementButton') private managementButton?: ElementRef<HTMLButtonElement>;
   private readonly auth = inject(AuthService);
   private readonly router = inject(Router);
   private readonly element = inject(ElementRef<HTMLElement>);
   readonly user = this.auth.currentUser;
   readonly menuOpen = signal(false);
   readonly navigationOpen = signal(false);
+  readonly managementOpen = signal(false);
   readonly passwordChangeOpen = signal(false);
   readonly successMessage = signal<string | null>(null);
   private successTimeout: ReturnType<typeof setTimeout> | null = null;
 
   constructor() {
     effect(() => {
+      if (!this.user() || this.user()?.role !== 'ADMIN') this.managementOpen.set(false);
       if (!this.user()) this.navigationOpen.set(false);
     });
   }
@@ -277,6 +311,9 @@ export class HeaderComponent implements OnDestroy {
     if (!this.element.nativeElement.querySelector('.account-menu')?.contains(event.target as Node)) {
       this.menuOpen.set(false);
     }
+    if (!this.element.nativeElement.querySelector('.management-menu')?.contains(event.target as Node)) {
+      this.managementOpen.set(false);
+    }
     if (!this.element.nativeElement.querySelector('nav')?.contains(event.target as Node)
         && !this.navigationButton?.nativeElement.contains(event.target as Node)) {
       this.navigationOpen.set(false);
@@ -285,8 +322,10 @@ export class HeaderComponent implements OnDestroy {
 
   @HostListener('document:keydown.escape')
   closeMenuOnEscape(): void {
-    if (this.navigationOpen()) this.navigationButton?.nativeElement.focus();
+    if (this.managementOpen()) this.managementButton?.nativeElement.focus();
+    else if (this.navigationOpen()) this.navigationButton?.nativeElement.focus();
     this.navigationOpen.set(false);
+    this.managementOpen.set(false);
     this.menuOpen.set(false);
   }
 
@@ -298,16 +337,26 @@ export class HeaderComponent implements OnDestroy {
 
   toggleMenu(): void {
     this.navigationOpen.set(false);
+    this.managementOpen.set(false);
     this.menuOpen.update((open) => !open);
   }
 
   toggleNavigation(): void {
     this.menuOpen.set(false);
+    this.managementOpen.set(false);
     this.navigationOpen.update((open) => !open);
   }
 
+  toggleManagement(): void {
+    this.menuOpen.set(false);
+    this.managementOpen.update((open) => !open);
+  }
+
   onNavigationClick(event: MouseEvent): void {
-    if (event.target instanceof Element && event.target.closest('a')) this.navigationOpen.set(false);
+    if (event.target instanceof Element && event.target.closest('a')) {
+      this.navigationOpen.set(false);
+      this.managementOpen.set(false);
+    }
   }
 
   openPasswordChange(): void {

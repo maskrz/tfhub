@@ -6,6 +6,24 @@
   padding: clamp(1.5rem, 4vw, 3.5rem) clamp(1rem, 3.25vw, 3.25rem);
 }
 
+.group-sync-panel {
+  align-items: flex-end;
+  background: #f7f9fc;
+  border: 1px solid #d8deea;
+  border-radius: .8rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+  padding: 1rem;
+}
+.group-sync-panel h2 { color: #20283a; font-size: 1.1rem; margin: 0 0 .25rem; }
+.group-sync-panel p { color: #59667e; margin: 0; }
+.group-sync-panel .feedback { flex-basis: 100%; }
+.group-sync-results { flex-basis: 100%; }
+.group-sync-results h3 { font-size: .95rem; margin: .25rem 0; }
+.group-sync-results ul { margin: .25rem 0 0; padding-left: 1.25rem; }
+
 .page-heading {
   align-items: center;
   display: flex;

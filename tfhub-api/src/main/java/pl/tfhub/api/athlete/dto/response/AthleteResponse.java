@@ -12,7 +12,8 @@ public record AthleteResponse(
 		Gender gender,
 		boolean active,
 		Long trainingGroupId,
-		List<String> aliases) {
+		List<String> aliases,
+		String pzlaId) {
 
 	public AthleteResponse(
 			Long id,
@@ -21,12 +22,17 @@ public record AthleteResponse(
 			Integer birthYear,
 			Gender gender,
 			boolean active) {
-		this(id, firstName, lastName, birthYear, gender, active, null, List.of());
+		this(id, firstName, lastName, birthYear, gender, active, null, List.of(), null);
 	}
 
 	public AthleteResponse(Long id, String firstName, String lastName, Integer birthYear, Gender gender,
 			boolean active, Long trainingGroupId) {
-		this(id, firstName, lastName, birthYear, gender, active, trainingGroupId, List.of());
+		this(id, firstName, lastName, birthYear, gender, active, trainingGroupId, List.of(), null);
+	}
+
+	public AthleteResponse(Long id, String firstName, String lastName, Integer birthYear, Gender gender,
+			boolean active, Long trainingGroupId, List<String> aliases) {
+		this(id, firstName, lastName, birthYear, gender, active, trainingGroupId, aliases, null);
 	}
 
 	public static AthleteResponse from(Athlete athlete) {
@@ -42,6 +48,7 @@ public record AthleteResponse(
 				athlete.getGender(),
 				athlete.isActive(),
 				athlete.getTrainingGroup() == null ? null : athlete.getTrainingGroup().getId(),
-				List.copyOf(aliases));
+				List.copyOf(aliases),
+				athlete.getPzlaId());
 	}
 }

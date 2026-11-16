@@ -38,6 +38,9 @@ public class Athlete {
 	@Column(nullable = false)
 	private boolean active = true;
 
+	@Column(name = "pzla_id", length = 20)
+	private String pzlaId;
+
 	@ManyToOne(fetch = FetchType.LAZY)
 	@JoinColumn(name = "training_group_id")
 	private TrainingGroup trainingGroup;
@@ -86,6 +89,10 @@ public class Athlete {
 		return active;
 	}
 
+	public String getPzlaId() {
+		return pzlaId;
+	}
+
 	public TrainingGroup getTrainingGroup() {
 		return trainingGroup;
 	}
@@ -103,5 +110,9 @@ public class Athlete {
 
 	public void changeStatus(boolean active) {
 		this.active = active;
+	}
+
+	public void changePzlaId(String pzlaId) {
+		this.pzlaId = pzlaId;
 	}
 }

@@ -8,7 +8,7 @@ Running training execution history is a separate athlete-scoped read operation,
 specified in [UC-511](UC-511-TRN-athlete-training-history.md); it does not alter
 the test-result operations described below.
 
-The functionality extends the existing `athlete` and `result` modules. No new backend module should be introduced.
+The test-result functionality extends the existing `athlete` and `result` modules. Official competition results are a separate domain and are specified independently; they must not be represented as `TestResult` records.
 
 The backend must support:
 - Retrieving an athlete's tests for which at least one result exists.
@@ -98,6 +98,7 @@ The frontend may use this ordering to construct the matrix, but must not rely on
 - Avoid N+1 queries when retrieving result details with test information.
 - Respect existing transaction and service-layer conventions.
 - Keep existing API behavior backward-compatible.
+- These constraints apply to TFHub `TestResult` history; official competition results use their separately specified domain model and module.
 
 ## API design
 

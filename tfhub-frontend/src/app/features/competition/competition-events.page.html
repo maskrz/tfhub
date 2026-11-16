@@ -1,0 +1,80 @@
+<section class="page" aria-labelledby="page-title">
+  <div class="page-heading">
+    <div><h1 id="page-title">Konkurencje zawodów</h1></div>
+    <button type="button" class="button button--primary" (click)="openCreate()">Dodaj konkurencję</button>
+  </div>
+
+  <div class="filters">
+    <label class="filter-field search-filter">
+      <span>Szukaj konkurencji</span>
+      <span class="search-field field-control-shell">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <circle cx="10.8" cy="10.8" r="6.8"></circle>
+          <path d="m16 16 5 5"></path>
+        </svg>
+        <input class="field-control__search" type="search" aria-label="Szukaj konkurencji"
+          placeholder="Szukaj konkurencji..." [value]="query()" (input)="onSearchInput($event)" />
+      </span>
+    </label>
+    <div class="filter-field inactive-filter">
+      <span id="inactive-filter-label">Pokaż nieaktywne</span>
+      <label class="inactive-toggle">
+        <input type="checkbox" aria-labelledby="inactive-filter-label"
+          [checked]="showInactive()" (change)="onInactiveToggle($event)" />
+        <span class="switch" aria-hidden="true"></span>
+      </label>
+    </div>
+  </div>
+
+  @if (statusError(); as message) {
+    <p class="feedback error status-error" role="alert">{{ message }}</p>
+  }
+  @if (loading()) {
+    <p class="feedback" role="status">Ładowanie konkurencji...</p>
+  } @else if (errorMessage(); as message) {
+    <div class="feedback error" role="alert">
+      <p>{{ message }}</p>
+      <button type="button" class="button button--primary retry-button" (click)="retry()">Spróbuj ponownie</button>
+    </div>
+  } @else if (visibleEvents().length === 0) {
+    <p class="feedback" role="status">{{ query().trim() ? 'Nie znaleziono konkurencji pasujących do wyszukiwania.' : 'Brak konkurencji do wyświetlenia.' }}</p>
+  } @else {
+    <div class="table-surface">
+      <table>
+        <thead><tr>
+          <th scope="col" [attr.aria-sort]="sortDirection() === 'asc' ? 'ascending' : 'descending'">
+            <button type="button" class="sort-button" (click)="sortByName()">Nazwa konkurencji
+              <span class="sort-indicator active" aria-hidden="true">{{ sortDirection() === 'asc' ? '↑' : '↓' }}</span>
+            </button>
+          </th>
+          <th scope="col" aria-label="Akcja"></th>
+        </tr></thead>
+        <tbody>
+          @for (event of visibleEvents(); track event.id) {
+            <tr [class.inactive-row]="!event.active">
+              <td><strong>{{ event.name }}</strong></td>
+              <td class="action-cell">
+                <button type="button" class="status-toggle" role="switch"
+                  [attr.aria-label]="'Status konkurencji: ' + event.name" [attr.aria-checked]="event.active"
+                  [attr.aria-busy]="updatingId() === event.id" [disabled]="updatingId() !== null"
+                  (click)="toggleStatus(event)">
+                  <span>{{ event.active ? 'Aktywna' : 'Nieaktywna' }}</span>
+                  <span class="status-toggle__track" aria-hidden="true"></span>
+                </button>
+                <button type="button" class="button button--secondary" (click)="openEdit(event)">Edytuj</button>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  }
+</section>
+
+@if (formOpen()) {
+  <div class="modal-backdrop" role="presentation">
+    <section class="modal-card" role="dialog" aria-modal="true" aria-labelledby="event-form-title">
+      <app-competition-event-form [event]="selectedEvent()" (saved)="onSaved($event)" (cancelled)="formOpen.set(false)" />
+    </section>
+  </div>
+}

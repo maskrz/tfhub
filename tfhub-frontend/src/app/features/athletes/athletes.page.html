@@ -110,6 +110,57 @@
     </div>
   </div>
 
+  @if (auth.currentUser()?.role === 'ADMIN') {
+    <section class="group-sync-panel" aria-labelledby="group-sync-heading">
+      <div>
+        <h2 id="group-sync-heading">Synchronizacja wyników PZLA dla grupy</h2>
+        <p>W filtrze grup wybierz dokładnie jedną grupę, a następnie wybierz zakres synchronizacji.</p>
+      </div>
+      <label class="filter-field">
+        <span>Zakres synchronizacji</span>
+        <select class="field-control select-with-arrow" [value]="groupSyncMode()" (change)="setGroupSyncMode($event)">
+          <option value="CURRENT_SEASON">Aktualny sezon</option>
+          <option value="FULL_HISTORY">Pełna dostępna historia</option>
+        </select>
+      </label>
+      <button type="button" class="button button--primary"
+        [disabled]="selectedGroupIds().length !== 1 || selectedGroupIds()[0] <= 0 || groupSyncLoading()"
+        [attr.aria-busy]="groupSyncLoading()"
+        (click)="startGroupSync()">
+        {{ groupSyncLoading() ? 'Synchronizowanie grupy...' : 'Synchronizuj wybraną grupę' }}
+      </button>
+      @if (selectedGroupIds().length !== 1 || selectedGroupIds()[0] <= 0) {
+        <p class="feedback">Wybierz dokładnie jedną grupę (nie „Bez grupy”).</p>
+      }
+      @if (groupSyncError(); as message) {
+        <p class="feedback error" role="alert">{{ message }}</p>
+      }
+      @if (groupSyncSkipped().length > 0) {
+        <div class="group-sync-results" role="status">
+          <h3>Pominięci zawodnicy</h3>
+          <ul>
+            @for (skipped of groupSyncSkipped(); track skipped.athleteId) {
+              <li>{{ athleteName(skipped.athleteId) }} — {{ skipped.reason }}</li>
+            }
+          </ul>
+        </div>
+      }
+      @if (groupSyncStatuses().length > 0) {
+        <div class="group-sync-results">
+          <h3>Status synchronizacji</h3>
+          <ul>
+            @for (sync of groupSyncStatuses(); track sync.runId) {
+              <li>
+                {{ athleteName(sync.athleteId) }} — {{ syncStatusLabel(sync.status) }}
+                @if (sync.status === 'FAILED' && sync.errorMessage) { <span>({{ sync.errorMessage }})</span> }
+              </li>
+            }
+          </ul>
+        </div>
+      }
+    </section>
+  }
+
   @if (statusError(); as message) {
     <p class="feedback error status-error" role="alert">{{ message }}</p>
   }

@@ -8,11 +8,14 @@
 
 This document describes the data model used by TFHub.
 
-The application data model consists of athlete, test, result, user, training-group, and training-session entities:
+The application data model consists of athlete, test, test-result, official competition-result, user, training-group, and training-session entities:
 
 - `Athlete` – an athlete managed by the coach.
 - `Test` – a definition of an athletic performance test.
 - `TestResult` – a recorded result of an athlete performing a test.
+- `CompetitionEvent` – a managed athletics discipline used for official competition results.
+- `CompetitionResult` – a competition result stored separately from TFHub test results, with source and source metadata.
+- `CompetitionSyncRun` – the status and outcome of an administrator-triggered PZLA synchronization.
 - `User` – login account, role, and active status.
 - `TrainingGroup` – current athlete group and coach access scope.
 - `Training` – a persisted session with TEMPO group assignment or FREE_TEXT group/individual-athlete assignment, plus type-specific training data.
@@ -70,6 +73,9 @@ erDiagram
     USERS }o--o{ ATHLETES : athlete_access
     ATHLETES ||--o{ TEST_RESULTS : has
     TESTS ||--o{ TEST_RESULTS : measures
+    ATHLETES ||--o{ COMPETITION_RESULTS : has
+    COMPETITION_EVENTS ||--o{ COMPETITION_RESULTS : classifies
+    ATHLETES ||--o{ COMPETITION_SYNC_RUNS : synchronization
 
     ATHLETES {
         bigint id PK
@@ -79,6 +85,7 @@ erDiagram
         varchar gender
         boolean active
         bigint training_group_id FK "nullable"
+        varchar pzla_id UK "nullable"
     }
 
     TESTS {
@@ -97,6 +104,38 @@ erDiagram
         date result_date
         numeric value
         varchar type
+    }
+
+    COMPETITION_EVENTS {
+        bigint id PK
+        varchar name UK
+        varchar unit
+        boolean active
+    }
+
+    COMPETITION_RESULTS {
+        bigint id PK
+        bigint athlete_id FK
+        bigint event_id FK
+        date result_date
+        varchar original_mark
+        numeric numeric_value
+        varchar unit
+        numeric wind
+        integer season
+        varchar season_type
+        varchar source
+        varchar source_fingerprint UK
+    }
+
+    COMPETITION_SYNC_RUNS {
+        bigint id PK
+        bigint athlete_id FK
+        varchar sync_mode
+        varchar status
+        timestamptz requested_at
+        timestamptz finished_at
+        varchar error_code
     }
 ```
 
@@ -139,6 +178,7 @@ Represents an athlete whose performance is tracked by the application.
 | gender | VARCHAR(20) | Yes | Athlete's gender |
 | active | BOOLEAN | Yes | Indicates whether the athlete is active |
 | training_group_id | BIGINT | No | Current group; null means unassigned |
+| pzla_id | VARCHAR(20) | No | Optional PZLA athlete ID, digits only and unique when present |
 
 ### 4.2 Gender
 
@@ -167,6 +207,8 @@ Allowed Java enum values:
 - Deactivation must not delete or modify historical results.
 - Inactive athletes remain available when viewing historical results.
 - Inactive athletes should be excluded from active athlete lists by default.
+
+The optional `pzla_id` is entered by an administrator. The database enforces digits-only formatting and uniqueness for non-null values. Clearing the identifier disables PZLA synchronization but does not delete already imported historical results.
 
 Birth year is used instead of a full date of birth. Age-related statistics are based on the athlete's birth year.
 
@@ -296,7 +338,31 @@ No separate Competition entity is required initially.
 - Multiple results for the same athlete, test and date are technically allowed.
 - The application does not enforce uniqueness of `(athlete_id, test_id, result_date)`.
 
-## 7 Training Session Status
+## 7. Official Competition Results
+
+Official results are not `TestResult` records. They are stored in the separate `competition_results` table so PZLA disciplines, original marks, wind, competition metadata, and import identity are not forced into the test-result model. The two data sets can later be queried together for a shared chart without losing their distinct source semantics.
+
+### 7.1 CompetitionEvent
+
+`competition_events` stores a unique discipline name, its unit, and active state. Events with results are retained and deactivated rather than deleted. Units are the event's canonical unit (`s`, `m`, `pkt`, or another explicitly supported unit); each competition result snapshots its unit so later catalog changes do not reinterpret historical values.
+
+### 7.2 CompetitionResult
+
+Each row belongs to one athlete and one competition event. It stores the competition date as `DATE`, PZLA's original mark, an optional normalized numeric value, the snapshotted unit, optional wind, season and indoor/outdoor classification, competition name/location, round metadata, and source (`PZLA` or `MANUAL`). Place, ambiguous trailing PZLA columns, and field-event attempts are not stored.
+
+For PZLA imports, `source_fingerprint` is unique per athlete and is used to upsert repeated rows and mark/wind corrections. `source_record_key` is retained when a stable source key can be derived. Manual rows have no source key or fingerprint. No competition result operation modifies `test_results`.
+
+### 7.3 CompetitionSyncRun
+
+`competition_sync_runs` records current-season or full-history synchronization attempts, status, timestamps, and safe error code/message. A partial unique index allows at most one queued or running synchronization per athlete. A failed retrieval is recorded without applying a partial result set; imported rows are applied together only after all pages for that run have been retrieved and parsed.
+
+TLS handshake failures are not retried. A `PZLA_TLS_CERTIFICATE_INVALID` status indicates that Java could not validate the certificate chain; check the server-provided intermediate certificates and the JVM truststore. Certificate and hostname verification must remain enabled.
+
+The PZLA HTTP client additionally trusts Certum Trusted Root CA and supplies the Certum DV TLS G2 R39 intermediate locally because the PZLA server omitted it during inspection. These public CA certificates are bundled under `src/main/resources/pzla/`; this does not change the JVM-wide truststore. The root SHA-256 fingerprint is `FE7696573855773E37A95E7AD4D9CC96C30157C15D31765BA9B15704E1AE78FD` and the intermediate fingerprint is `83C0A5A76844C840DFAF820FFD02ADF6573A26823EF6AF758A3384A0AC044083`. Review and update the certificates when the server chain changes, or remove this workaround when the server supplies a complete chain and the JVM trusts its root.
+
+Only administrators can start individual or group synchronization and manage events/results. Result reads use the existing athlete access scope: administrators have unrestricted access, coaches are limited to assigned groups, and athlete accounts can read only their own results.
+
+## 8 Training Session Status
 
 Each persisted training session has a required `training_type` column stored as `VARCHAR(20)`, constrained to `TEMPO` or `FREE_TEXT`. The Java enum values match. V13 defaults and backfills existing sessions to `TEMPO`; training type is immutable after creation.
 
@@ -314,9 +380,9 @@ Migration V5 replaces the legacy training-session `active` flag with `status`. T
 
 The training list index is `(training_group_id, status, training_date DESC, id)`. Add an index for type filtering only if query-plan evidence shows it is needed.
 
-## 8. Relationships
+## 9. Relationships
 
-### 8.1 Athlete – TestResult
+### 9.1 Athlete – TestResult
 
 One athlete can have multiple test results.
 
@@ -324,7 +390,7 @@ Each test result belongs to exactly one athlete.
 
 Deleting an athlete with existing results must be prevented.
 
-### 8.2 Test – TestResult
+### 9.2 Test – TestResult
 
 One test can have multiple results.
 
@@ -332,7 +398,7 @@ Each test result belongs to exactly one test.
 
 Deleting a test with existing results must be prevented.
 
-### 8.3 Referential integrity
+### 9.3 Referential integrity
 
 Foreign key constraints are enforced by PostgreSQL.
 
@@ -340,9 +406,9 @@ The database uses `ON DELETE RESTRICT` for both relationships.
 
 An athlete has zero or one current training group. A coach may belong to multiple groups and a group may have multiple coaches. Reassignment changes current coach access only; it does not update, delete, or re-parent historical results.
 
-## 9. Data Types and Precision
+## 10. Data Types and Precision
 
-### 9.1 Numeric values
+### 10.1 Numeric values
 
 Test results use `NUMERIC(12,3)`.
 
@@ -357,7 +423,7 @@ Examples:
 
 The application must not store formatted values such as `2:15.00`.
 
-### 9.2 Dates
+### 10.2 Dates
 
 Results use PostgreSQL `DATE`.
 
@@ -365,7 +431,7 @@ The corresponding Java type should be `LocalDate`.
 
 No time or timezone information is stored.
 
-### 9.3 Enumerations
+### 10.3 Enumerations
 
 Enum-like values are stored as VARCHAR columns.
 
@@ -373,7 +439,7 @@ Java enums provide application-level type safety.
 
 Database columns are not PostgreSQL native enum types.
 
-## 10. Database Schema Management
+## 11. Database Schema Management
 
 The current athlete, test, and result schema is created by Flyway migration:
 
@@ -389,27 +455,28 @@ The authentication and training-group tables were introduced through `V3__add_us
 
 Existing applied migrations must not be modified.
 
+Migration `V18__create_competition_results.sql` adds the optional athlete PZLA ID and the competition event, result, and synchronization-run tables. It preserves all existing `test_results`.
+
 Hibernate uses schema validation and must not modify the schema automatically.
 
-## 11. Explicitly Excluded Entities and Capabilities
+## 12. Explicitly Excluded Entities and Capabilities
 
 The following entities and capabilities are not part of the current model:
 
 - Public registration or account-management UI
 - Training-group management UI and athlete group-reassignment UI
-- Competition
+- A general competition entity; competition name and location remain metadata on each result
 - TrainingPlan
 
 They may be introduced later when supported by actual application requirements.
 
-## 12. Future Extensions
+## 13. Future Extensions
 
 Potential future improvements include:
 
 - Administrative user/group management screens.
 - Parent accounts and multiple athlete profiles per account.
-- Detailed competition metadata.
-- Import of external competition results.
+- A common chart that presents normalized competition and TFHub test results together without merging their storage models.
 - Performance history and analytics.
 - Additional measurement units and test categories.
 
