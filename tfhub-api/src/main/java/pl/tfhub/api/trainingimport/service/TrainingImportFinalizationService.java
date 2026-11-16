@@ -87,7 +87,9 @@ public class TrainingImportFinalizationService {
 					trainingImport.getTrainingGroup().getId(),
 					List.of(),
 					sections));
-			freeTextTrainingService.markCompleted(created.id());
+			if (draft.trainingDate() != null) {
+				freeTextTrainingService.markCompleted(created.id());
+			}
 			trainingImport.accept(created.id());
 			importRepository.saveAndFlush(trainingImport);
 			return new TrainingImportAcceptanceResponse(
@@ -143,8 +145,12 @@ public class TrainingImportFinalizationService {
 			}
 		}
 
-		trainingCompletionService.completeTraining(
-				created.id(), new CompleteTrainingRequest(participations, List.of(), List.of()));
+		CompleteTrainingRequest completion = new CompleteTrainingRequest(participations, List.of(), List.of());
+		if (draft.trainingDate() == null) {
+			trainingCompletionService.addUndatedImportParticipations(created.id(), completion);
+		} else {
+			trainingCompletionService.completeTraining(created.id(), completion);
+		}
 		trainingImport.accept(created.id());
 		importRepository.saveAndFlush(trainingImport);
 		return new TrainingImportAcceptanceResponse(

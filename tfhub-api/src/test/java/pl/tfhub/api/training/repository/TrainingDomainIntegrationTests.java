@@ -397,6 +397,51 @@ class TrainingDomainIntegrationTests {
     }
 
     @Test
+    void undatedFreeTextRequiresDateBeforeCompletionAndCannotClearCompletedDate() {
+        var created = freeTextTrainingService.create(new CreateFreeTextTrainingRequest(
+                "Undated", null, TrainingAssignmentType.GROUP, 1L, List.of(),
+                List.of(new CreateTrainingSectionRequest("Warm-up", "Run", 1))));
+        assertEquals(TrainingStatus.PLANNED, trainingRepository.findById(created.id()).orElseThrow().getStatus());
+        assertThrows(InvalidTrainingRequestException.class, () -> freeTextTrainingService.markCompleted(created.id()));
+        var section = sectionRepository.findAllByTraining_IdOrderBySequenceNumberAsc(created.id()).getFirst();
+        var dated = new EditFreeTextTrainingRequest("Undated", LocalDate.parse("2026-03-03"),
+                TrainingAssignmentType.GROUP, 1L, List.of(),
+                List.of(new EditTrainingSectionRequest(section.getId(), "Warm-up", "Run", 1)));
+        freeTextTrainingService.update(created.id(), dated);
+        assertEquals(TrainingStatus.PLANNED, trainingRepository.findById(created.id()).orElseThrow().getStatus());
+        freeTextTrainingService.markCompleted(created.id());
+        var undated = new EditFreeTextTrainingRequest("Undated", null,
+                TrainingAssignmentType.GROUP, 1L, List.of(), dated.sections());
+        assertThrows(InvalidTrainingRequestException.class, () -> freeTextTrainingService.update(created.id(), undated));
+        assertThrows(DataIntegrityViolationException.class, () -> jdbcTemplate.update(
+                "UPDATE training_sessions SET training_date = NULL WHERE id = ?", created.id()));
+    }
+
+    @Test
+    void undatedTempoCannotBeCompletedOrHideExistingExecutionHistory() {
+        var rows = insertTrainingRows();
+        insertExecution(rows.participationId(), rows.segmentId(), rows.definitionId(), "NOT_COMPLETED");
+        var definitions = List.of(editDefinition(rows.definitionId(), "Plan", 1,
+                List.of(editSegment(rows.segmentId(), 1, 400, null)), List.of()));
+        var noDate = new EditTrainingRequest("Training", null, definitions);
+        assertThrows(InvalidTrainingRequestException.class,
+                () -> trainingUpdateService.updateTraining(rows.trainingId(), noDate));
+        jdbcTemplate.update("UPDATE training_segment_executions SET status = 'PENDING' WHERE participation_id = ?",
+                rows.participationId());
+        trainingUpdateService.updateTraining(rows.trainingId(), noDate);
+        assertEquals(TrainingStatus.PLANNED, trainingRepository.findById(rows.trainingId()).orElseThrow().getStatus());
+        assertTrue(athleteTrainingHistoryService.getHistory(1, null, null).isEmpty());
+        assertThrows(InvalidTrainingRequestException.class, () -> trainingCompletionService.completeTraining(
+                rows.trainingId(), new CompleteTrainingRequest(List.of(), List.of(), List.of())));
+        trainingUpdateService.updateTraining(rows.trainingId(),
+                new EditTrainingRequest("Training", LocalDate.parse("2026-03-04"), definitions));
+        assertEquals(TrainingStatus.PLANNED, trainingRepository.findById(rows.trainingId()).orElseThrow().getStatus());
+        trainingCompletionService.completeTraining(rows.trainingId(),
+                new CompleteTrainingRequest(List.of(), List.of(), List.of()));
+        assertEquals(TrainingStatus.COMPLETED, trainingRepository.findById(rows.trainingId()).orElseThrow().getStatus());
+    }
+
+    @Test
     void individualFreeTextAssignmentsExposeOnlySelectedAthletesAndRemainVisibleByIdOnlyToThem() {
         long oneAthleteTraining = createFreeTextTraining(
                 "One athlete", TrainingAssignmentType.ATHLETES, null, List.of(1L));
@@ -450,6 +495,19 @@ class TrainingDomainIntegrationTests {
         assertThrows(TrainingNotFoundException.class, () -> trainingDetailsService.getTraining(groupTraining));
         authenticate(athleteThreeUser, UserRole.ATHLETE, "group-athlete-three");
         assertEquals(List.of(), trainingQueryService.listTrainings(true, null));
+    }
+
+    @Test
+    void undatedFreeTextUsesExistingAthleteVisibilityAndNullFirstOrdering() {
+        long dated = createFreeTextTraining("Dated", TrainingAssignmentType.GROUP, 1L, List.of());
+        long undated = freeTextTrainingService.create(new CreateFreeTextTrainingRequest(
+                "Undated", null, TrainingAssignmentType.GROUP, 1L, List.of(),
+                List.of(new CreateTrainingSectionRequest("Section", "Content", 1)))).id();
+        long athlete = insertAthleteAccount(1, "undated-athlete");
+        authenticate(athlete, UserRole.ATHLETE, "undated-athlete");
+        assertEquals(List.of(undated, dated),
+                trainingQueryService.listTrainings(true, null).stream().map(item -> item.id()).toList());
+        assertEquals(TrainingStatus.PLANNED, trainingDetailsService.getTraining(undated).status());
     }
 
     @Test
@@ -551,11 +609,13 @@ class TrainingDomainIntegrationTests {
                     POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword());
                     var statement = connection.createStatement();
                     var result = statement.executeQuery(
-                            "SELECT training_group_id, assignment_type FROM " + schema
+                            "SELECT training_group_id, assignment_type, training_date, status FROM " + schema
                                     + ".training_sessions WHERE id = " + trainingId)) {
                 assertTrue(result.next());
                 assertEquals(groupId, result.getLong("training_group_id"));
                 assertEquals("GROUP", result.getString("assignment_type"));
+                assertEquals(LocalDate.parse("2026-03-05"), result.getObject("training_date", LocalDate.class));
+                assertEquals("PLANNED", result.getString("status"));
             }
         } finally {
             try (var connection = DriverManager.getConnection(

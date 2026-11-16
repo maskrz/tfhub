@@ -104,7 +104,7 @@ export interface TrainingImportDraft {
   trainingType: TrainingType;
   trainingGroup: { id: number; name: string };
   name: string;
-  trainingDate: string;
+  trainingDate: string | null;
   recognitionMetadata: Record<string, unknown>;
   recognitionReviewed: boolean;
   definitions: ImportDefinition[];
@@ -121,7 +121,7 @@ export interface TrainingImportDraft {
 
 export interface TrainingImportDraftUpdate {
   name: string;
-  trainingDate: string;
+  trainingDate: string | null;
   recognitionReviewed: boolean;
   definitions: {
     id: number | null;

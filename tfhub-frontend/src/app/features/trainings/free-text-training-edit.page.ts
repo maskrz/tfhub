@@ -69,7 +69,7 @@ export class FreeTextTrainingEditPage implements OnInit {
   readonly athletesLoading = signal(true);
   readonly form = new FormGroup({
     name: new FormControl('', { nonNullable: true, validators: [trimmedRequired, Validators.maxLength(255)] }),
-    trainingDate: new FormControl('', { nonNullable: true, validators: [Validators.required, validDate] }),
+    trainingDate: new FormControl('', { nonNullable: true, validators: [validDate] }),
     trainingGroupId: new FormControl<number | null>(null, Validators.required),
     athleteIds: new FormControl<number[]>({ value: [], disabled: true }, {
       nonNullable: true,
@@ -164,7 +164,7 @@ export class FreeTextTrainingEditPage implements OnInit {
     this.submitting.set(true);
     this.trainingsApi.updateFreeText(this.trainingId, {
       name: value.name.trim(),
-      trainingDate: value.trainingDate,
+      trainingDate: value.trainingDate || null,
       assignmentType: this.assignmentType(),
       trainingGroupId: this.assignmentType() === 'GROUP' ? value.trainingGroupId : null,
       athleteIds: this.assignmentType() === 'ATHLETES' ? value.athleteIds : [],
@@ -203,7 +203,11 @@ export class FreeTextTrainingEditPage implements OnInit {
       }
       this.training.set(training);
       this.form.controls.name.setValue(training.name);
-      this.form.controls.trainingDate.setValue(training.trainingDate);
+      this.form.controls.trainingDate.setValue(training.trainingDate ?? '');
+      if (training.status === 'COMPLETED') {
+        this.form.controls.trainingDate.addValidators(Validators.required);
+        this.form.controls.trainingDate.updateValueAndValidity();
+      }
       this.applyAssignmentType(training.assignmentType, false);
       this.form.controls.trainingGroupId.setValue(training.trainingGroup?.id ?? null);
       this.form.controls.athleteIds.setValue(training.assignedAthletes.map((athlete) => athlete.id));

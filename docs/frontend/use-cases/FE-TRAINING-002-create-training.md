@@ -88,7 +88,7 @@ Rules:
 
 Validate the form before submission:
 - Training name is required.
-- Date is required.
+- Date is optional; a supplied date must be valid.
 - For TEMPO and FREE_TEXT/GROUP, group is required.
 - For FREE_TEXT, assignment mode is required; GROUP requires a group and ATHLETES requires one or more active athletes.
 - Training type is required.

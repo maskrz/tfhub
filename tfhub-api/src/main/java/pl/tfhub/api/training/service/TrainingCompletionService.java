@@ -67,11 +67,16 @@ public class TrainingCompletionService {
 
     @Transactional
     public UpdateTrainingResponse completeTraining(long trainingId, CompleteTrainingRequest request) {
-        applyTrainingChanges(trainingId, request);
+        applyTrainingChanges(trainingId, request, true);
         return new UpdateTrainingResponse(trainingId);
     }
 
-    private void applyTrainingChanges(long trainingId, CompleteTrainingRequest request) {
+    @Transactional
+    public void addUndatedImportParticipations(long trainingId, CompleteTrainingRequest request) {
+        applyTrainingChanges(trainingId, request, false);
+    }
+
+    private void applyTrainingChanges(long trainingId, CompleteTrainingRequest request, boolean complete) {
         accessScopeService.requireCoachOrAdmin();
         if (trainingId <= 0) {
             throw new InvalidTrainingIdException();
@@ -86,6 +91,17 @@ public class TrainingCompletionService {
         if (request == null || request.add() == null || request.update() == null
                 || request.removeParticipationIds() == null) {
             throw new InvalidTrainingRequestException("Add, update, and removal collections are required");
+        }
+        if (complete && training.getTrainingDate() == null) {
+            throw new InvalidTrainingRequestException("A date is required to complete training");
+        }
+        if (!complete && (training.getTrainingDate() != null
+                || training.getStatus() != pl.tfhub.api.training.enums.TrainingStatus.PLANNED
+                || !request.update().isEmpty() || !request.removeParticipationIds().isEmpty()
+                || request.add().stream().anyMatch(add -> add == null || add.executionUpdates() == null
+                        || add.executionUpdates().stream().anyMatch(execution -> execution == null
+                                || execution.status() != TrainingExecutionStatus.PENDING)))) {
+            throw new InvalidTrainingRequestException("Undated imports may contain only pending executions");
         }
 
         List<TrainingDefinition> definitions =
@@ -115,7 +131,9 @@ public class TrainingCompletionService {
                 request, definitionsById, segments, segmentsById, participationsById, executionsById, executions,
                 training.getTrainingGroup().getId());
         applyPlan(training, plan, participationsById);
-        training.markCompleted();
+        if (complete) {
+            training.markCompleted();
+        }
     }
 
     private CompletionPlan validateAndPlan(

@@ -93,7 +93,7 @@ export class TrainingImportReviewPage implements OnInit {
   readonly dialogAction = signal<DialogAction | null>(null);
   readonly form = new FormGroup({
     name: new FormControl('', { nonNullable: true, validators: [nonBlank, Validators.maxLength(255)] }),
-    trainingDate: new FormControl('', { nonNullable: true, validators: Validators.required }),
+    trainingDate: new FormControl('', { nonNullable: true }),
     recognitionReviewed: new FormControl(false, { nonNullable: true }),
     definitions: new FormArray<DefinitionForm>([]),
     sections: new FormArray<SectionForm>([]),
@@ -483,6 +483,7 @@ export class TrainingImportReviewPage implements OnInit {
       ATHLETE_UNRESOLVED: 'Przypisz zawodnika lub pomiń wiersz.',
       ATHLETE_OUTSIDE_GROUP: 'Przypisany zawodnik nie należy już do wybranej grupy.',
       EXECUTIONS_INCOMPLETE: 'Uzupełnij dane wykonania dla każdego odcinka.',
+      TRAINING_DATE_REQUIRED: 'Podaj datę treningu dla wykonanych odcinków.',
     };
     return messages[code] ?? 'Sprawdź wskazane dane importu.';
   }
@@ -543,7 +544,7 @@ export class TrainingImportReviewPage implements OnInit {
       this.sections.push(this.sectionForm(section));
     }
     this.form.controls.name.setValue(draft.name);
-    this.form.controls.trainingDate.setValue(draft.trainingDate);
+    this.form.controls.trainingDate.setValue(draft.trainingDate ?? '');
     this.form.controls.recognitionReviewed.setValue(draft.recognitionReviewed);
     const controls = this.resettableControls();
     if (!this.initialized) {
@@ -643,7 +644,7 @@ export class TrainingImportReviewPage implements OnInit {
     const value = this.form.getRawValue();
     return {
       name: value.name.trim(),
-      trainingDate: value.trainingDate,
+      trainingDate: value.trainingDate || null,
       recognitionReviewed: value.recognitionReviewed,
       definitions: value.definitions.map((definition, definitionIndex) => {
         const sequences = this.sequenceNumbers(definition.segments.map((segment) => segment.originalSequence));

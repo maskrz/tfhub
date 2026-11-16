@@ -17,7 +17,7 @@ import pl.tfhub.api.trainingimport.enums.TrainingImportAthleteMatchStatus;
 
 public record TrainingImportDraftUpdateRequest(
 		@NotBlank @Size(max = 255) String name,
-		@NotNull LocalDate trainingDate,
+		LocalDate trainingDate,
 		boolean recognitionReviewed,
 		@NotNull List<@Valid Definition> definitions,
 		List<@Valid Section> sections) {

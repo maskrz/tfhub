@@ -126,7 +126,7 @@ export class TrainingCreatePage implements OnInit {
     }),
     trainingDate: new FormControl('', {
       nonNullable: true,
-      validators: [Validators.required, validDate],
+      validators: [validDate],
     }),
     trainingGroupId: new FormControl<number | null>(null, Validators.required),
     athleteIds: new FormControl<number[]>({ value: [], disabled: true }, {
@@ -333,7 +333,7 @@ export class TrainingCreatePage implements OnInit {
     }));
     return {
       name: value.name.trim(),
-      trainingDate: value.trainingDate,
+      trainingDate: value.trainingDate || null,
       trainingGroupId: value.trainingGroupId!,
       definitions,
     };
@@ -348,7 +348,7 @@ export class TrainingCreatePage implements OnInit {
     }));
     return {
       name: value.name.trim(),
-      trainingDate: value.trainingDate,
+      trainingDate: value.trainingDate || null,
       assignmentType: this.assignmentType(),
       trainingGroupId: this.assignmentType() === 'GROUP' ? value.trainingGroupId : null,
       athleteIds: this.assignmentType() === 'ATHLETES' ? value.athleteIds : [],

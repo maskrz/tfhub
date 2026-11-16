@@ -20,7 +20,7 @@ For `FREE_TEXT` trainings, the same authorized service boundary supports editing
 ### 3.1 Training Session
 
 - The training name and date may be changed.
-- The training must retain a non-empty name and valid date.
+- The training must retain a non-empty name. A date is optional for planned sessions, but cannot be cleared from a completed session or from a TEMPO session with non-PENDING executions. Adding a date does not change status.
 - TEMPO group assignment is immutable and is not accepted as an editable request field.
 - Training status does not restrict editing; completed training plans can still be corrected.
 - The operation does not edit athlete assignments or execution status, results, or spike usage.
@@ -69,12 +69,13 @@ For `FREE_TEXT` trainings, the same authorized service boundary supports editing
 - FREE_TEXT assignment may be changed between GROUP and ATHLETES or updated within the current mode. Exactly one group or one or more active athlete IDs must be supplied, never both.
 - In ATHLETES mode, only active athletes may be selected. A coach must have current group access to every selected athlete.
 - Assignment replacement is atomic with the section update; changing assignment does not create TEMPO participation or execution records.
-- An authorized user can mark a planned FREE_TEXT training completed through `PATCH /api/trainings/{trainingId}/complete`; this does not add athlete participation or change the training's type.
+- An authorized user can mark a dated planned FREE_TEXT training completed through `PATCH /api/trainings/{trainingId}/complete`; this does not add athlete participation or change the training's type.
 
 ## 4. API Contract
 
 - **Method and path:** `PUT /api/trainings/{trainingId}`
 - **Request:** training `name`, `trainingDate`, and the complete ordered `definitions` collection. Each definition contains nullable `id`, `name`, `sequenceNumber`, and `segments`; each segment contains nullable `id`, `sequenceNumber`, `distanceM`, and nullable `restAfterSeconds`.
+- `trainingDate` may be null or omitted only when the session is planned and has no non-PENDING executions.
 - The TEMPO request has no `trainingGroupId`, athlete assignments, or execution records. These values cannot be changed through this endpoint.
 - A null definition or segment ID identifies a new item. Existing IDs identify retained items and must belong to this training/definition.
 - **Response:** at least the updated training `id`.

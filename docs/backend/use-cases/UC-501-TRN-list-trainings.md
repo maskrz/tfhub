@@ -54,7 +54,7 @@ The operation must enforce role-based access and training group visibility rules
 
 ### 4.4 Training Status
 
-- A session created directly through UC-502 has status `PLANNED`; acceptance of an import through UC-509 creates a `COMPLETED` session.
+- A session created directly through UC-502 has status `PLANNED`; acceptance of a dated import creates a `COMPLETED` session and acceptance of an undated import creates a `PLANNED` session.
 - The first successful UC-510 completion save changes its status to `COMPLETED`, even if some execution values remain `PENDING`.
 - Completed sessions remain editable and can be corrected by authorized users.
 - Only planned sessions are included by default. Completed sessions are included only when the caller explicitly sets `includeCompleted=true`.
@@ -96,10 +96,11 @@ The response includes the session's status in addition to the identifying and su
 - When `includeCompleted=true`, return both `PLANNED` and `COMPLETED` sessions.
 - When `trainingType` is omitted, return both types; when provided, return only matching records.
 - The response item includes `status` and `trainingType` so clients can filter or label it.
+- The `trainingDate` response field may be null for planned sessions; clients must handle null.
 
 ## 7. Sorting
 
-- Training sessions must be sorted by training date, newest first.
+- Undated training sessions precede dated sessions; dated sessions are sorted by training date, newest first.
 - Training sessions with the same date must have a deterministic secondary ordering.
 - Sorting must be applied consistently by the backend.
 
@@ -159,7 +160,7 @@ If the user has no sessions matching the requested status, the operation returns
 7. The participant count includes all participants assigned to the training session, including athletes who have since changed their current group.
 8. Completed training sessions are excluded by default and included only when `includeCompleted=true`.
 9. Training import drafts and pending OCR imports are excluded.
-10. Training sessions are sorted by date, newest first, with deterministic ordering for equal dates.
+10. Undated sessions appear first; dated sessions are sorted newest first, with deterministic ordering for equal dates.
 11. No duplicate training sessions are returned.
 12. Each returned item includes its status and type; the optional type filter returns only the selected type, while omission returns both.
 13. An empty collection is returned when no sessions match the requested status and type.

@@ -10,7 +10,7 @@ export type TrainingAssignmentType = 'GROUP' | 'ATHLETES';
 export interface TrainingListItem {
   id: number;
   name: string;
-  trainingDate: string;
+  trainingDate: string | null;
   trainingGroup: TrainingGroupSummary | null;
   definitionCount: number;
   participantCount: number;
@@ -34,7 +34,7 @@ export interface CreateTrainingDefinitionRequest {
 
 export interface CreateTrainingRequest {
   name: string;
-  trainingDate: string;
+  trainingDate: string | null;
   trainingGroupId: number;
   definitions: CreateTrainingDefinitionRequest[];
 }
@@ -51,7 +51,7 @@ export interface EditTrainingSectionRequest extends CreateTrainingSectionRequest
 
 export interface CreateFreeTextTrainingRequest {
   name: string;
-  trainingDate: string;
+  trainingDate: string | null;
   assignmentType: TrainingAssignmentType;
   trainingGroupId: number | null;
   athleteIds: number[];
@@ -60,7 +60,7 @@ export interface CreateFreeTextTrainingRequest {
 
 export interface EditFreeTextTrainingRequest {
   name: string;
-  trainingDate: string;
+  trainingDate: string | null;
   assignmentType: TrainingAssignmentType;
   trainingGroupId: number | null;
   athleteIds: number[];
@@ -125,7 +125,7 @@ export interface TrainingAssignedAthlete {
 export interface TrainingDetails {
   id: number;
   name: string;
-  trainingDate: string;
+  trainingDate: string | null;
   status: TrainingStatus;
   trainingGroup: TrainingGroupSummary | null;
   assignmentType: TrainingAssignmentType;
@@ -158,7 +158,7 @@ export interface EditTrainingDefinitionRequest {
 
 export interface EditTrainingRequest {
   name: string;
-  trainingDate: string;
+  trainingDate: string | null;
   definitions: EditTrainingDefinitionRequest[];
 }
 

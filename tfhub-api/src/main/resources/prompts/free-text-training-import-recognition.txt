@@ -10,6 +10,8 @@ Extract:
 - Recognized training group name, if visible.
 - Ordered training sections and their content.
 
+The date may be absent. Return trainingDate.value=null when no date is visible; if date-like text is unreadable, preserve it in originalText and mark it uncertain. Never invent a date.
+
 The paper may contain no section headings and may show only a sequential list of exercises. Preserve the original order of all recognized content.
 
 ## Training name recognition

@@ -13,7 +13,7 @@ import tools.jackson.databind.annotation.JsonDeserialize;
 
 public record CreateTrainingRequest(
         @NotBlank @Size(max = 255) String name,
-        @NotNull LocalDate trainingDate,
+        LocalDate trainingDate,
         @NotNull @Positive @JsonDeserialize(using = StrictLongDeserializer.class) Long trainingGroupId,
         @NotEmpty List<@NotNull @Valid CreateTrainingDefinitionRequest> definitions) {
 

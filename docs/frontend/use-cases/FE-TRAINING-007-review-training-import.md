@@ -44,6 +44,7 @@ For FREE_TEXT imports, show editable section titles/content in order, allow sect
 - Use the backend's draft validation result to show whether the draft is ready for acceptance and which issues remain.
 - Preserve user edits when saving fails and display field-level or general errors using existing TFHUB patterns.
 - Save the current draft atomically. Do not present or create per-edit history or draft versions.
+- Permit an empty date and show preserved uncertain date text. Explain that matched non-PENDING TEMPO executions require a date before acceptance.
 - The optimized JPEG remains available for comparison and is not changed by review.
 
 ## 6. UI, Loading, and Error Handling

@@ -49,9 +49,13 @@
               <label [class.needs-review]="form.controls.trainingDate.invalid || (needsTrainingReview() && isUncertain(fieldMetadata(current.recognitionMetadata, 'trainingDate')))">
                 Data treningu
                 <span class="input-with-reset">
-                  <input class="field-control" type="date" formControlName="trainingDate" required />
+                  <input class="field-control" type="date" formControlName="trainingDate" />
                   @if (changed(form.controls.trainingDate)) { <button type="button" class="reset-button" aria-label="Przywróć datę treningu" title="Przywróć wartość z początku weryfikacji" (click)="reset(form.controls.trainingDate)">↶</button> }
                 </span>
+                @if (metadataText(fieldMetadata(current.recognitionMetadata, 'trainingDate'), 'originalText'); as originalDate) {
+                  <span>Rozpoznany tekst: {{ originalDate }}</span>
+                }
+                <span>Data jest opcjonalna, chyba że zawarto wykonane odcinki.</span>
               </label>
             </div>
             <span class="status-badge">Do weryfikacji</span>

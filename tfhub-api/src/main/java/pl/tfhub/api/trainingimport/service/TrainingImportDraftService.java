@@ -213,7 +213,8 @@ public class TrainingImportDraftService {
 		TrainingImportDraftResponse response = toResponse(draft, updated, trainingImport);
 		if (response.validation().issues().stream().anyMatch(issue ->
 				!issue.code().equals("SEGMENT_DISTANCE_UNRESOLVED")
-						&& !issue.code().equals("SEGMENT_DISTANCE_REVIEW_REQUIRED"))) {
+						&& !issue.code().equals("SEGMENT_DISTANCE_REVIEW_REQUIRED")
+						&& !issue.code().equals("TRAINING_DATE_REQUIRED"))) {
 			throw new InvalidTrainingImportDraftException(
 					"Training import draft contains unresolved validation issues");
 		}
@@ -473,6 +474,12 @@ public class TrainingImportDraftService {
 								+ "/executions/" + execution.getSegment().getSequenceNumber(),
 						"Spike usage must be confirmed"));
 			}
+			if (draft.getTrainingDate() == null
+					&& execution.getAthleteRow().getMatchStatus() == TrainingImportAthleteMatchStatus.MATCHED
+					&& execution.getStatus() != TrainingExecutionStatus.PENDING) {
+				issues.add(issue("TRAINING_DATE_REQUIRED", "trainingDate",
+						"A training date is required for completed execution data"));
+			}
 		}
 		for (TrainingImportDraftAthleteRow row : data.athleteRows()) {
 			if (row.getMatchStatus() == TrainingImportAthleteMatchStatus.UNRESOLVED) {
@@ -501,9 +508,9 @@ public class TrainingImportDraftService {
 			TrainingImportDraft draft,
 			TrainingImportDraftUpdateRequest request) {
 		if (request == null || request.name() == null || request.name().isBlank()
-				|| request.name().length() > 255 || request.trainingDate() == null
+				|| request.name().length() > 255
 				|| request.sections() == null || request.sections().isEmpty()) {
-			throw invalid("Training name, date, and at least one section are required");
+			throw invalid("Training name and at least one section are required");
 		}
 		if (request.definitions() == null || !request.definitions().isEmpty()) {
 			throw invalid("FREE_TEXT drafts cannot contain tempo definitions");
@@ -569,8 +576,8 @@ public class TrainingImportDraftService {
 			TrainingImportDraftUpdateRequest request,
 			DraftData existing) {
 		if (request == null || request.name() == null || request.name().isBlank()
-				|| request.name().length() > 255 || request.trainingDate() == null) {
-			throw invalid("Training name and date are required");
+				|| request.name().length() > 255) {
+			throw invalid("Training name is required");
 		}
 		if (request.definitions() == null || request.definitions().isEmpty()) {
 			throw invalid("At least one training definition is required");

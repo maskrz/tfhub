@@ -16,6 +16,7 @@ Display complete training details, including type, immutable training group and 
 1. The user opens a training from the list.
 2. The frontend retrieves complete details using UC-504.
 3. The view displays training name, date, type, status and assignment, then either ordered TEMPO definitions/segments and executions or ordered FREE_TEXT sections. ATHLETES-mode FREE_TEXT has no group.
+   An undated plan displays `Bez daty`; staff must add a date before completing it.
 4. TEMPO users may select **Edytuj trening** (FE-TRAINING-003) or **Uzupełnij trening** (FE-TRAINING-009). FREE_TEXT users may edit sections and mark a planned training completed through `PATCH /api/trainings/{trainingId}/complete`.
 5. Planned and completed trainings remain editable by authorized users. They can permanently delete the training from this view (FE-TRAINING-005).
 

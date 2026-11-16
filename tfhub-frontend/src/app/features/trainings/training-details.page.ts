@@ -65,7 +65,7 @@ export class TrainingDetailsPage implements OnInit {
 
   completeFreeTextTraining(): void {
     const training = this.training();
-    if (!training || training.trainingType !== 'FREE_TEXT' || training.status !== 'PLANNED' || this.completing()) return;
+    if (!training || !training.trainingDate || training.trainingType !== 'FREE_TEXT' || training.status !== 'PLANNED' || this.completing()) return;
     this.completing.set(true);
     this.actionError.set(null);
     this.trainingsApi.completeFreeText(training.id).pipe(
@@ -85,7 +85,8 @@ export class TrainingDetailsPage implements OnInit {
     void this.router.navigate(['/trainings']);
   }
 
-  formatDate(date: string): string {
+  formatDate(date: string | null): string {
+    if (!date) return 'Bez daty';
     const [year, month, day] = date.split('-').map(Number);
     return new Intl.DateTimeFormat('pl-PL').format(new Date(year, month - 1, day));
   }

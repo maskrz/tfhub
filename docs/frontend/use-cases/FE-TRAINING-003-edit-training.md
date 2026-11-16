@@ -51,7 +51,7 @@ Athlete assignments, execution status, results and spike usage are not editable 
 
 ## 6. Validation and Submission
 
-- Validate required training name/date, non-empty definitions and segments, non-empty definition names, positive integer distances and valid rest values.
+- Validate the required training name, any supplied date, non-empty definitions and segments, non-empty definition names, positive integer distances and valid rest values. Completed sessions and TEMPO sessions with non-PENDING executions must retain their dates.
 - Accept rest as minutes (for example `4` or `1,5`), seconds (`45s`) or mixed values (`4m 10s`); send seconds to the API.
 - Do not send group, participation or execution fields in the TEMPO UC-503 request. Send exactly the chosen group or athlete IDs in the FREE_TEXT request.
 - Prevent duplicate submissions.

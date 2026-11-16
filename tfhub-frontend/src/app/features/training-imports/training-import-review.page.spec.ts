@@ -98,6 +98,21 @@ describe('TrainingImportReviewPage', () => {
     expect(request.definitions[0].athleteRows[0].athleteId).toBe(4);
   });
 
+  it('displays the unreadable date and saves an undated draft', async () => {
+    const undated = structuredClone(draft);
+    undated.trainingDate = null;
+    undated.recognitionMetadata = { uncertain: false, fields: {
+      trainingDate: { uncertain: true, originalText: '??.11' },
+    } };
+    undated.definitions[0].segments[0].distanceM = 400;
+    undated.definitions[0].segments[0].recognitionMetadata = {};
+    await createPage(undated);
+    expect(fixture.nativeElement.textContent).toContain('??.11');
+    expect((fixture.nativeElement.querySelector('input[formControlName=trainingDate]') as HTMLInputElement).value).toBe('');
+    fixture.componentInstance.save();
+    expect(api.updateDraft.mock.calls[0][1].trainingDate).toBeNull();
+  });
+
   it('highlights missing rest until the coach confirms it and saves the empty value', async () => {
     const missingRest = structuredClone(draft);
     missingRest.definitions[0].segments[0].distanceM = 400;

@@ -22,7 +22,7 @@ The operation must enforce role-based access and training group assignment rules
 ### 4.1 Training Session
 
 - A training session must have a non-empty name.
-- A training session must have a valid training date.
+- A training date is optional; when supplied it must be valid.
 - TEMPO sessions must belong to exactly one training group.
 - FREE_TEXT sessions use exactly one of two assignment modes: one group (`GROUP`) or one or more individual athletes (`ATHLETES`).
 - The selected assignment mode is required during creation.
@@ -67,7 +67,7 @@ The operation must enforce role-based access and training group assignment rules
 
 ### 4.6 FREE_TEXT Training
 
-- A FREE_TEXT training has a non-empty name, valid date, and at least one ordered section.
+- A FREE_TEXT training has a non-empty name, optional date, and at least one ordered section.
 - In `GROUP` mode it has exactly one group and no athlete targets. In `ATHLETES` mode it has one or more active athlete targets and no group.
 - Each section has a user-editable non-empty title and content and a unique positive sequence number.
 - FREE_TEXT creation does not create definitions, athlete participations or execution data.
@@ -90,7 +90,7 @@ The operation must enforce role-based access and training group assignment rules
 - **ATHLETES mode has no targets, includes inactive/non-existing athletes, or includes duplicate IDs:** creation is rejected.
 - **COACH selects an athlete whose current group is not assigned to them:** creation is rejected.
 - **Missing or blank training name:** creation is rejected.
-- **Missing or invalid training date:** creation is rejected.
+- **Invalid training date:** creation is rejected.
 - **No training definitions supplied:** creation is rejected.
 - **FREE_TEXT training without sections or with blank section title/content:** creation is rejected.
 - **Training definition with blank name:** creation is rejected.

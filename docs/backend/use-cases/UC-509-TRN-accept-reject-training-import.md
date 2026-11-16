@@ -38,15 +38,15 @@ Rejection must preserve the import, its current draft, processing attempts and o
 - An athlete may participate in only one training definition within the created training session.
 - Training definitions and segments must preserve their reviewed order.
 - Execution status, measured results and spike usage must preserve the values confirmed during review.
-- The created training session must have status `COMPLETED`, even if some executions remain `PENDING`.
-- An accepted `FREE_TEXT` training is also created with status `COMPLETED`; normal manually created FREE_TEXT trainings may remain planned until completed later.
+- A dated import creates a `COMPLETED` session, even if some executions remain `PENDING`. An undated import creates a `PLANNED` session.
+- Undated TEMPO acceptance preserves matched participations and PENDING executions. Any non-PENDING execution in a matched row requires a date; skipped rows are not imported.
 - The created training session must retain the immutable group selected during upload.
 - The import must transition to ACCEPTED only after the complete training session and its related data have been successfully persisted.
 
 ### 4.2 Acceptance Validation
 
 - The complete draft must be validated again during acceptance.
-- The draft must contain a non-empty training name and valid date.
+- The draft must contain a non-empty training name and, when supplied, a valid date.
 - The import must reference the existing training group selected during upload; the group is immutable.
 - The requesting user must still be authorized for the selected group.
 - The draft must contain at least one training definition.
@@ -116,7 +116,7 @@ Rejection must preserve the import, its current draft, processing attempts and o
 - **Draft is missing or invalid:** acceptance is rejected.
 - **Training group does not exist:** acceptance is rejected.
 - **COACH is no longer assigned to the selected group:** acceptance or rejection is rejected.
-- **Training name or date is invalid:** acceptance is rejected.
+- **Training name or supplied date is invalid, or matched non-PENDING execution data lacks a date:** acceptance is rejected.
 - **No valid training definitions exist:** acceptance is rejected.
 - **Training definition has no segments:** acceptance is rejected.
 - **Invalid segment distance or ordering:** acceptance is rejected.
@@ -198,7 +198,7 @@ Use `POST /api/training-imports/{importId}/reject`.
 7. All athlete rows must be matched or explicitly skipped before acceptance.
 8. Only existing athletes belonging to the selected group can be persisted as participants.
 9. Skipped athlete rows do not create athlete participations or execution records.
-10. Acceptance creates exactly one training session with status `COMPLETED`.
+10. Acceptance creates exactly one training session, `COMPLETED` if dated and `PLANNED` if undated.
 11. A TEMPO session contains the reviewed definitions, segments, participants and execution data; a FREE_TEXT session contains its ordered sections and no athlete records. TEMPO participation and execution changes after creation use UC-510.
 12. Execution statuses, measured results and spike usage are preserved.
 13. The import transitions to ACCEPTED only after successful creation of all training data.

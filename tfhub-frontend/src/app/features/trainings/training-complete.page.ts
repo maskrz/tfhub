@@ -231,7 +231,7 @@ export class TrainingCompletePage implements OnInit, OnDestroy {
   }
 
   submit(): void {
-    if (this.submitting() || !this.training()) return;
+    if (this.submitting() || !this.training()?.trainingDate) return;
     this.attemptedSubmit.set(true);
     this.errorMessage.set(null);
     this.dismissSuccessMessage();
@@ -281,6 +281,10 @@ export class TrainingCompletePage implements OnInit, OnDestroy {
     ).subscribe((training) => {
       if (training.trainingType !== 'TEMPO' || !training.trainingGroup) {
         this.loadError.set('Ten trening nie może być uzupełniony.');
+        return;
+      }
+      if (!training.trainingDate) {
+        this.loadError.set('Dodaj datę treningu przed jego uzupełnieniem.');
         return;
       }
       this.training.set(training);

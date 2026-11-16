@@ -5,7 +5,7 @@
 
 ## 1. Design decisions
 
-- A `Training` is one dated session. TEMPO is assigned to exactly one existing `TrainingGroup`; FREE_TEXT is assigned either to one group or directly to one or more athletes.
+- A `Training` is one session, optionally undated while planned. TEMPO is assigned to exactly one existing `TrainingGroup`; FREE_TEXT is assigned either to one group or directly to one or more athletes.
 - `Training` is the shared root for `TEMPO` and `FREE_TEXT` sessions. Its `training_type` is immutable after creation.
 - `TEMPO` keeps its existing group assignment, definitions, segments, athlete participations and execution records. `FREE_TEXT` has ordered text sections and no athlete participations or executions.
 - FREE_TEXT group assignment uses current athlete membership for visibility. Direct athlete assignment is mutually exclusive with group assignment.
@@ -32,12 +32,12 @@ One persisted training event.
 | `id` | `BIGINT` identity | No | Primary key |
 | `training_group_id` | `BIGINT` | Yes | FK to `training_groups.id`; required for TEMPO and FREE_TEXT/GROUP |
 | `name` | `VARCHAR` | No | Training name |
-| `training_date` | `DATE` | No | Calendar date |
+| `training_date` | `DATE` | Yes | Calendar date; required for completed sessions |
 | `status` | `VARCHAR(20)` | No | `PLANNED` or `COMPLETED`; defaults to `PLANNED` |
 | `training_type` | `VARCHAR(20)` | No | `TEMPO` or `FREE_TEXT`; existing sessions default to `TEMPO` |
 | `assignment_type` | `VARCHAR(20)` | No | `GROUP` or `ATHLETES`; existing sessions default to `GROUP` |
 
-Use `ON DELETE RESTRICT` / `ON UPDATE RESTRICT` for the group FK. Constrain status to `PLANNED` or `COMPLETED`. Do not add creator-based access. TEMPO remains group-assigned and its group remains immutable. FREE_TEXT edits may switch assignment modes or replace the selected group/athletes. Row checks enforce the valid `training_type`/`assignment_type`/group combinations; transactional service validation enforces non-empty athlete targets and mode-consistent association rows.
+Use `ON DELETE RESTRICT` / `ON UPDATE RESTRICT` for the group FK. Constrain status to `PLANNED` or `COMPLETED` and require a date for `COMPLETED`. Do not add creator-based access. TEMPO remains group-assigned and its group remains immutable. FREE_TEXT edits may switch assignment modes or replace the selected group/athletes. Row checks enforce the valid `training_type`/`assignment_type`/group combinations; transactional service validation enforces non-empty athlete targets and mode-consistent association rows.
 
 The training type is immutable. Tempo-specific operations must reject FREE_TEXT sessions; free-text operations must reject TEMPO sessions. The existing tempo tables, their IDs and all their foreign keys remain unchanged. V16 backfills existing sessions as `GROUP`, retaining every existing group reference.
 
@@ -206,7 +206,7 @@ The single current editable draft per import.
 | `import_id` | `BIGINT` | No | Unique FK to import |
 | `generated_by_attempt_id` | `BIGINT` | No | FK to successful attempt |
 | `name` | `VARCHAR` | No | Correctable training name |
-| `training_date` | `DATE` | No | Correctable date |
+| `training_date` | `DATE` | Yes | Correctable date |
 | `recognition_metadata` | `JSONB` | No | OCR confidence/uncertainty metadata |
 
 No draft revision, rollback, or snapshot table is used.
@@ -352,7 +352,7 @@ Acceptance locks the import, then revalidates the draft, current coach-group aut
 1. Create one `training_session` using the immutable import group.
 2. Create definitions, segments, matched participations, and executions.
 3. Omit skipped rows from persisted training data.
-4. Mark the training `COMPLETED` and set the import's accepted-session link and `ACCEPTED` status.
+4. Mark a dated training `COMPLETED`; leave an undated training `PLANNED`. Set the import's accepted-session link and `ACCEPTED` status.
 
 Any failure rolls back the session and all children and leaves the import unaccepted. Rejection changes status only and retains the optimized image, current draft, and processing attempts. Keep one current draft per import; do not add draft revisions, a review-edit audit log, or a separate review-history model.
 
@@ -362,7 +362,7 @@ Any failure rolls back the session and all children and leaves the import unacce
 - The retained source is the optimized JPEG. The original upload bytes are not retained.
 - Processing attempts retain the raw model response when one is returned; the response is not exposed to clients and is excluded from logs unless Gemini diagnostic logging is explicitly enabled.
 - Each import has one current editable draft and its processing-attempt records. User edits do not create draft versions or an audit trail.
-- Acceptance creates a `COMPLETED` training session, even if some executions are `PENDING`. The persisted training lifecycle uses `PLANNED` and `COMPLETED`, not the legacy `active` flag.
+- Acceptance creates a `COMPLETED` session when dated and a `PLANNED` session when undated. Undated TEMPO sessions can retain only PENDING executions. The persisted training lifecycle uses `PLANNED` and `COMPLETED`, not the legacy `active` flag.
 - Existing training groups have no lifecycle field; selecting an existing group does not include an active/inactive check.
 - Plan editing and participation/execution completion remain separate operations; import acceptance is the explicit atomic path that creates both.
 - Training measured results use seconds, `NUMERIC(12,3)`, and the nonnegative rule; they do not reuse the positive-only test-result rule.

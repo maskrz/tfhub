@@ -40,7 +40,7 @@ public class TrainingImportDraft {
 	@Column(nullable = false, length = 255)
 	private String name;
 
-	@Column(name = "training_date", nullable = false)
+	@Column(name = "training_date")
 	private LocalDate trainingDate;
 
 	@JdbcTypeCode(SqlTypes.JSON)
@@ -67,7 +67,7 @@ public class TrainingImportDraft {
 			throw new IllegalArgumentException("Training name must not be blank");
 		}
 		this.name = name.strip();
-		this.trainingDate = Objects.requireNonNull(trainingDate);
+		this.trainingDate = trainingDate;
 	}
 
 	public void setRecognitionMetadata(Map<String, Object> recognitionMetadata) {

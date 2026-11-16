@@ -69,14 +69,19 @@ export class TrainingsPage implements OnInit {
         if (trainingType && training.trainingType !== trainingType) return false;
         if (groupIds.length > 0
           && (!training.trainingGroup || !groupIds.includes(training.trainingGroup.id))) return false;
-        if (dateFrom && training.trainingDate < dateFrom) return false;
-        if (dateTo && training.trainingDate > dateTo) return false;
+        if ((dateFrom || dateTo) && !training.trainingDate) return false;
+        if (dateFrom && training.trainingDate && training.trainingDate < dateFrom) return false;
+        if (dateTo && training.trainingDate && training.trainingDate > dateTo) return false;
         const searchable = `${training.name} ${training.trainingGroup?.name ?? 'indywidualny'}`
           .toLocaleLowerCase('pl');
         return terms.every((term) => searchable.includes(term));
       })
       .sort((left, right) => {
         if (this.sortColumn() === 'date') {
+          if (!left.trainingDate || !right.trainingDate) {
+            if (!left.trainingDate && !right.trainingDate) return (left.id - right.id) * direction;
+            return !left.trainingDate ? -1 : 1;
+          }
           const dateComparison = left.trainingDate.localeCompare(right.trainingDate);
           return dateComparison === 0
             ? (left.id - right.id) * direction
@@ -300,7 +305,8 @@ export class TrainingsPage implements OnInit {
     this.successMessage.set('Trening został trwale usunięty.');
   }
 
-  formatDate(date: string): string {
+  formatDate(date: string | null): string {
+    if (!date) return 'Bez daty';
     const [year, month, day] = date.split('-').map(Number);
     return new Intl.DateTimeFormat('pl-PL').format(new Date(year, month - 1, day));
   }

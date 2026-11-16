@@ -42,6 +42,7 @@ Reviewing or modifying a draft must not create or modify persisted training sess
 - The draft must preserve the relationship between definitions, segments, athletes and execution data.
 - The review operation must not modify the optimized JPEG or persisted training data.
 - The immutable import type determines the draft shape. A `FREE_TEXT` draft contains ordered sections and no definitions, athlete rows or executions; a `TEMPO` draft follows the existing definition/athlete review flow.
+- A draft may be saved without a date. For TEMPO, a matched row with a non-PENDING execution prevents acceptance until a date is provided; skipped rows do not.
 
 ### 4.1.1 FREE_TEXT Sections
 
@@ -127,7 +128,7 @@ The corrected draft must satisfy the plan rules defined in UC-502 and the athlet
 ### 4.7 Draft Validation
 
 - All corrected data must be validated before it can be considered ready for acceptance.
-- The draft must contain a valid training name and date.
+- The draft must contain a valid training name and may omit its date, subject to the matched-execution readiness rule above.
 - The draft must retain the single existing training group selected at upload; the group is read-only and cannot be changed in the draft.
 - The draft must contain at least one valid training definition.
 - Every definition must contain at least one valid segment.
@@ -168,7 +169,7 @@ The corrected draft must satisfy the plan rules defined in UC-502 and the athlet
 - **COACH is not currently assigned to the import's group:** the operation returns the same not-found response as for a nonexistent import.
 - **Import is not in REVIEW_REQUIRED state:** draft modification is rejected.
 - **Missing or blank training name:** modification is rejected.
-- **Missing or invalid training date:** modification is rejected.
+- **Invalid supplied training date:** modification is rejected.
 - **Athlete does not belong to the selected group:** the assignment is rejected.
 - **Athlete does not exist:** the assignment is rejected.
 - **Athlete is assigned more than once within the same training session:** modification is rejected.

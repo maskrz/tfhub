@@ -51,7 +51,9 @@
             ? ['/trainings', currentTraining.id, 'edit']
             : ['/trainings', currentTraining.id, 'free-text', 'edit']"
         >Edytuj trening</a>
-        @if (currentTraining.trainingType === 'TEMPO') {
+        @if (!currentTraining.trainingDate) {
+          <p>Dodaj datę treningu przed jego uzupełnieniem lub zakończeniem.</p>
+        } @else if (currentTraining.trainingType === 'TEMPO') {
           <a class="button button--primary" [routerLink]="['/trainings', currentTraining.id, 'complete']">
             Uzupełnij trening
           </a>

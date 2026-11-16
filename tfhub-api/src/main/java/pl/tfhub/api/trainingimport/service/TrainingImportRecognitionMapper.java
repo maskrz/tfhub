@@ -49,12 +49,12 @@ public class TrainingImportRecognitionMapper {
 			String candidateText,
 			long trainingGroupId,
 			TrainingType trainingType) {
-		TrainingImportRecognitionData recognized = parse(candidateText);
+		TrainingImportRecognitionData recognized = normalizeDate(parse(candidateText));
 		if (trainingType == TrainingType.FREE_TEXT) {
 			return mapFreeText(recognized);
 		}
 		validateHeader(recognized);
-		LocalDate trainingDate = LocalDate.parse(recognized.trainingDate().value());
+		LocalDate trainingDate = parseDate(recognized.trainingDate());
 		List<ImportCandidate> groupAthletes = athleteService.findImportCandidates(trainingGroupId);
 		Map<TrainingImportRecognitionData.AthleteRow, TrainingImportAthleteMatcher.Match> matches =
 				new IdentityHashMap<>();
@@ -184,7 +184,7 @@ public class TrainingImportRecognitionMapper {
 
 		return new TrainingImportRecognizedDraft(
 				TrainingType.TEMPO,
-				nameOrDefault(recognized.name(), "Trening " + trainingDate.format(DEFAULT_NAME_DATE_FORMAT)),
+				nameOrDefault(recognized.name(), defaultTrainingName(trainingDate)),
 				trainingDate,
 				Map.copyOf(rootMetadata),
 				List.copyOf(definitions),
@@ -192,15 +192,12 @@ public class TrainingImportRecognitionMapper {
 	}
 
 	private TrainingImportRecognizedDraft mapFreeText(TrainingImportRecognitionData recognized) {
-		if (recognized == null || recognized.trainingDate() == null) {
+		if (recognized == null) {
 			throw invalid("The model response is missing required training information");
 		}
-		requireField(recognized.trainingDate(), "training date");
-		LocalDate trainingDate;
-		try {
-			trainingDate = LocalDate.parse(recognized.trainingDate().value());
-		} catch (RuntimeException exception) {
-			throw invalid("The recognized training date is invalid");
+		LocalDate trainingDate = parseDate(recognized.trainingDate());
+		if (trainingDate != null) {
+			requireField(recognized.trainingDate(), "training date");
 		}
 		validateName(recognized.name(), "training name");
 
@@ -252,7 +249,7 @@ public class TrainingImportRecognitionMapper {
 		putIfPresent(rootMetadata, "recognizedGroupName", recognized.recognizedGroupName());
 		return new TrainingImportRecognizedDraft(
 				TrainingType.FREE_TEXT,
-				nameOrDefault(recognized.name(), "Trening " + trainingDate.format(DEFAULT_NAME_DATE_FORMAT)),
+				nameOrDefault(recognized.name(), defaultTrainingName(trainingDate)),
 				trainingDate,
 				Map.copyOf(rootMetadata),
 				List.of(),
@@ -278,11 +275,48 @@ public class TrainingImportRecognitionMapper {
 		}
 		try {
 			JsonNode root = objectMapper.readTree(candidateText);
+			if (root instanceof ObjectNode rootObject) {
+				normalizeSegmentField(rootObject, "trainingDate");
+			}
 			normalizeSegmentFields(root);
 			return objectMapper.treeToValue(root, TrainingImportRecognitionData.class);
 		} catch (JacksonException | IllegalArgumentException exception) {
 			throw invalid("The model response did not match the expected training data structure");
 		}
+	}
+
+	private TrainingImportRecognitionData normalizeDate(TrainingImportRecognitionData recognized) {
+		if (recognized == null) {
+			return null;
+		}
+		var date = recognized.trainingDate();
+		if (date != null && date.value() != null && !date.value().isBlank()) {
+			try {
+				LocalDate.parse(date.value());
+				return recognized;
+			} catch (java.time.format.DateTimeParseException exception) {
+				date = new TrainingImportRecognitionData.RecognizedField(null,
+						date.originalText() != null ? date.originalText() : date.value(),
+						true, "Training date could not be recognized");
+			}
+		}
+		if (date != null && (date.value() == null || date.value().isBlank())
+				&& date.originalText() != null && !date.originalText().isBlank()
+				&& !Boolean.TRUE.equals(date.uncertain())) {
+			date = new TrainingImportRecognitionData.RecognizedField(null, date.originalText(),
+					true, "Training date could not be recognized");
+		}
+		return new TrainingImportRecognitionData(recognized.name(), date, recognized.recognizedGroupName(),
+				recognized.definitions(), recognized.sections());
+	}
+
+	private LocalDate parseDate(TrainingImportRecognitionData.RecognizedField date) {
+		return date == null || date.value() == null || date.value().isBlank()
+				? null : LocalDate.parse(date.value());
+	}
+
+	private String defaultTrainingName(LocalDate date) {
+		return date == null ? "Trening" : "Trening " + date.format(DEFAULT_NAME_DATE_FORMAT);
 	}
 
 	private void normalizeSegmentFields(JsonNode root) {
@@ -327,16 +361,12 @@ public class TrainingImportRecognitionMapper {
 	}
 
 	private void validateHeader(TrainingImportRecognitionData recognized) {
-		if (recognized == null || recognized.trainingDate() == null
-				|| recognized.definitions() == null || recognized.definitions().isEmpty()) {
+		if (recognized == null || recognized.definitions() == null || recognized.definitions().isEmpty()) {
 			throw invalid("The model response is missing required training information");
 		}
 		validateName(recognized.name(), "training name");
-		requireField(recognized.trainingDate(), "training date");
-		try {
-			LocalDate.parse(recognized.trainingDate().value());
-		} catch (RuntimeException exception) {
-			throw invalid("The recognized training date is invalid");
+		if (parseDate(recognized.trainingDate()) != null) {
+			requireField(recognized.trainingDate(), "training date");
 		}
 	}
 

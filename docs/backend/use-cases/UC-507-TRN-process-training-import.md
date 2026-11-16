@@ -122,8 +122,8 @@ Additional recognition rules:
 - The draft must contain recognized training information, definitions, segments, participants and execution data.
 - The draft must preserve the association between each athlete, definition, segment and recognized execution.
 - The draft must include recognition uncertainty and unresolved athlete matching information.
-- If the recognized training name is missing or blank, use `Trening DD.MM.YYYY` with the recognized training date. If a definition name is missing or blank, use `Cała grupa`. These names remain editable during review.
-- A valid recognized training date is still required; no date is invented. Existing uncertainty indicators remain available for review.
+- If the recognized training name is missing or blank, use `Trening DD.MM.YYYY` with the recognized training date, or `Trening` when the date is absent. If a definition name is missing or blank, use `Cała grupa`. These names remain editable during review.
+- A missing or unparseable date does not fail processing. Store null without inventing a date; preserve unreadable date text and uncertainty for review.
 - A missing, empty, unparseable or non-positive segment distance is stored as null, flagged uncertain, and retained with its segment and other recognized data for review.
 - A missing or empty rest after the final segment defaults to zero without requiring confirmation. A missing or empty rest on other segments, or an unparseable or negative rest on any segment, is stored as null and flagged uncertain for review.
 - The draft must retain original recognized text where applicable.

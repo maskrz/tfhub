@@ -117,7 +117,7 @@ describe('TrainingCreatePage', () => {
     fixture.detectChanges();
 
     expect(fixture.nativeElement.textContent).toContain('Wpisz nazwę treningu.');
-    expect(fixture.nativeElement.textContent).toContain('Wybierz prawidłową datę.');
+    expect(fixture.nativeElement.textContent).toContain('Data (opcjonalnie)');
     expect(fixture.nativeElement.textContent).toContain('Wybierz grupę treningową.');
     expect(fixture.nativeElement.textContent).toContain('Wpisz nazwę podgrupy.');
     expect(fixture.nativeElement.textContent).toContain('Wpisz dystans.');
@@ -238,6 +238,16 @@ describe('TrainingCreatePage', () => {
       ],
     });
     expect(navigate).toHaveBeenCalledWith(['/trainings', 77]);
+  });
+
+  it('creates an undated TEMPO training', async () => {
+    await createPage();
+    vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+    fillRequiredFields();
+    setInput('#training-date', '');
+    enterDefinition(0, 'Główna', '400');
+    fixture.componentInstance.submit();
+    expect(trainingsApi.create.mock.calls[0][0].trainingDate).toBeNull();
   });
 
   it('creates FREE_TEXT training for multiple selected athletes without a group', async () => {

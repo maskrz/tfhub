@@ -33,7 +33,7 @@
             }
           </div>
           <div class="field">
-            <label for="training-date">Data <span aria-hidden="true">*</span></label>
+            <label for="training-date">Data</label>
             <input id="training-date" class="field-control" type="date" [formControl]="form.controls.trainingDate" />
             @if (fieldError(form.controls.trainingDate, 'Wybierz prawidłową datę.', 'Wybierz prawidłową datę.'); as message) {
               <span class="field-error">{{ message }}</span>

@@ -14,7 +14,7 @@ import tools.jackson.databind.annotation.JsonDeserialize;
 
 public record EditFreeTextTrainingRequest(
         @NotBlank @Size(max = 255) String name,
-        @NotNull LocalDate trainingDate,
+        LocalDate trainingDate,
         @NotNull TrainingAssignmentType assignmentType,
         @Positive @JsonDeserialize(using = StrictLongDeserializer.class) Long trainingGroupId,
         @JsonDeserialize(contentUsing = StrictLongDeserializer.class)

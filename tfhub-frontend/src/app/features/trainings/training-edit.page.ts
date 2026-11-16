@@ -99,7 +99,7 @@ export class TrainingEditPage implements OnInit {
     }),
     trainingDate: new FormControl('', {
       nonNullable: true,
-      validators: [Validators.required, validDate],
+      validators: [validDate],
     }),
     definitions: new FormArray<DefinitionForm>([], {
       validators: [Validators.minLength(1)],
@@ -213,7 +213,13 @@ export class TrainingEditPage implements OnInit {
 
   private populateForm(training: TrainingDetails): void {
     this.form.controls.name.setValue(training.name);
-    this.form.controls.trainingDate.setValue(training.trainingDate);
+    this.form.controls.trainingDate.setValue(training.trainingDate ?? '');
+    if (training.status === 'COMPLETED'
+      || training.definitions.some((definition) => definition.participations.some((participation) =>
+        participation.executions.some((execution) => execution.status !== 'PENDING')))) {
+      this.form.controls.trainingDate.addValidators(Validators.required);
+      this.form.controls.trainingDate.updateValueAndValidity();
+    }
     this.definitions.clear();
     for (const definition of training.definitions) {
       const segments = definition.segments.map((segment) => createSegmentForm(
@@ -251,7 +257,7 @@ export class TrainingEditPage implements OnInit {
     }));
     return {
       name: value.name.trim(),
-      trainingDate: value.trainingDate,
+      trainingDate: value.trainingDate || null,
       definitions,
     };
   }

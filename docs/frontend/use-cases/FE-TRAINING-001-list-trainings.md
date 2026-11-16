@@ -54,6 +54,7 @@ Retrieve active import summaries separately from `GET /api/training-imports`. Sh
 - Do not introduce a new filtering UX or custom control style.
 - Do not implement filtering that requires unsupported backend functionality. If filtering is performed locally, it must operate on the data actually loaded by the endpoint.
 - Follow existing list sorting conventions where applicable.
+- Show `Bez daty` for undated plans. Undated sessions appear before dated sessions in both date-sort directions and are excluded while any date-range filter is active.
 - Provide a status filter with **Planowane**, **Zakończone**, and **Wszystkie statusy** options, following existing TFHUB status-filter patterns.
 - Provide a training-type filter for **Wszystkie typy**, **Trening tempowy**, and **Trening ogólny**.
 - Load completed trainings through UC-501's `includeCompleted` option; apply the selected status filter to the returned data.

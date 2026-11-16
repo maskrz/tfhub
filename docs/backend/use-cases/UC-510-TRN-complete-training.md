@@ -13,6 +13,7 @@ This operation applies only to `TEMPO` trainings; `FREE_TEXT` trainings do not h
 - **COACH** – can complete a training only while currently assigned to its group.
 - The requester is authenticated and has the ADMIN or COACH role.
 - The training exists.
+- The training has a date.
 
 ## 3. Business Rules
 
@@ -48,7 +49,7 @@ This operation applies only to `TEMPO` trainings; `FREE_TEXT` trainings do not h
 
 ### 3.4 Training Status
 
-- A training created directly through UC-502 has status `PLANNED`; acceptance of an import through UC-509 creates a `COMPLETED` training.
+- A training created directly through UC-502 has status `PLANNED`; a dated import creates a `COMPLETED` training and an undated import creates a `PLANNED` training.
 - The first successful UC-510 save changes its status to `COMPLETED`, regardless of whether some executions remain `PENDING`.
 - A failed save does not change the status.
 - A completed training remains editable through UC-503 and UC-510 so authorized users can correct its plan and execution data.

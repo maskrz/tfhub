@@ -84,6 +84,10 @@ public class FreeTextTrainingService {
     public UpdateTrainingResponse update(long trainingId, EditFreeTextTrainingRequest request) {
         Training training = findAccessibleTrainingForUpdate(trainingId);
         requireFreeText(training);
+        if (training.getStatus() == pl.tfhub.api.training.enums.TrainingStatus.COMPLETED
+                && request.trainingDate() == null) {
+            throw new InvalidTrainingRequestException("A completed training must have a date");
+        }
         ResolvedAssignment assignment = resolveAssignment(
                 request.assignmentType(), request.trainingGroupId(), request.athleteIds());
         validateSectionOrders(request.sections().stream()
@@ -130,6 +134,9 @@ public class FreeTextTrainingService {
     public UpdateTrainingResponse markCompleted(long trainingId) {
         Training training = findAccessibleTrainingForUpdate(trainingId);
         requireFreeText(training);
+        if (training.getTrainingDate() == null) {
+            throw new InvalidTrainingRequestException("A date is required to complete training");
+        }
         training.markCompleted();
         trainingRepository.flush();
         return new UpdateTrainingResponse(trainingId);

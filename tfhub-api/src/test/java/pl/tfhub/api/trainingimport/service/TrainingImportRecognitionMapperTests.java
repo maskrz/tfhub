@@ -93,7 +93,7 @@ class TrainingImportRecognitionMapperTests {
 	}
 
 	@Test
-	void rejectsMalformedFreeTextDateOrDuplicateSectionOrderAsUnusable() {
+	void keepsMalformedFreeTextDateReviewableButRejectsDuplicateSectionOrder() {
 		var mapper = mapper(mock(AthleteRepository.class));
 		String input = """
 				{
@@ -101,8 +101,12 @@ class TrainingImportRecognitionMapperTests {
 				  "sections":[]
 				}
 				""";
-		assertThrows(TrainingImportProcessingException.class,
-				() -> mapper.validateAndMap(input, 7L, TrainingType.FREE_TEXT));
+		var draft = mapper.validateAndMap(input, 7L, TrainingType.FREE_TEXT);
+		assertNull(draft.trainingDate());
+		assertEquals("Trening", draft.name());
+		assertEquals(Boolean.TRUE, draft.recognitionMetadata().get("uncertain"));
+		var fields = (java.util.Map<?, ?>) draft.recognitionMetadata().get("fields");
+		assertEquals("??", ((java.util.Map<?, ?>) fields.get("trainingDate")).get("originalText"));
 
 		String duplicateOrder = """
 				{
@@ -210,15 +214,22 @@ class TrainingImportRecognitionMapperTests {
 	}
 
 	@Test
-	void retainsRecognizedNamesAndStillRejectsInvalidDatesAndOversizedNames() {
+	void retainsRecognizedNamesAndMakesInvalidDatesReviewable() {
 		TrainingImportRecognitionMapper mapper =
 				mapper(mock(AthleteRepository.class));
 		String input = recognition("[]");
 		var draft = mapper.validateAndMap(input, 7L);
 		assertEquals("Recognized session", draft.name());
 		assertEquals("Main set", draft.definitions().getFirst().name());
-		assertThrows(TrainingImportProcessingException.class,
-				() -> mapper.validateAndMap(input.replace("2026-11-10", "invalid-date"), 7L));
+		var invalidDate = mapper.validateAndMap(input.replace("2026-11-10", "invalid-date"), 7L);
+		assertNull(invalidDate.trainingDate());
+		assertEquals(Boolean.TRUE, invalidDate.recognitionMetadata().get("uncertain"));
+		var missingDate = mapper.validateAndMap(input.replace(
+				"\"value\":\"2026-11-10\"", "\"value\":null"), 7L);
+		assertNull(missingDate.trainingDate());
+		var malformedDate = mapper.validateAndMap(input.replaceAll(
+				"\"trainingDate\":\\{[^}]*\\}", "\"trainingDate\":\"unclear\""), 7L);
+		assertNull(malformedDate.trainingDate());
 		assertThrows(TrainingImportProcessingException.class,
 				() -> mapper.validateAndMap(input.replace("Recognized session", "a".repeat(256)), 7L));
 		assertThrows(TrainingImportProcessingException.class,

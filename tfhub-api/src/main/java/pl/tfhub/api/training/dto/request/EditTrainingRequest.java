@@ -10,7 +10,7 @@ import java.util.List;
 
 public record EditTrainingRequest(
         @NotBlank @Size(max = 255) String name,
-        @NotNull LocalDate trainingDate,
+        LocalDate trainingDate,
         @NotEmpty List<@NotNull @Valid EditTrainingDefinitionRequest> definitions) {
 
     public EditTrainingRequest {

@@ -114,7 +114,7 @@ The response must include at least:
 
 - Training identifier.
 - Training name.
-- Training date.
+- Training date, which may be null for planned sessions.
 - Training type (`TEMPO` or `FREE_TEXT`).
 - Training status.
 - Assigned training group identifier and name.

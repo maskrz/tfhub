@@ -253,7 +253,7 @@
                       : ['/trainings', training.id, 'free-text', 'edit']"
                     [attr.aria-label]="'Edytuj trening: ' + training.name"
                   >Edytuj</a>
-                  @if (training.trainingType === 'TEMPO') {
+                  @if (training.trainingType === 'TEMPO' && training.trainingDate) {
                     <a
                       class="button button--primary complete-training-link"
                       [routerLink]="['/trainings', training.id, 'complete']"

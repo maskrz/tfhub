@@ -692,6 +692,50 @@ class TrainingImportDomainIntegrationTests {
 	}
 
 	@Test
+	void undatedTempoRequiresDateForMatchedResultsButPreservesPendingAssignments() {
+		TrainingImport trainingImport = saveReviewDraft(1, "undated.jpg");
+		var initial = draftService.getDraft(trainingImport.getId());
+		var dated = updateRequest(initial, 1, false);
+		var undated = new TrainingImportDraftUpdateRequest(
+				dated.name(), null, dated.recognitionReviewed(), dated.definitions());
+		var blocked = draftService.updateDraft(trainingImport.getId(), undated);
+		assertFalse(blocked.validation().readyForAcceptance());
+		assertTrue(blocked.validation().issues().stream()
+				.anyMatch(issue -> issue.code().equals("TRAINING_DATE_REQUIRED")));
+		assertThrows(InvalidTrainingImportDraftException.class,
+				() -> finalizationService.accept(trainingImport.getId()));
+
+		jdbcTemplate.update("""
+				UPDATE training_import_draft_executions
+				SET status = 'PENDING', measured_result = NULL
+				WHERE draft_id = (SELECT id FROM training_import_drafts WHERE import_id = ?)
+				""", trainingImport.getId());
+		assertTrue(draftService.getDraft(trainingImport.getId()).validation().readyForAcceptance());
+		var accepted = finalizationService.accept(trainingImport.getId());
+		var training = trainingDetailsService.getTraining(accepted.trainingId());
+		assertNull(training.trainingDate());
+		assertEquals(pl.tfhub.api.training.enums.TrainingStatus.PLANNED, training.status());
+		var participant = training.definitions().getFirst().participations().getFirst();
+		assertEquals(2, participant.executions().size());
+		assertTrue(participant.executions().stream()
+				.allMatch(execution -> execution.status() == TrainingExecutionStatus.PENDING));
+		assertTrue(participant.executions().stream().anyMatch(execution -> execution.usesSpikes()));
+	}
+
+	@Test
+	void undatedSkippedResultsDoNotRequireDate() {
+		TrainingImport trainingImport = saveReviewDraft(1, "undated-skipped.jpg");
+		var dated = updateRequest(draftService.getDraft(trainingImport.getId()), 1, true);
+		var undated = new TrainingImportDraftUpdateRequest(
+				dated.name(), null, dated.recognitionReviewed(), dated.definitions());
+		assertTrue(draftService.updateDraft(trainingImport.getId(), undated).validation().readyForAcceptance());
+		var accepted = finalizationService.accept(trainingImport.getId());
+		assertEquals(pl.tfhub.api.training.enums.TrainingStatus.PLANNED,
+				trainingDetailsService.getTraining(accepted.trainingId()).status());
+		assertEquals(0L, count("training_athlete_participations"));
+	}
+
+	@Test
 	void skippedRowsAreOmittedAndFailedAcceptanceLeavesNoPartialTraining() {
 		TrainingImport skippedImport = saveReviewDraft(1, "accept-skip.jpg");
 		TrainingImportDraftResponse skippedDraft = draftService.getDraft(skippedImport.getId());
@@ -799,6 +843,54 @@ class TrainingImportDomainIntegrationTests {
 		assertEquals(TrainingImportStatus.ACCEPTED,
 				trainingImportRepository.findById(trainingImport.getId()).orElseThrow().getStatus());
 		assertArrayEquals(sourceImage, sourceImageService.getSourceImage(trainingImport.getId()));
+	}
+
+	@Test
+	void processesAndAcceptsUndatedFreeTextImportAsPlanned() {
+		TrainingImport trainingImport = saveImportWithStoredImage(
+				1, "undated-free-text.jpg", "8".repeat(64),
+				new byte[] {(byte) 0xff, (byte) 0xd8, 1, 2}, TrainingType.FREE_TEXT);
+		String response = """
+				{
+				  "name":{"value":"Plan","uncertain":false},
+				  "trainingDate":{"value":null,"originalText":null,"uncertain":false},
+				  "sections":[{"sequenceNumber":1,
+				    "title":{"value":"Warm-up","uncertain":false},
+				    "content":{"value":"Easy running","uncertain":false}}]
+				}
+				""";
+		when(geminiClient.recognize(any(), eq(TrainingType.FREE_TEXT))).thenReturn(
+				new GeminiTrainingRecognitionClient.GeminiRecognitionResponse("raw", response));
+		Long attemptId = processingStateService.claimPending(trainingImport.getId());
+		processingService.processClaimedAttempt(attemptId);
+		var draft = draftService.getDraft(trainingImport.getId());
+		assertNull(draft.trainingDate());
+		assertTrue(draft.validation().readyForAcceptance());
+		var accepted = finalizationService.accept(trainingImport.getId());
+		var training = trainingDetailsService.getTraining(accepted.trainingId());
+		assertNull(training.trainingDate());
+		assertEquals(pl.tfhub.api.training.enums.TrainingStatus.PLANNED, training.status());
+		assertEquals("Easy running", training.sections().getFirst().content());
+	}
+
+	@Test
+	void processingUndatedTempoWithResultsReachesReviewAndRequiresDate() {
+		TrainingImport trainingImport = saveImportWithStoredImage(
+				1, "undated-tempo.jpg", "7".repeat(64), new byte[] {(byte) 0xff, (byte) 0xd8, 1, 2});
+		String response = validRecognition("Tempo").replace("\"value\":\"2026-11-10\"",
+				"\"value\":null").replace("\"originalText\":\"10.11.2026\"", "\"originalText\":null");
+		when(geminiClient.recognize(any())).thenReturn(
+				new GeminiTrainingRecognitionClient.GeminiRecognitionResponse("raw", response));
+		Long attemptId = processingStateService.claimPending(trainingImport.getId());
+		processingService.processClaimedAttempt(attemptId);
+		var draft = draftService.getDraft(trainingImport.getId());
+		assertEquals(TrainingImportStatus.REVIEW_REQUIRED, draft.status());
+		assertNull(draft.trainingDate());
+		assertFalse(draft.validation().readyForAcceptance());
+		assertTrue(draft.validation().issues().stream()
+				.anyMatch(issue -> issue.code().equals("TRAINING_DATE_REQUIRED")));
+		assertEquals("12.3", draft.definitions().getFirst().athleteRows().getFirst()
+				.executions().getFirst().recognizedText());
 	}
 
 	@Test

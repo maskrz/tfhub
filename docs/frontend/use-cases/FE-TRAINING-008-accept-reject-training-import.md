@@ -24,7 +24,7 @@ Allow an authorized user to explicitly accept the complete reviewed draft into o
 ## 4. Confirmation and Data Integrity
 
 - Acceptance and rejection are separate, explicit whole-import operations; never automatically finalize based on OCR confidence or draft validity.
-- Acceptance uses the latest saved draft. The backend revalidates it and atomically creates the training with status `COMPLETED`. TEMPO imports create definitions, segments, matched participations and executions; FREE_TEXT imports create ordered sections only, with no athlete records.
+- Acceptance uses the latest saved draft. The backend revalidates it and atomically creates a `COMPLETED` training if dated, or a `PLANNED` training if undated. TEMPO imports create definitions, segments, matched participations and executions; FREE_TEXT imports create ordered sections only, with no athlete records.
 - Skipped athlete rows do not create persisted participation or execution records.
 - Rejection does not create a training.
 - The optimized JPEG, current draft and processing attempts remain retained after either outcome. The UI must not imply that individual draft-edit history is stored.
@@ -51,9 +51,9 @@ Allow an authorized user to explicitly accept the complete reviewed draft into o
 1. Only authorized users can access finalization; backend authorization remains authoritative.
 2. Acceptance requires a saved draft that the backend reports ready.
 3. Acceptance and rejection each require explicit confirmation; canceling sends no request.
-4. Acceptance calls UC-509 once, disables repeat submission, and on success opens the created `COMPLETED` training.
+4. Acceptance calls UC-509 once, disables repeat submission, and on success opens the created training.
 5. Rejection calls UC-509 once, disables repeat submission, and creates no training.
 6. Backend errors do not change the UI to a success/finalized state.
 7. The import's optimized JPEG and current draft remain retained after finalization.
 8. The UI follows existing TFHUB dialog, notification, Polish-language and responsive conventions.
-9. Accepted FREE_TEXT imports open a completed section-based training, with no participations or tempo execution data.
+9. Accepted FREE_TEXT imports open a section-based training, completed if dated or planned if undated, with no participations or tempo execution data.

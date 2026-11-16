@@ -20,7 +20,7 @@ This flow applies only to TEMPO trainings. FREE_TEXT trainings have no athlete p
 4. The frontend submits explicit additions, execution updates, and removals to UC-510. Omitted participants and executions remain unchanged.
 5. On success, the frontend stays on the completion view and displays a dismissible success notice that closes automatically after five seconds. The frontend refreshes the saved training data so later edits use persisted participation and execution IDs.
 
-The first successful save changes the training status from `PLANNED` to `COMPLETED`, even if some executions remain `PENDING`. Failed saves do not change the status. Completed trainings remain editable for later corrections.
+The training must have a date before this task is available. The first successful save changes the training status from `PLANNED` to `COMPLETED`, even if some executions remain `PENDING`. Failed saves do not change the status. Completed trainings remain editable for later corrections.
 
 ## 4. Athlete Assignments
 

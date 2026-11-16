@@ -142,6 +142,18 @@ describe('TrainingsPage', () => {
     );
   }
 
+  it('sorts undated sessions first and excludes them from date ranges', async () => {
+    const undated: TrainingListItem = { ...trainings[0], id: 8, name: 'Bez terminu', trainingDate: null };
+    await createPage(() => of([...trainings, undated]));
+    const page = fixture.componentInstance;
+    expect(page.visibleTrainings()[0].id).toBe(8);
+    expect(fixture.nativeElement.textContent).toContain('Bez daty');
+    page.sortDirection.set('asc');
+    expect(page.visibleTrainings()[0].id).toBe(8);
+    page.trainingDateFrom.set('2026-11-01');
+    expect(page.visibleTrainings().some((training) => training.id === 8)).toBe(false);
+  });
+
   it('shows loading while the API request is pending', async () => {
     const response = new Subject<TrainingListItem[]>();
     await createPage(() => response, false);

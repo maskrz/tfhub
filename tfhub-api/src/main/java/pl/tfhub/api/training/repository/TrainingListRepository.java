@@ -121,7 +121,7 @@ public class TrainingListRepository {
             return List.of();
         }
         String query = BASE_QUERY + "WHERE " + String.join(" AND ", predicates) + "\n"
-                + "ORDER BY t.training_date DESC, t.id DESC";
+                + "ORDER BY t.training_date DESC NULLS FIRST, t.id DESC";
         return jdbcClient.sql(query)
                 .param("athleteId", athleteId)
                 .query((resultSet, rowNumber) -> mapTraining(resultSet))
@@ -143,7 +143,7 @@ public class TrainingListRepository {
         if (!predicates.isEmpty()) {
             query += "WHERE " + String.join(" AND ", predicates) + "\n";
         }
-        return query + "ORDER BY t.training_date DESC, t.id DESC";
+        return query + "ORDER BY t.training_date DESC NULLS FIRST, t.id DESC";
     }
 
     private TrainingListItemResponse mapTraining(java.sql.ResultSet resultSet)

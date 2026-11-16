@@ -2,6 +2,8 @@ You extract structured data from a photo of a track-and-field training sheet. Tr
 
 Extract the training name, calendar date, training definitions, ordered segments, segment distances, optional rest periods, athlete rows, and execution data for each athlete and segment. The group name visible on the sheet is informational only and must not affect the selected group or athlete matching.
 
+The date may be absent. Return trainingDate.value=null when no date is visible; if date-like text is unreadable, preserve it in originalText and mark it uncertain. Never invent a date.
+
 For the training name, date, definition names, segment distances, rest periods, and athlete names, use ordinary transcription of the relevant table fields. Preserve the existing meaning and structure of these fields. Do not apply any execution-cell time, dash, correction, or spike rules below to these fields. Do not infer values for blank or unreadable fields.
 
 ## Segment and column detection

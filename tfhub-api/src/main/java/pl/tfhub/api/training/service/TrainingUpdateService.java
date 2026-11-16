@@ -19,6 +19,7 @@ import pl.tfhub.api.training.entity.TrainingDefinition;
 import pl.tfhub.api.training.entity.TrainingSegment;
 import pl.tfhub.api.training.entity.TrainingSegmentExecution;
 import pl.tfhub.api.training.enums.TrainingExecutionStatus;
+import pl.tfhub.api.training.enums.TrainingStatus;
 import pl.tfhub.api.training.enums.TrainingType;
 import pl.tfhub.api.training.exception.InvalidTrainingIdException;
 import pl.tfhub.api.training.exception.InvalidTrainingRequestException;
@@ -84,6 +85,11 @@ public class TrainingUpdateService {
                 ? List.of()
                 : executionRepository.findAllByParticipation_IdIn(participationIds);
 
+        if (request.trainingDate() == null && (training.getStatus() == TrainingStatus.COMPLETED
+                || currentExecutions.stream().anyMatch(execution ->
+                        execution.getStatus() != TrainingExecutionStatus.PENDING))) {
+            throw new InvalidTrainingRequestException("A date is required for completed training or executions");
+        }
         EditPlan plan = validateAndPlan(request, training, currentDefinitions, currentSegments, currentExecutions);
         applyPlan(training, request, plan, currentDefinitions, currentSegments, currentParticipations, currentExecutions);
         return new UpdateTrainingResponse(trainingId);

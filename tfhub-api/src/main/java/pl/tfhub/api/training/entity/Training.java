@@ -40,8 +40,7 @@ public class Training {
     @Column(nullable = false, length = 255)
     private String name;
 
-    @NotNull
-    @Column(name = "training_date", nullable = false)
+    @Column(name = "training_date")
     private LocalDate trainingDate;
 
     @ManyToOne(fetch = FetchType.LAZY)
@@ -86,14 +85,14 @@ public class Training {
             TrainingType trainingType,
             TrainingAssignmentType assignmentType) {
         setName(name);
-        this.trainingDate = Objects.requireNonNull(trainingDate);
+        this.trainingDate = trainingDate;
         this.trainingType = Objects.requireNonNull(trainingType);
         changeAssignment(assignmentType, trainingGroup);
     }
 
     public void updateDetails(String name, LocalDate trainingDate) {
         setName(name);
-        this.trainingDate = Objects.requireNonNull(trainingDate);
+        this.trainingDate = trainingDate;
     }
 
     public void markCompleted() {
