@@ -13,6 +13,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 
 from tfhub_ml.analysis.audit import AuditData, overview
+from tfhub_ml.analysis.competition import CompetitionAudit
 
 
 def _save_csv(frame: pd.DataFrame, path: Path) -> None:
@@ -55,6 +56,17 @@ def _plot_coverage(matrix: pd.DataFrame, path: Path) -> None:
         axis.set_ylabel("Test ID")
         fig.colorbar(image, ax=axis, label="Athletes with results in both tests")
     axis.set_title("Athlete overlap by test")
+    fig.tight_layout()
+    fig.savefig(path, dpi=150)
+    plt.close(fig)
+
+
+def _plot_competition_events(events: pd.DataFrame, path: Path) -> None:
+    fig, axis = plt.subplots(figsize=(9, max(5, len(events) * 0.35)))
+    ordered = events.sort_values("result_count")
+    axis.barh(ordered["event_name"], ordered["result_count"], color="#326891")
+    axis.set_xlabel("Competition results")
+    axis.set_title("Competition results per event")
     fig.tight_layout()
     fig.savefig(path, dpi=150)
     plt.close(fig)
@@ -117,7 +129,7 @@ def _assessment(
         "- Correlations use one nearest-in-time result pair per athlete and test pair within each reported window. Athletes with repeated measurements are not treated as independent rows within a correlation.",
     ]
     next_steps = [
-        "- Review the observed date-gap distribution and the 7/14/30/60-day pair-count table before selecting any correlation window.",
+        "- Review observed date-gap distributions and the configured pair-count tables before selecting any comparison window.",
         "- Investigate flagged quality records against the source application; do not remove or normalize records based only on statistical flags.",
         "- For any later prediction experiment, define the target, prediction date, and leakage-safe chronological evaluation split before feature engineering.",
     ]
@@ -139,6 +151,7 @@ def generate_report(
     pair_windows: pd.DataFrame,
     correlations: pd.DataFrame,
     issues: pd.DataFrame,
+    competition: CompetitionAudit,
 ) -> Path:
     timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     output = output_root / timestamp
@@ -162,10 +175,13 @@ def generate_report(
     _save_csv(pair_windows, output / "cross_test_pair_counts_by_window.csv")
     _save_csv(correlations, output / "test_correlations.csv")
     _save_csv(issues, output / "data_quality_issues.csv")
+    for name in ("overview", "events", "seasons", "monthly", "quality", "overlap", "gaps", "gap_summary", "windows"):
+        _save_csv(getattr(competition, name), output / f"competition_{name}.csv")
 
     _plot_results_by_test(test_stats, output / "results_per_test.png")
     _plot_monthly_results(monthly, output / "results_per_month.png")
     _plot_coverage(coverage, output / "test_coverage_heatmap.png")
+    _plot_competition_events(competition.events, output / "competition_results_per_event.png")
 
     stats = overview(data)
     issue_summary = (
@@ -177,12 +193,27 @@ def generate_report(
     readiness, next_steps = _assessment(
         stats, test_stats, coverage_distribution, repeat_intervals, issues, pair_windows
     )
+    competition_issue_summary = (
+        competition.quality.groupby("issue_type", as_index=False)
+        .size().sort_values("size", ascending=False)
+        .rename(columns={"size": "flagged_item_count"})
+    )
+    competition_overview = competition.overview.iloc[0]
+    readiness.append(
+        f"- **Competition data:** {competition_overview['result_count']} results across "
+        f"{competition_overview['athletes_with_results']} athletes; "
+        f"{competition_overview['missing_numeric_values']} numeric values are missing. "
+        "Shared athletes and close dates alone do not establish comparability or predictive readiness."
+    )
+    next_steps.insert(
+        0, "- Review event definitions, relay context, historical units, and season classifications with the coach before approving any test-to-event mapping."
+    )
     report_lines = [
         "# TFHUB data audit",
         "",
         f"- Generated (UTC): {timestamp}",
         "- Source: configured PostgreSQL schema, read-only transaction.",
-        "- Scope: athletes, training groups, tests, and test results. No athlete names were extracted.",
+        "- Scope: athletes, training groups, tests, test results, competition events and competition results. No athlete names were extracted.",
         "- No source records were modified.",
         "",
         "## Database overview",
@@ -205,7 +236,7 @@ def generate_report(
         "",
         "## Test coverage and temporal matching",
         "",
-        "The coverage matrix counts athletes with at least one result in each test pair. Cross-test pair tables show raw result-pair counts and distinct athletes at 7, 14, 30, and 60 days. Correlations use at most one nearest-in-time pair per athlete for each test pair and window.",
+        "The coverage matrix counts athletes with at least one result in each test pair. Cross-test pair tables show raw result-pair counts and distinct athletes for the configured candidate windows. Correlations use at most one nearest-in-time pair per athlete for each test pair and window.",
         "",
         _markdown_table(pair_windows, limit=40),
         "",
@@ -232,6 +263,28 @@ def generate_report(
         _markdown_table(correlations, limit=40),
         "",
         "Pearson and Spearman coefficients are exploratory, not causal evidence or proof of predictive ability. Small samples are explicitly flagged; repeated results from one athlete are reduced to one nearest-date pair per athlete for each test pair and cutoff.",
+        "",
+        "## Competition data overview",
+        "",
+        _markdown_table(competition.overview),
+        "",
+        _markdown_table(competition.events, limit=100),
+        "",
+        "Events and their unit snapshots are separate from tests. Event row counts are not counts of independent athletes. Counts of athletes with repeated distinct dates are descriptive and do not establish chronological validation. See `competition_seasons.csv` for event, season type, and historical result-unit counts and `competition_monthly.csv` for monthly coverage.",
+        "",
+        "## Competition data quality",
+        "",
+        _markdown_table(competition_issue_summary, limit=100),
+        "",
+        "See `competition_quality.csv` for result IDs and review context. Missing numeric values are permitted by the source schema and are not assumed invalid; investigate original marks in the application. Unknown seasons and units differing from current event metadata are review flags, not automatic corrections. Result units are historical snapshots.",
+        "",
+        "## Test-to-competition coverage and timing",
+        "",
+        "The following are same-athlete overlaps only, not approved mappings or correlations. Names, similar units, and close dates do not establish comparability; event and test direction, relay context, historical units, and indoor/outdoor conditions require review.",
+        "",
+        _markdown_table(competition.overlap, limit=30),
+        "",
+        "Complete overlap and configured-window counts are in `competition_overlap.csv` and `competition_windows.csv`. Pair counts can reuse the same result and are not independent observations; athlete counts are distinct per test/event/window. `competition_gaps.csv` contains the closest pair per athlete and test/event, including signed days (competition date minus test date); `competition_gap_summary.csv` summarizes those absolute gaps. Window counts also show test-on-or-before-competition counts; same-day records have no time-of-day ordering and are not evidence of leakage-safe inputs. No test-to-competition correlation or model has been calculated.",
         "",
         "## Dataset readiness assessment",
         "",

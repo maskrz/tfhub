@@ -218,7 +218,10 @@ def cross_test_analysis(
                     first_values = pd.to_numeric(selected["value_first"], errors="coerce")
                     second_values = pd.to_numeric(selected["value_second"], errors="coerce")
                     if first_values.nunique() > 1 and second_values.nunique() > 1:
-                        coefficient = first_values.corr(second_values, method=method)
+                        if method == "spearman":
+                            first_values = first_values.rank()
+                            second_values = second_values.rank()
+                        coefficient = first_values.corr(second_values, method="pearson")
                 correlations.append(
                     {
                         "test_id_1": first_id,

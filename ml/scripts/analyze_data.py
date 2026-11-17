@@ -19,6 +19,7 @@ from tfhub_ml.analysis.audit import (
     temporal_statistics,
     test_statistics,
 )
+from tfhub_ml.analysis.competition import competition_audit
 from tfhub_ml.config.settings import load_settings
 from tfhub_ml.database.connection import create_read_only_engine
 from tfhub_ml.data.extract import read_audit_data
@@ -31,7 +32,7 @@ def main() -> int:
         settings = load_settings(PROJECT_ROOT / ".env")
         engine = create_read_only_engine(settings)
         try:
-            data = read_audit_data(engine, settings)
+            data, competition = read_audit_data(engine, settings)
         finally:
             engine.dispose()
 
@@ -43,6 +44,7 @@ def main() -> int:
             data, settings.match_windows_days
         )
         issues = data_quality_issues(data)
+        competition_results = competition_audit(data, competition, settings.match_windows_days)
         output = generate_report(
             data,
             PROJECT_ROOT / "reports",
@@ -58,6 +60,7 @@ def main() -> int:
             windows,
             correlations,
             issues,
+            competition_results,
         )
     except (ValueError, SQLAlchemyError, OSError) as exc:
         logging.error("%s", exc)

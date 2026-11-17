@@ -9,7 +9,9 @@ from tfhub_ml.analysis.audit import (
     test_statistics as calculate_test_statistics,
 )
 from tfhub_ml.reporting.generate import generate_report
+from tfhub_ml.analysis.competition import competition_audit
 from test_analysis import sample_data
+from test_competition import sample_competition
 
 
 def test_report_generation_writes_name_free_timestamped_outputs(tmp_path: Path) -> None:
@@ -24,12 +26,17 @@ def test_report_generation_writes_name_free_timestamped_outputs(tmp_path: Path) 
     output = generate_report(
         data, tmp_path, tests, athletes, coverage, distribution,
         monthly, yearly, athlete_period, intervals, gaps, windows, correlations, issues,
+        competition_audit(data, sample_competition(), (7, 30)),
     )
     report = (output / "data_audit_report.md").read_text(encoding="utf-8")
 
     assert (output / "test_statistics.csv").exists()
     assert (output / "test_coverage_heatmap.png").exists()
     assert "Dataset readiness assessment" in report
+    assert "Competition data overview" in report
+    assert "not approved mappings" in report
+    assert (output / "competition_windows.csv").exists()
+    assert (output / "competition_results_per_event.png").exists()
     assert report.rstrip().endswith("- For any later prediction experiment, define the target, prediction date, and leakage-safe chronological evaluation split before feature engineering.")
     assert "first_name" not in report
     assert "last_name" not in report

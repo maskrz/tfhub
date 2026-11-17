@@ -1,4 +1,5 @@
 import pandas as pd
+import pytest
 
 from tfhub_ml.analysis.audit import (
     athlete_statistics,
@@ -80,6 +81,38 @@ def test_cross_test_cutoffs_and_correlations_report_pairing_unit() -> None:
     assert result["paired_observation_count"] == 1
     assert result["distinct_athlete_count"] == 1
     assert result["reliability_warning"]
+
+
+def test_spearman_uses_average_ranks_for_tied_values() -> None:
+    data = sample_data()
+    values = [(1.0, 4.0), (2.0, 1.0), (2.0, 1.0), (4.0, 3.0)]
+    results = pd.DataFrame(
+        [
+            {
+                "id": athlete_id * 10 + test_id,
+                "athlete_id": athlete_id,
+                "test_id": test_id,
+                "result_date": pd.Timestamp("2025-01-01"),
+                "value": value,
+                "type": "TRAINING",
+            }
+            for athlete_id, (first, second) in enumerate(values, start=1)
+            for test_id, value in ((10, first), (20, second))
+        ]
+    )
+    _, _, correlations = cross_test_analysis(
+        AuditData(data.athletes, data.tests, results, data.training_group_count),
+        windows_days=(7,),
+    )
+    row = correlations.loc[
+        (correlations["test_id_1"] == 10)
+        & (correlations["test_id_2"] == 20)
+        & (correlations["correlation_method"] == "spearman")
+    ].iloc[0]
+
+    assert row["paired_observation_count"] == 4
+    assert row["distinct_athlete_count"] == 4
+    assert row["correlation"] == pytest.approx(-1 / 3)
 
 
 def test_temporal_statistics_return_month_year_athlete_and_repeat_tables() -> None:

@@ -1,4 +1,4 @@
-"""Extract only the existing athletic-test data needed by the audit."""
+"""Extract the existing athletic-test and competition data needed by the audit."""
 
 from dataclasses import dataclass
 
@@ -17,13 +17,19 @@ class AuditData:
     training_group_count: int
 
 
-def read_audit_data(engine: Engine, settings: Settings) -> AuditData:
+@dataclass(frozen=True)
+class CompetitionData:
+    events: pd.DataFrame
+    results: pd.DataFrame
+
+
+def read_audit_data(engine: Engine, settings: Settings) -> tuple[AuditData, CompetitionData]:
     """Read one consistent snapshot; the transaction is explicitly read-only."""
     schema = f'"{settings.db_schema}"'
     with engine.connect() as connection:
         with connection.begin():
-            connection.execute(text("SET TRANSACTION READ ONLY"))
-            return extract_from_connection(connection, schema)
+            connection.execute(text("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY"))
+            return extract_from_connection(connection, schema), extract_competition_data(connection, schema)
 
 
 def extract_from_connection(connection: Connection, schema: str) -> AuditData:
@@ -54,3 +60,18 @@ def extract_from_connection(connection: Connection, schema: str) -> AuditData:
         ).scalar_one()
     )
     return AuditData(athletes, tests, results, training_group_count)
+
+
+def extract_competition_data(connection: Connection, schema: str) -> CompetitionData:
+    events = pd.read_sql_query(
+        text(f"SELECT id, name, unit, active FROM {schema}.competition_events ORDER BY id"),
+        connection,
+    )
+    results = pd.read_sql_query(
+        text(
+            f"SELECT id, athlete_id, event_id, result_date, numeric_value, unit, season_type "
+            f"FROM {schema}.competition_results ORDER BY id"
+        ),
+        connection,
+    )
+    return CompetitionData(events, results)
