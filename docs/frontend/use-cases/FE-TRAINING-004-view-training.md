@@ -34,10 +34,14 @@ Display complete training details, including type, immutable training group and 
 - Offer **Usuń trening** for planned and completed sessions with explicit confirmation (FE-TRAINING-005).
 - Backend authorization remains authoritative.
 - ATHLETE users see only visible FREE_TEXT details and no edit, completion or delete actions; TEMPO details remain staff-only.
+- ADMIN and authorized COACH users can copy a FREE_TEXT training using the icon on the right of the summary or copy an individual TEMPO subgroup using the icon on the right of its heading, regardless of training status. Copying is available for empty section and segment collections.
+- Copied plain text contains the training name, date when present, and either all ordered FREE_TEXT section titles and contents or the selected subgroup name and ordered TEMPO distances and rest periods. Unspecified rest is shown as a dash. Section text is preserved as entered.
+- Copying excludes equipment, assignments, participants, execution results, spikes, internal identifiers and OCR information. It does not change training visibility or persisted data.
 
 ## 5. UI and Error Handling
 
 Follow existing TFHub view, loading, empty, error, and responsive patterns. All user-facing text is in Polish. Do not expose details for trainings that the user is not authorized to view.
+Clipboard success is reported in a small, temporary message beside the copy icon; failures are reported there with accessible Polish feedback. An unavailable or denied clipboard is an error.
 
 ## 6. Out of Scope
 
@@ -53,3 +57,4 @@ Follow existing TFHub view, loading, empty, error, and responsive patterns. All 
 4. Planned and completed trainings can be deleted after confirmation.
 5. The view handles empty, loading and error states and remains usable on mobile.
 6. FREE_TEXT details display ordered sections without TEMPO athlete participation; an ATHLETE sees only their visible session and no other selected athlete identities.
+7. Authorized staff can copy only the relevant training definition, receive success or failure feedback, and never copy private equipment or participant data.

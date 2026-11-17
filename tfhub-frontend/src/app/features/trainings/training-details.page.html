@@ -36,9 +36,28 @@
             {{ currentTraining.trainingType === 'TEMPO' ? 'Trening tempowy' : 'Trening ogólny' }}
           </span>
         </div>
-        <span class="status-badge" [class.status-badge--completed]="currentTraining.status === 'COMPLETED'">
-          {{ currentTraining.status === 'COMPLETED' ? 'Zakończony' : 'Planowany' }}
-        </span>
+        <div class="summary-controls">
+          <span class="status-badge" [class.status-badge--completed]="currentTraining.status === 'COMPLETED'">
+            {{ currentTraining.status === 'COMPLETED' ? 'Zakończony' : 'Planowany' }}
+          </span>
+          @if (canManageTraining && currentTraining.trainingType === 'FREE_TEXT') {
+            <div class="copy-control">
+              <button type="button" class="copy-button copy-training-button" aria-label="Kopiuj trening"
+                title="Kopiuj trening" [disabled]="copying()" (click)="copyFreeTextTraining()">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="12" height="12" rx="2" /><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2" /></svg>
+              </button>
+              @if (copyFeedback(); as feedback) {
+                @if (feedback.target === 'training') {
+                  @if (feedback.error) {
+                    <span class="copy-feedback copy-feedback--error" role="alert">{{ feedback.message }}</span>
+                  } @else {
+                    <span class="copy-feedback" role="status" aria-live="polite">{{ feedback.message }}</span>
+                  }
+                }
+              }
+            </div>
+          }
+        </div>
       </div>
       @if (actionError(); as message) {
         <p class="feedback error" role="alert">{{ message }}</p>
@@ -110,6 +129,24 @@
         <section class="details-card definition-card" [attr.aria-labelledby]="'definition-' + definition.id">
           <div class="section-heading">
             <h2 [id]="'definition-' + definition.id">{{ definition.sequenceNumber }}. {{ definition.name }}</h2>
+            @if (canManageTraining) {
+              <div class="copy-control">
+                <button type="button" class="copy-button copy-definition-button"
+                  [attr.aria-label]="'Kopiuj podgrupę: ' + definition.name" title="Kopiuj podgrupę"
+                  [disabled]="copying()" (click)="copyTempoDefinition(definition)">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="12" height="12" rx="2" /><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2" /></svg>
+                </button>
+                @if (copyFeedback(); as feedback) {
+                  @if (feedback.target === definition.id) {
+                    @if (feedback.error) {
+                      <span class="copy-feedback copy-feedback--error" role="alert">{{ feedback.message }}</span>
+                    } @else {
+                      <span class="copy-feedback" role="status" aria-live="polite">{{ feedback.message }}</span>
+                    }
+                  }
+                }
+              </div>
+            }
           </div>
 
           @if (definition.segments.length === 0) {

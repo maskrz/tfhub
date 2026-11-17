@@ -6,12 +6,14 @@ import { EMPTY, catchError, finalize, take } from 'rxjs';
 import { AuthService } from '../../core/auth/auth.service';
 import {
   TrainingDetails,
+  TrainingDefinitionDetails,
   TrainingExecutionDetails,
   TrainingParticipationDetails,
 } from './training.model';
 import { TrainingsApiService } from './trainings-api.service';
 import { TrainingDeleteConfirmationComponent } from './training-delete-confirmation.component';
 import { formatRestMinutes } from './training-rest-time';
+import { formatFreeTextTraining, formatTempoTraining, formatTrainingDate } from './training-copy';
 
 @Component({
   imports: [RouterLink, TrainingDeleteConfirmationComponent],
@@ -27,6 +29,8 @@ export class TrainingDetailsPage implements OnInit {
   readonly deletionDialogOpen = signal(false);
   readonly completing = signal(false);
   readonly actionError = signal<string | null>(null);
+  readonly copying = signal(false);
+  readonly copyFeedback = signal<{ target: number | 'training'; message: string; error: boolean } | null>(null);
 
   readonly auth = inject(AuthService);
   private readonly route = inject(ActivatedRoute);
@@ -34,6 +38,11 @@ export class TrainingDetailsPage implements OnInit {
   private readonly trainingsApi = inject(TrainingsApiService);
   private readonly destroyRef = inject(DestroyRef);
   private trainingId = 0;
+  private copyFeedbackTimer: ReturnType<typeof setTimeout> | undefined;
+
+  constructor() {
+    this.destroyRef.onDestroy(() => clearTimeout(this.copyFeedbackTimer));
+  }
 
   get canManageTraining(): boolean {
     const role = this.auth.currentUser()?.role;
@@ -86,9 +95,41 @@ export class TrainingDetailsPage implements OnInit {
   }
 
   formatDate(date: string | null): string {
-    if (!date) return 'Bez daty';
-    const [year, month, day] = date.split('-').map(Number);
-    return new Intl.DateTimeFormat('pl-PL').format(new Date(year, month - 1, day));
+    return date ? formatTrainingDate(date) : 'Bez daty';
+  }
+
+  copyFreeTextTraining(): void {
+    const training = this.training();
+    if (!this.canManageTraining || !training || training.trainingType !== 'FREE_TEXT') return;
+    void this.copyText(formatFreeTextTraining(training), 'training');
+  }
+
+  copyTempoDefinition(definition: TrainingDefinitionDetails): void {
+    const training = this.training();
+    if (!this.canManageTraining || !training || training.trainingType !== 'TEMPO') return;
+    void this.copyText(formatTempoTraining(training, definition), definition.id);
+  }
+
+  private async copyText(text: string, target: number | 'training'): Promise<void> {
+    if (this.copying()) return;
+    this.copying.set(true);
+    clearTimeout(this.copyFeedbackTimer);
+    this.copyFeedback.set(null);
+    try {
+      if (!navigator.clipboard?.writeText) {
+        throw new Error('Clipboard unavailable');
+      }
+      await navigator.clipboard.writeText(text);
+      if (this.destroyRef.destroyed) return;
+      this.copyFeedback.set({ target, message: 'Skopiowano do schowka', error: false });
+      this.copyFeedbackTimer = setTimeout(() => this.copyFeedback.set(null), 3000);
+    } catch {
+      if (!this.destroyRef.destroyed) {
+        this.copyFeedback.set({ target, message: 'Nie udało się skopiować do schowka. Spróbuj ponownie.', error: true });
+      }
+    } finally {
+      this.copying.set(false);
+    }
   }
 
   assignedAthleteNames(): string {

@@ -62,6 +62,17 @@ describe('TrainingDetailsPage', () => {
     completeFreeText: ReturnType<typeof vi.fn>;
   };
 
+  afterEach(() => vi.unstubAllGlobals());
+
+  function mockClipboard(writeText?: (text: string) => Promise<void>): void {
+    const mockNavigator = Object.create(navigator) as Navigator;
+    Object.defineProperty(mockNavigator, 'clipboard', {
+      value: writeText ? { writeText } : undefined,
+      configurable: true,
+    });
+    vi.stubGlobal('navigator', mockNavigator);
+  }
+
   async function createPage(
     loader: () => Observable<TrainingDetails> = () => of(training),
     id = '12',
@@ -292,5 +303,130 @@ describe('TrainingDetailsPage', () => {
 
     expect(fixture.nativeElement.textContent).toContain('Nieprawidłowy identyfikator treningu.');
     expect(api.getById).not.toHaveBeenCalled();
+  });
+
+  it.each(['ADMIN', 'COACH'] as const)('copies only the selected TEMPO subgroup for %s', async (role) => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    mockClipboard(writeText);
+    await createPage(() => of({ ...training, status: 'COMPLETED' }), '12', role);
+    const buttons = fixture.nativeElement.querySelectorAll('.copy-definition-button') as NodeListOf<HTMLButtonElement>;
+    expect(buttons).toHaveLength(2);
+    expect(buttons[1].getAttribute('aria-label')).toBe('Kopiuj podgrupę: Rozgrzewka');
+    expect(buttons[1].querySelector('svg[aria-hidden="true"]')).toBeTruthy();
+    expect(buttons[1].textContent?.trim()).toBe('');
+    expect(buttons[1].closest('.section-heading')).toBeTruthy();
+    buttons[1].click();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(writeText).toHaveBeenCalledExactlyOnceWith(
+      'Trening szybkościowy\n11.11.2026\n\nRozgrzewka\n\n1. 100 m — przerwa: —',
+    );
+    const cards = fixture.nativeElement.querySelectorAll('.definition-card');
+    expect(cards[0].querySelector('.copy-feedback')).toBeNull();
+    expect(cards[1].querySelector('.copy-feedback[role="status"]')?.textContent).toContain('Skopiowano');
+  });
+
+  it.each(['ADMIN', 'COACH'] as const)('copies a FREE_TEXT training without equipment or assignments for %s', async (role) => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    mockClipboard(writeText);
+    await createPage(() => of({
+      ...training, trainingType: 'FREE_TEXT', equipment: 'Tajny sprzęt',
+      assignedAthletes: [{ id: 100, firstName: 'Jan', lastName: 'Kowalski' }],
+      sections: [{ id: 31, title: 'Rozgrzewka', content: 'Trucht\nSkip A', sequenceNumber: 1 }],
+    }), '12', role);
+    const button = fixture.nativeElement.querySelector('.copy-training-button') as HTMLButtonElement;
+    expect(button.getAttribute('aria-label')).toBe('Kopiuj trening');
+    expect(button.querySelector('svg[aria-hidden="true"]')).toBeTruthy();
+    expect(button.textContent?.trim()).toBe('');
+    expect(button.closest('.summary-heading')).toBeTruthy();
+    expect(button.closest('.training-actions')).toBeNull();
+    button.click();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(writeText).toHaveBeenCalledExactlyOnceWith('Trening szybkościowy\n11.11.2026\n\nRozgrzewka\nTrucht\nSkip A');
+    expect(fixture.nativeElement.querySelector('.training-summary .copy-feedback[role="status"]')?.textContent)
+      .toBe('Skopiowano do schowka');
+  });
+
+  it('does not expose copy actions to athletes', async () => {
+    await createPage(() => of({ ...training, trainingType: 'FREE_TEXT', sections: [] }), '12', 'ATHLETE');
+    expect(fixture.nativeElement.querySelector('.copy-training-button')).toBeNull();
+    expect(fixture.nativeElement.querySelector('.copy-definition-button')).toBeNull();
+    mockClipboard(vi.fn().mockResolvedValue(undefined));
+    fixture.componentInstance.copyFreeTextTraining();
+    expect(navigator.clipboard.writeText).not.toHaveBeenCalled();
+  });
+
+  it('copies empty undated FREE_TEXT and TEMPO definitions', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    mockClipboard(writeText);
+    await createPage(() => of({ ...training, trainingType: 'FREE_TEXT', trainingDate: null, sections: [] }));
+    (fixture.nativeElement.querySelector('.copy-training-button') as HTMLButtonElement).click();
+    await fixture.whenStable();
+    expect(writeText).toHaveBeenCalledWith('Trening szybkościowy');
+
+    fixture.componentInstance.training.set({
+      ...training, trainingDate: null, definitions: [{ ...training.definitions[0], segments: [] }],
+    });
+    fixture.detectChanges();
+    (fixture.nativeElement.querySelector('.copy-definition-button') as HTMLButtonElement).click();
+    await fixture.whenStable();
+    expect(writeText).toHaveBeenLastCalledWith('Trening szybkościowy\n\nGłówna');
+  });
+
+  it.each(['rejected', 'unavailable'] as const)('reports clipboard %s and clears old feedback on retry', async (failure) => {
+    const writeText = vi.fn().mockRejectedValue(new Error('permission denied'));
+    mockClipboard(failure === 'rejected' ? writeText : undefined);
+    await createPage();
+    const button = fixture.nativeElement.querySelector('.copy-definition-button') as HTMLButtonElement;
+    button.click();
+    await fixture.whenStable();
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('.copy-feedback[role="alert"]')?.textContent).toContain('Nie udało się');
+
+    const successfulWrite = vi.fn().mockResolvedValue(undefined);
+    mockClipboard(successfulWrite);
+    button.click();
+    await fixture.whenStable();
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('.copy-feedback[role="alert"]')).toBeNull();
+    expect(fixture.nativeElement.querySelector('.copy-feedback[role="status"]')?.textContent).toContain('Skopiowano');
+  });
+
+  it('prevents overlapping copy operations until the clipboard write finishes', async () => {
+    let finishWrite!: () => void;
+    const writeText = vi.fn(() => new Promise<void>((resolve) => { finishWrite = resolve; }));
+    mockClipboard(writeText);
+    await createPage();
+    const buttons = fixture.nativeElement.querySelectorAll('.copy-definition-button') as NodeListOf<HTMLButtonElement>;
+    buttons[0].click();
+    fixture.detectChanges();
+    expect(buttons[1].disabled).toBe(true);
+    fixture.componentInstance.copyTempoDefinition(training.definitions[1]);
+    expect(writeText).toHaveBeenCalledTimes(1);
+    finishWrite();
+    await fixture.whenStable();
+    fixture.detectChanges();
+    expect(buttons[1].disabled).toBe(false);
+  });
+
+  it('dismisses the success bubble after a short delay', async () => {
+    mockClipboard(vi.fn().mockResolvedValue(undefined));
+    await createPage();
+    vi.useFakeTimers();
+    try {
+      (fixture.nativeElement.querySelector('.copy-definition-button') as HTMLButtonElement).click();
+      await Promise.resolve();
+      fixture.detectChanges();
+      expect(fixture.nativeElement.querySelector('.copy-control .copy-feedback[role="status"]')?.textContent)
+        .toBe('Skopiowano do schowka');
+      vi.advanceTimersByTime(3000);
+      fixture.detectChanges();
+      expect(fixture.nativeElement.querySelector('.copy-feedback')).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

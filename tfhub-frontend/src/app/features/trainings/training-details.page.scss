@@ -67,6 +67,39 @@ h1 {
   padding: .3rem .65rem;
 }
 .status-badge--completed { background: #e6f6ec; color: #16834e; }
+.summary-controls { align-items: center; display: flex; gap: .75rem; margin-left: auto; }
+.section-heading h2 { flex: 1 1 0; min-width: 0; overflow-wrap: anywhere; }
+.copy-control { flex: none; position: relative; }
+.copy-button {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  border-radius: .45rem;
+  color: #365b48;
+  cursor: pointer;
+  display: inline-flex;
+  height: 2.75rem;
+  justify-content: center;
+  width: 2.75rem;
+}
+.copy-button:hover:not(:disabled) { background: #eef4f0; }
+.copy-button:focus-visible { outline: 3px solid var(--button-focus); }
+.copy-button:disabled { opacity: .5; }
+.copy-button svg { fill: none; height: 1.25rem; stroke: currentColor; stroke-width: 1.8; width: 1.25rem; }
+.copy-feedback {
+  background: #273e31;
+  border-radius: .4rem;
+  color: #fff;
+  font-size: .8rem;
+  max-width: min(16rem, 75vw);
+  padding: .4rem .6rem;
+  position: absolute;
+  right: 0;
+  top: calc(100% + .25rem);
+  width: max-content;
+  z-index: 1;
+}
+.copy-feedback--error { background: #8d2929; }
 .training-actions { display: flex; flex-wrap: wrap; gap: .6rem; margin-top: 1rem; }
 .training-actions .button { min-height: var(--field-height); }
 
