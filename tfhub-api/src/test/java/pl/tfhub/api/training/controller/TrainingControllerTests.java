@@ -30,6 +30,8 @@ import pl.tfhub.api.traininggroup.dto.response.TrainingGroupResponse;
 
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -60,6 +62,28 @@ class TrainingControllerTests {
 
     @MockitoBean
     private FreeTextTrainingService freeTextTrainingService;
+
+    @Test
+    void distinguishesOmittedEquipmentFromExplicitNullInFreeTextUpdates() throws Exception {
+        when(freeTextTrainingService.update(org.mockito.ArgumentMatchers.eq(43L), org.mockito.ArgumentMatchers.any()))
+                .thenReturn(new UpdateTrainingResponse(43));
+        String base = """
+                {"name":"Session","assignmentType":"GROUP","trainingGroupId":3,"athleteIds":[],
+                 "sections":[{"title":"Warmup","content":"Run","sequenceNumber":1}]%s}
+                """;
+        for (String equipment : List.of("", ",\"equipment\":null", ",\"equipment\":\"Ball\\nBands\"")) {
+            mockMvc.perform(MockMvcRequestBuilders.put("/api/trainings/43/free-text")
+                            .contentType(MediaType.APPLICATION_JSON).content(base.formatted(equipment)))
+                    .andExpect(status().isOk());
+        }
+        var requests = org.mockito.ArgumentCaptor.forClass(EditFreeTextTrainingRequest.class);
+        verify(freeTextTrainingService, org.mockito.Mockito.times(3)).update(
+                org.mockito.ArgumentMatchers.eq(43L), requests.capture());
+        assertNull(requests.getAllValues().get(0).equipment());
+        assertTrue(requests.getAllValues().get(1).equipment().isNull());
+        org.junit.jupiter.api.Assertions.assertEquals("Ball\nBands",
+                requests.getAllValues().get(2).equipment().textValue());
+    }
 
     @Test
     void createsTrainingAndReturnsItsIdentifierAndLocation() throws Exception {

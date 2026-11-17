@@ -71,6 +71,7 @@ public class FreeTextTrainingService {
                 assignment.group(),
                 TrainingType.FREE_TEXT,
                 assignment.type()));
+        training.setEquipment(request.equipment());
         assignmentRepository.replaceAthletes(training.getId(), assignment.athleteIds());
         List<TrainingSection> sections = request.sections().stream()
                 .map(section -> new TrainingSection(
@@ -120,6 +121,12 @@ public class FreeTextTrainingService {
         }
 
         training.updateDetails(request.name(), request.trainingDate());
+        if (request.equipment() != null) {
+            if (!request.equipment().isNull() && !request.equipment().isTextual()) {
+                throw new InvalidTrainingRequestException("Equipment must be text or null");
+            }
+            training.setEquipment(request.equipment().isNull() ? null : request.equipment().textValue());
+        }
         training.changeAssignment(assignment.type(), assignment.group());
         assignmentRepository.replaceAthletes(trainingId, assignment.athleteIds());
         List<TrainingSection> removedSections = currentSections.stream()

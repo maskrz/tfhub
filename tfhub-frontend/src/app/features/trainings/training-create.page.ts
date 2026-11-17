@@ -128,6 +128,7 @@ export class TrainingCreatePage implements OnInit {
       nonNullable: true,
       validators: [validDate],
     }),
+    equipment: new FormControl('', { nonNullable: true }),
     trainingGroupId: new FormControl<number | null>(null, Validators.required),
     athleteIds: new FormControl<number[]>({ value: [], disabled: true }, {
       nonNullable: true,
@@ -353,6 +354,7 @@ export class TrainingCreatePage implements OnInit {
       trainingGroupId: this.assignmentType() === 'GROUP' ? value.trainingGroupId : null,
       athleteIds: this.assignmentType() === 'ATHLETES' ? value.athleteIds : [],
       sections,
+      equipment: value.equipment || null,
     };
   }
 

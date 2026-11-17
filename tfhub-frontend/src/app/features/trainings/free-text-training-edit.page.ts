@@ -70,6 +70,7 @@ export class FreeTextTrainingEditPage implements OnInit {
   readonly form = new FormGroup({
     name: new FormControl('', { nonNullable: true, validators: [trimmedRequired, Validators.maxLength(255)] }),
     trainingDate: new FormControl('', { nonNullable: true, validators: [validDate] }),
+    equipment: new FormControl('', { nonNullable: true }),
     trainingGroupId: new FormControl<number | null>(null, Validators.required),
     athleteIds: new FormControl<number[]>({ value: [], disabled: true }, {
       nonNullable: true,
@@ -168,6 +169,7 @@ export class FreeTextTrainingEditPage implements OnInit {
       assignmentType: this.assignmentType(),
       trainingGroupId: this.assignmentType() === 'GROUP' ? value.trainingGroupId : null,
       athleteIds: this.assignmentType() === 'ATHLETES' ? value.athleteIds : [],
+      equipment: value.equipment || null,
       sections: value.sections.map((section, index) => ({
         id: section.id,
         title: section.title.trim(),
@@ -204,6 +206,7 @@ export class FreeTextTrainingEditPage implements OnInit {
       this.training.set(training);
       this.form.controls.name.setValue(training.name);
       this.form.controls.trainingDate.setValue(training.trainingDate ?? '');
+      this.form.controls.equipment.setValue(training.equipment ?? '');
       if (training.status === 'COMPLETED') {
         this.form.controls.trainingDate.addValidators(Validators.required);
         this.form.controls.trainingDate.updateValueAndValidity();

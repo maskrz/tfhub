@@ -8,6 +8,8 @@ The operation preserves the training session's identity, group and historical ex
 
 For `FREE_TEXT` trainings, the same authorized service boundary supports editing the name, date, ordered free-text sections and assignment; tempo definitions and execution data are not accepted by that operation.
 
+The FREE_TEXT editor also accepts optional multiline `equipment`. An omitted property preserves the existing note; explicit null clears it. The note remains private to authorized staff.
+
 ## 2. Actors and Preconditions
 
 - **ADMIN** – can edit any training session.

@@ -804,6 +804,7 @@ class TrainingImportDomainIntegrationTests {
 				{
 				  "name":{"value":"Trening ogólny","originalText":"Trening ogólny","uncertain":false},
 				  "trainingDate":{"value":"2026-11-10","originalText":"10.11.2026","uncertain":false},
+				  "equipment":{"value":"Medicine ball\\nBands","originalText":"Medicine ball\\nBands","uncertain":true},
 				  "sections":[
 				    {
 				      "sequenceNumber":1,
@@ -826,6 +827,24 @@ class TrainingImportDomainIntegrationTests {
 
 		TrainingImportDraftResponse draft = draftService.getDraft(trainingImport.getId());
 		assertEquals(TrainingType.FREE_TEXT, draft.trainingType());
+		assertFalse(draft.validation().readyForAcceptance());
+		assertEquals("Medicine ball\nBands", draft.equipment());
+		assertThrows(InvalidTrainingImportDraftException.class,
+				() -> finalizationService.accept(trainingImport.getId()));
+		var sections = draft.sections().stream().map(section -> new TrainingImportDraftUpdateRequest.Section(
+				section.id(), section.sequenceNumber(), section.title(), section.content(), section.recognitionReviewed()))
+				.toList();
+		draft = draftService.updateDraft(trainingImport.getId(), new TrainingImportDraftUpdateRequest(
+				draft.name(), draft.trainingDate(), draft.recognitionReviewed(), List.of(), sections));
+		assertEquals("Medicine ball\nBands", draft.equipment());
+		assertFalse(draft.validation().readyForAcceptance());
+		sections = draft.sections().stream().map(section -> new TrainingImportDraftUpdateRequest.Section(
+				section.id(), section.sequenceNumber(), section.title(), section.content(), section.recognitionReviewed()))
+				.toList();
+		draft = draftService.updateDraft(trainingImport.getId(), new TrainingImportDraftUpdateRequest(
+				draft.name(), draft.trainingDate(), draft.recognitionReviewed(), List.of(), sections,
+				new tools.jackson.databind.ObjectMapper().readTree("\"Ball\\nBands\""), true));
+		assertEquals("Ball\nBands", draft.equipment());
 		assertTrue(draft.validation().readyForAcceptance());
 		assertTrue(draft.definitions().isEmpty());
 		assertEquals(List.of("Rozgrzewka", "Część główna"),
@@ -834,6 +853,7 @@ class TrainingImportDomainIntegrationTests {
 		var accepted = finalizationService.accept(trainingImport.getId());
 		var training = trainingDetailsService.getTraining(accepted.trainingId());
 		assertEquals(TrainingType.FREE_TEXT, training.trainingType());
+		assertEquals("Ball\nBands", training.equipment());
 		assertEquals(pl.tfhub.api.training.enums.TrainingStatus.COMPLETED, training.status());
 		assertTrue(training.definitions().isEmpty());
 		assertEquals(List.of("Rozgrzewka", "Część główna"),

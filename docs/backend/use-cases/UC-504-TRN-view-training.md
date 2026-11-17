@@ -42,6 +42,7 @@ The operation must enforce role-based access and training group visibility rules
 - ATHLETE cannot retrieve TEMPO details.
 - An unselected athlete, including one in a selected athlete's group, receives the same not-found result as for a nonexistent training.
 - Athlete responses must not reveal other selected athletes' identities.
+- Athlete responses must not contain the private `equipment` note.
 
 ### 4.3 Training Information
 
@@ -52,6 +53,7 @@ The operation must return the complete structure of the training session, includ
 - Selected athlete identities for authorized ADMIN/COACH users; an ATHLETE response does not disclose other selected athlete identities.
 - For `TEMPO`, all training definitions/segments, athlete participations and execution data.
 - For `FREE_TEXT`, all sections in sequence order, with title and content; no athlete participation or execution data is created or returned.
+- For authorized ADMIN/COACH users, FREE_TEXT details additionally include `equipment` when present. It is omitted for athletes and TEMPO, and is never included in lists.
 
 The response must represent the persisted state of the training session.
 

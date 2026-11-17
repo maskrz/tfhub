@@ -236,6 +236,22 @@
           </section>
         }
         } @else {
+          <section class="details-card definition-card" aria-labelledby="equipment-heading"
+            [class.needs-review]="isUncertain(current.equipmentRecognitionMetadata ?? {}) && !form.controls.equipmentRecognitionReviewed.value">
+            <h2 id="equipment-heading">Sprzęt</h2>
+            @if (metadataText(current.equipmentRecognitionMetadata ?? {}, 'originalText'); as originalEquipment) {
+              <p class="equipment-original">Rozpoznany tekst: {{ originalEquipment }}</p>
+            }
+            @if (metadataText(current.equipmentRecognitionMetadata ?? {}, 'uncertaintyReason'); as reason) {
+              <p>{{ reason }}</p>
+            }
+            @if (isUncertain(current.equipmentRecognitionMetadata ?? {})) {
+              <label class="checkbox">
+                <input type="checkbox" formControlName="equipmentRecognitionReviewed" />
+                Potwierdzam lub poprawiłem/am notatkę o sprzęcie
+              </label>
+            }
+          </section>
           @for (section of sections.controls; track section; let s = $index) {
             <section class="details-card definition-card" [formGroup]="section"
               [class.needs-review]="needsSectionReview(section)"

@@ -139,6 +139,7 @@ describe('TrainingDetailsPage', () => {
     const freeText: TrainingDetails = {
       ...training,
       trainingType: 'FREE_TEXT',
+      equipment: 'Piłka\nGumy',
       definitions: [],
       sections: [
         { id: 31, title: 'Rozgrzewka', content: 'Trucht 10 minut', sequenceNumber: 1 },
@@ -150,6 +151,7 @@ describe('TrainingDetailsPage', () => {
     expect(fixture.nativeElement.textContent).toContain('1. Rozgrzewka');
     expect(fixture.nativeElement.textContent).toContain('Trucht 10 minut');
     expect(fixture.nativeElement.textContent).toContain('2. Część główna');
+    expect(fixture.nativeElement.querySelector('#equipment-heading')?.parentElement.textContent).toContain('Piłka\nGumy');
     expect(fixture.nativeElement.querySelector('a[href="/trainings/12/free-text/edit"]')).toBeTruthy();
     expect(fixture.nativeElement.querySelector('a[href="/trainings/12/complete"]')).toBeNull();
     expect(fixture.nativeElement.textContent).toContain('Oznacz jako zakończony');
@@ -163,6 +165,7 @@ describe('TrainingDetailsPage', () => {
     const individual: TrainingDetails = {
       ...training,
       trainingType: 'FREE_TEXT',
+      equipment: 'Prywatny sprzęt',
       assignmentType: 'ATHLETES',
       trainingGroup: null,
       definitions: [],
@@ -172,6 +175,8 @@ describe('TrainingDetailsPage', () => {
 
     expect(fixture.nativeElement.textContent).toContain('Trening przypisany bezpośrednio do Ciebie.');
     expect(fixture.nativeElement.textContent).toContain('Ćwiczenia biegowe');
+    expect(fixture.nativeElement.textContent).not.toContain('Prywatny sprzęt');
+    expect(fixture.nativeElement.querySelector('#equipment-heading')).toBeNull();
     expect(fixture.nativeElement.querySelector('.training-actions')).toBeNull();
     expect(fixture.nativeElement.querySelector('.delete-training-button')).toBeNull();
   });

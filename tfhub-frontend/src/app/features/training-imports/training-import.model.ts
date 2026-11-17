@@ -108,6 +108,9 @@ export interface TrainingImportDraft {
   recognitionMetadata: Record<string, unknown>;
   recognitionReviewed: boolean;
   definitions: ImportDefinition[];
+  equipment?: string | null;
+  equipmentRecognitionMetadata?: Record<string, unknown>;
+  equipmentRecognitionReviewed?: boolean;
   sections: {
     id: number;
     sequenceNumber: number;
@@ -115,6 +118,8 @@ export interface TrainingImportDraft {
     content: string;
     recognitionMetadata: Record<string, unknown>;
     recognitionReviewed: boolean;
+    equipment?: string | null;
+    equipmentRecognitionReviewed?: boolean;
   }[];
   validation: { readyForAcceptance: boolean; issues: { code: string; path: string; message: string }[] };
 }

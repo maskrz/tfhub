@@ -6,6 +6,8 @@ Allow an authorized user to edit the plan of an existing planned or completed tr
 
 This flow covers TEMPO plan editing and the type-specific FREE_TEXT editor at `/trainings/:id/free-text/edit`. TEMPO group assignment remains unchanged; the FREE_TEXT editor also allows changing between GROUP and ATHLETES assignment.
 
+The FREE_TEXT editor loads and allows correction or clearing of the private multiline `Sprzęt` note.
+
 ## 2. Actors and Preconditions
 
 - **ADMIN** – can edit any training.

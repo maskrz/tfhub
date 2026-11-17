@@ -237,6 +237,8 @@ public class TrainingImportProcessingStateService {
 			draft = draftRepository.saveAndFlush(draft);
 		}
 
+		draft.setEquipment(recognizedDraft.equipment());
+		draftRepository.saveAndFlush(draft);
 		persistDraftChildren(draft, trainingImport, recognizedDraft);
 		attempt.markSucceeded(now(), rawModelResponse);
 		trainingImport.changeStatus(TrainingImportStatus.REVIEW_REQUIRED);

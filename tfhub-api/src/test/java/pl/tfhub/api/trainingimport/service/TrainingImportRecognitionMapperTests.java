@@ -34,6 +34,26 @@ class TrainingImportRecognitionMapperTests {
 	}
 
 	@Test
+	void retainsEquipmentLinesAndUncertaintyAndSupportsOldResponses() {
+		var mapper = mapper(mock(AthleteRepository.class));
+		String base = """
+				{"name":{"value":"Session","uncertain":false},
+				 "trainingDate":{"value":null,"uncertain":false},
+				 "sections":[]%s}
+				""";
+		var old = mapper.validateAndMap(base.formatted(""), 1, TrainingType.FREE_TEXT);
+		assertNull(old.equipment());
+		assertNull(old.recognitionMetadata().get("equipment"));
+		var recognized = mapper.validateAndMap(base.formatted(
+				",\"equipment\":{\"value\":\"Ball\\nBands\",\"originalText\":\"Ball\\nBands\",\"uncertain\":true}"),
+				1, TrainingType.FREE_TEXT);
+		assertEquals("Ball\nBands", recognized.equipment());
+		var metadata = (java.util.Map<?, ?>) recognized.recognitionMetadata().get("equipment");
+		assertEquals(Boolean.TRUE, metadata.get("uncertain"));
+		assertEquals("Ball\nBands", metadata.get("originalText"));
+	}
+
+	@Test
 	void mapsFreeTextSectionsInOrderAndRetainsUncertaintyForReview() {
 		var mapper = mapper(mock(AthleteRepository.class));
 		String input = """

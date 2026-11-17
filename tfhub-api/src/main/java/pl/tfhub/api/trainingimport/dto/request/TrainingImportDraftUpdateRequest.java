@@ -14,20 +14,28 @@ import jakarta.validation.constraints.PositiveOrZero;
 import jakarta.validation.constraints.Size;
 import pl.tfhub.api.training.enums.TrainingExecutionStatus;
 import pl.tfhub.api.trainingimport.enums.TrainingImportAthleteMatchStatus;
+import tools.jackson.databind.JsonNode;
 
 public record TrainingImportDraftUpdateRequest(
 		@NotBlank @Size(max = 255) String name,
 		LocalDate trainingDate,
 		boolean recognitionReviewed,
 		@NotNull List<@Valid Definition> definitions,
-		List<@Valid Section> sections) {
+		List<@Valid Section> sections,
+		JsonNode equipment,
+		Boolean equipmentRecognitionReviewed) {
+
+	public TrainingImportDraftUpdateRequest(String name, LocalDate trainingDate, boolean recognitionReviewed,
+			List<Definition> definitions, List<Section> sections) {
+		this(name, trainingDate, recognitionReviewed, definitions, sections, null, null);
+	}
 
 	public TrainingImportDraftUpdateRequest(
 			String name,
 			LocalDate trainingDate,
 			boolean recognitionReviewed,
 			List<Definition> definitions) {
-		this(name, trainingDate, recognitionReviewed, definitions, List.of());
+		this(name, trainingDate, recognitionReviewed, definitions, List.of(), null, null);
 	}
 
 	public record Section(

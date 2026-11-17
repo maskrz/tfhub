@@ -31,7 +31,7 @@ Rejection must preserve the import, its current draft, processing attempts and o
 - Individual cells, athletes or training definitions cannot be accepted separately.
 - Acceptance creates exactly one persisted training session using the import's immutable type and latest saved, validated draft.
 - For `TEMPO`, the persisted session includes the training name/date, one assigned group, ordered definitions/segments, matched participations and valid executions.
-- For `FREE_TEXT`, the persisted session includes the training name/date, one assigned group and ordered free-text sections. It creates no definitions, athlete participations or execution records.
+- For `FREE_TEXT`, the persisted session includes the training name/date, one assigned group, ordered free-text sections and the latest saved optional equipment note. It creates no definitions, athlete participations or execution records.
 - Athlete rows explicitly marked as skipped must not create athlete participations or execution records.
 - Unresolved athlete rows must prevent acceptance.
 - Only athletes matched to existing athletes belonging to the selected training group may be persisted.

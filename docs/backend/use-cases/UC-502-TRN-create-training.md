@@ -25,6 +25,7 @@ The operation must enforce role-based access and training group assignment rules
 - A training date is optional; when supplied it must be valid.
 - TEMPO sessions must belong to exactly one training group.
 - FREE_TEXT sessions use exactly one of two assignment modes: one group (`GROUP`) or one or more individual athletes (`ATHLETES`).
+- FREE_TEXT may include a nullable multiline `equipment` staff note, separate from athlete-facing sections. TEMPO has no equipment field.
 - The selected assignment mode is required during creation.
 - FREE_TEXT assignment may be changed later through its edit operation; TEMPO group assignment remains unchanged.
 - A training session is created with status `PLANNED`.

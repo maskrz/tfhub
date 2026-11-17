@@ -1,5 +1,6 @@
 package pl.tfhub.api.trainingimport.dto.response;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
@@ -21,7 +22,10 @@ public record TrainingImportDraftResponse(
 		boolean recognitionReviewed,
 		List<Definition> definitions,
 		List<Section> sections,
-		Validation validation) {
+		Validation validation,
+		@JsonInclude(JsonInclude.Include.NON_NULL) String equipment,
+		@JsonInclude(JsonInclude.Include.NON_NULL) Map<String, Object> equipmentRecognitionMetadata,
+		@JsonInclude(JsonInclude.Include.NON_NULL) Boolean equipmentRecognitionReviewed) {
 
 	public TrainingImportDraftResponse(
 			long importId,
@@ -34,7 +38,7 @@ public record TrainingImportDraftResponse(
 			List<Definition> definitions,
 			Validation validation) {
 		this(importId, status, TrainingType.TEMPO, trainingGroup, name, trainingDate,
-				recognitionMetadata, recognitionReviewed, definitions, List.of(), validation);
+				recognitionMetadata, recognitionReviewed, definitions, List.of(), validation, null, null, null);
 	}
 
 	public record Definition(

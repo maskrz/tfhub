@@ -37,6 +37,8 @@ The group selected at upload is read-only. Athlete candidate results and assignm
 
 For FREE_TEXT imports, show editable section titles/content in order, allow section add/remove/reorder, and preserve partial or uncertain OCR for correction. A one-section fallback or uncertain grouping is reviewable; only outstanding required data/review issues should block readiness, not successful draft retrieval.
 
+Provide a separate optional multiline `Sprzęt` field. Show uncertain source text to staff and require explicit confirmation before acceptance.
+
 ## 5. Validation and Saving
 
 - Keep all athlete rows matched or explicitly skipped before acceptance; show unresolved rows clearly.

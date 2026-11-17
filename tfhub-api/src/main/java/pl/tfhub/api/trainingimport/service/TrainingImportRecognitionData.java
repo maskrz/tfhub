@@ -7,7 +7,8 @@ public record TrainingImportRecognitionData(
 		RecognizedField trainingDate,
 		String recognizedGroupName,
 		List<Definition> definitions,
-		List<Section> sections) {
+		List<Section> sections,
+		RecognizedField equipment) {
 
 	public record RecognizedField(
 			String value,

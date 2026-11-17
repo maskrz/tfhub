@@ -86,7 +86,8 @@ public class TrainingImportFinalizationService {
 					TrainingAssignmentType.GROUP,
 					trainingImport.getTrainingGroup().getId(),
 					List.of(),
-					sections));
+					sections,
+					draft.equipment()));
 			if (draft.trainingDate() != null) {
 				freeTextTrainingService.markCompleted(created.id());
 			}

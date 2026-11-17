@@ -9,6 +9,16 @@ Extract:
 - Calendar date.
 - Recognized training group name, if visible.
 - Ordered training sections and their content.
+- Equipment notes under a clearly separated heading "Sprzęt".
+
+## Equipment
+
+Extract only text belonging to a clearly separated "Sprzęt" section into the
+optional equipment field. Preserve its wording, order and line breaks. Do not
+infer equipment from exercises or move ordinary training content into it.
+Return null when there is clearly no equipment section. When membership is unclear,
+do not guess: preserve readable ambiguous text in equipment.originalText,
+set equipment.value to null and mark it uncertain for manual review.
 
 The date may be absent. Return trainingDate.value=null when no date is visible; if date-like text is unreadable, preserve it in originalText and mark it uncertain. Never invent a date.
 
@@ -141,7 +151,7 @@ Always prioritize returning a structurally valid response over rejecting an impe
 
 ## Field format
 
-For training name, date, section title and section content, use this exact field shape:
+For training name, date, equipment, section title and section content, use this exact field shape:
 
 {
   "value": "recognized value or null",
@@ -191,6 +201,7 @@ Return exactly one JSON object in this structure:
     "uncertaintyReason": null
   },
   "recognizedGroupName": "Group name as written, or null",
+  "equipment": null,
   "sections": [
     {
       "sequenceNumber": 1,
@@ -223,6 +234,7 @@ For recognizedGroupName:
 - Sequence numbers must be positive, unique, and consecutive, starting at 1.
 - Sections must follow the original order of the training content.
 - Every section must contain title and content using the specified field structure.
+- Equipment is either null or a field object using the specified field structure.
 - Do not add fields.
 - Do not return comments, explanations or Markdown outside the JSON object.
 - A valid but incomplete or uncertain extraction is preferable to rejecting the entire import.

@@ -348,6 +348,58 @@ class TrainingDomainIntegrationTests {
     }
 
     @Test
+    void equipmentIsPersistedAndNeverSerializedToAthletesOrLists() throws Exception {
+        String equipment = "Medicine ball\nBands";
+        long groupTraining = freeTextTrainingService.create(new CreateFreeTextTrainingRequest(
+                "Group", null, TrainingAssignmentType.GROUP, 1L, List.of(),
+                List.of(new CreateTrainingSectionRequest("Warm-up", "Run", 1)), equipment)).id();
+        long individualTraining = freeTextTrainingService.create(new CreateFreeTextTrainingRequest(
+                "Individual", null, TrainingAssignmentType.ATHLETES, null, List.of(1L),
+                List.of(new CreateTrainingSectionRequest("Warm-up", "Run", 1)), equipment)).id();
+        assertEquals(equipment, trainingDetailsService.getTraining(groupTraining).equipment());
+        var section = sectionRepository.findAllByTraining_IdOrderBySequenceNumberAsc(groupTraining).getFirst();
+        var editSections = List.of(new EditTrainingSectionRequest(section.getId(), "Warm-up", "Run", 1));
+        freeTextTrainingService.update(groupTraining, new EditFreeTextTrainingRequest(
+                "Group", null, TrainingAssignmentType.GROUP, 1L, List.of(), editSections));
+        assertEquals(equipment, trainingDetailsService.getTraining(groupTraining).equipment());
+        var json = new tools.jackson.databind.ObjectMapper();
+        freeTextTrainingService.update(groupTraining, new EditFreeTextTrainingRequest(
+                "Group", null, TrainingAssignmentType.GROUP, 1L, List.of(), editSections, json.readTree("null")));
+        assertNullEquipment(groupTraining);
+        jdbcTemplate.update("UPDATE training_sessions SET equipment = ? WHERE id = ?", equipment, groupTraining);
+        long tempo = insertTraining("Tempo");
+        assertThrows(DataIntegrityViolationException.class, () -> jdbcTemplate.update(
+                "UPDATE training_sessions SET equipment = ? WHERE id = ?", equipment, tempo));
+
+        String password = "equipment-test-password";
+        for (String role : List.of("ADMIN", "COACH", "ATHLETE")) {
+            jdbcTemplate.update("INSERT INTO users (username, password_hash, role) VALUES (?, ?, ?)",
+                    role.toLowerCase(), passwordEncoder.encode(password), role);
+        }
+        jdbcTemplate.update("INSERT INTO user_training_group (user_id, training_group_id) VALUES (2, 1)");
+        jdbcTemplate.update("INSERT INTO user_athlete_access (user_id, athlete_id) VALUES (3, 1)");
+        SecurityContextHolder.clearContext();
+        MockHttpSession admin = loginForHistory("admin", password);
+        MockHttpSession coach = loginForHistory("coach", password);
+        MockHttpSession athlete = loginForHistory("athlete", password);
+        for (long id : List.of(groupTraining, individualTraining)) {
+            mockMvc.perform(get("/api/trainings/" + id).session(admin))
+                    .andExpect(status().isOk()).andExpect(jsonPath("$.equipment").value(equipment));
+            mockMvc.perform(get("/api/trainings/" + id).session(coach))
+                    .andExpect(status().isOk()).andExpect(jsonPath("$.equipment").value(equipment));
+            mockMvc.perform(get("/api/trainings/" + id).session(athlete))
+                    .andExpect(status().isOk()).andExpect(jsonPath("$.equipment").doesNotHaveJsonPath());
+        }
+        mockMvc.perform(get("/api/trainings").session(athlete))
+                .andExpect(status().isOk()).andExpect(jsonPath("$[0].equipment").doesNotHaveJsonPath());
+        mockMvc.perform(get("/api/training-imports").session(athlete)).andExpect(status().isForbidden());
+    }
+
+    private void assertNullEquipment(long trainingId) {
+        org.junit.jupiter.api.Assertions.assertNull(trainingDetailsService.getTraining(trainingId).equipment());
+    }
+
+    @Test
     void managesFreeTextSectionsAndCompletesWithoutAthleteParticipation() {
         var created = freeTextTrainingService.create(new CreateFreeTextTrainingRequest(
                 "General session",
@@ -562,6 +614,66 @@ class TrainingDomainIntegrationTests {
         jdbcTemplate.update("UPDATE athletes SET active = FALSE WHERE id = 3");
         assertThrows(AthleteNotFoundException.class, () -> createFreeTextTraining(
                 "Inactive assignment", TrainingAssignmentType.ATHLETES, null, List.of(3L)));
+    }
+
+    @Test
+    void v19MigrationPreservesExistingTrainingData() throws Exception {
+        String schema = "migration_" + UUID.randomUUID().toString().replace("-", "");
+        try {
+            Flyway.configure().dataSource(POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword())
+                    .schemas(schema).defaultSchema(schema).target(MigrationVersion.fromVersion("18"))
+                    .load().migrate();
+            try (var connection = DriverManager.getConnection(
+                    POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword());
+                    var statement = connection.createStatement()) {
+                statement.execute("INSERT INTO " + schema + ".training_groups (id, name) VALUES (1, 'Legacy')");
+                statement.execute("INSERT INTO " + schema + ".training_sessions "
+                        + "(id, name, training_group_id, training_type) VALUES "
+                        + "(1, 'General', 1, 'FREE_TEXT'), (2, 'Tempo', 1, 'TEMPO')");
+                statement.execute("INSERT INTO " + schema + ".training_sections "
+                        + "(training_session_id, title, content, sequence_number) VALUES (1, 'Warmup', 'Run', 1)");
+                statement.execute("INSERT INTO " + schema + ".users (id, username, password_hash, role) "
+                        + "VALUES (1, 'legacy', 'hash', 'ADMIN')");
+                statement.execute("INSERT INTO " + schema + ".training_imports "
+                        + "(id, training_group_id, initiated_by_user_id, training_type) VALUES (1, 1, 1, 'FREE_TEXT')");
+                statement.execute("INSERT INTO " + schema + ".training_import_attempts "
+                        + "(id, import_id, attempt_number, model_name, status, started_at) "
+                        + "VALUES (1, 1, 1, 'model', 'PROCESSING', CURRENT_TIMESTAMP)");
+                statement.execute("INSERT INTO " + schema + ".training_import_drafts "
+                        + "(import_id, generated_by_attempt_id, name) VALUES (1, 1, 'Legacy draft')");
+            }
+            Flyway.configure().dataSource(POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword())
+                    .schemas(schema).defaultSchema(schema).load().migrate();
+            try (var connection = DriverManager.getConnection(
+                    POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword());
+                    var statement = connection.createStatement();
+                    var result = statement.executeQuery("SELECT t.name, t.equipment, s.content FROM " + schema
+                            + ".training_sessions t LEFT JOIN " + schema
+                            + ".training_sections s ON s.training_session_id = t.id ORDER BY t.id")) {
+                assertTrue(result.next());
+                assertEquals("General", result.getString("name"));
+                org.junit.jupiter.api.Assertions.assertNull(result.getString("equipment"));
+                assertEquals("Run", result.getString("content"));
+                assertTrue(result.next());
+                assertEquals("Tempo", result.getString("name"));
+                org.junit.jupiter.api.Assertions.assertNull(result.getString("equipment"));
+            }
+            try (var connection = DriverManager.getConnection(
+                    POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword());
+                    var statement = connection.createStatement();
+                    var result = statement.executeQuery(
+                            "SELECT name, equipment FROM " + schema + ".training_import_drafts")) {
+                assertTrue(result.next());
+                assertEquals("Legacy draft", result.getString("name"));
+                org.junit.jupiter.api.Assertions.assertNull(result.getString("equipment"));
+            }
+        } finally {
+            try (var connection = DriverManager.getConnection(
+                    POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword());
+                    var statement = connection.createStatement()) {
+                statement.execute("DROP SCHEMA IF EXISTS " + schema + " CASCADE");
+            }
+        }
     }
 
     @Test

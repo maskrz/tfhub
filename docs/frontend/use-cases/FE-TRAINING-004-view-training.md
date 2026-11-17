@@ -29,6 +29,7 @@ Display complete training details, including type, immutable training group and 
 - The group is read-only.
 - Display the FREE_TEXT assignment mode and target summary. Do not expose other selected athletes' identities to an ATHLETE account.
 - FREE_TEXT sections are displayed in their saved order and no athlete-participation controls are shown.
+- Authorized staff see a separate `Sprzęt` section when the FREE_TEXT equipment note is present, preserving line breaks. Athletes never see the note.
 - Provide separate actions for plan editing and assigning/recording athlete participation. Do not combine them into one edit action.
 - Offer **Usuń trening** for planned and completed sessions with explicit confirmation (FE-TRAINING-005).
 - Backend authorization remains authoritative.

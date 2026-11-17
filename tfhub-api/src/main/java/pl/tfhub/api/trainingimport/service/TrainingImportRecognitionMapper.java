@@ -188,7 +188,8 @@ public class TrainingImportRecognitionMapper {
 				trainingDate,
 				Map.copyOf(rootMetadata),
 				List.copyOf(definitions),
-				List.of());
+				List.of(),
+				null);
 	}
 
 	private TrainingImportRecognizedDraft mapFreeText(TrainingImportRecognitionData recognized) {
@@ -246,6 +247,9 @@ public class TrainingImportRecognitionMapper {
 		rootMetadata.put("fields", Map.of(
 				"name", fieldMetadata(recognized.name()),
 				"trainingDate", fieldMetadata(recognized.trainingDate())));
+		if (recognized.equipment() != null) {
+			rootMetadata.put("equipment", fieldMetadata(recognized.equipment()));
+		}
 		putIfPresent(rootMetadata, "recognizedGroupName", recognized.recognizedGroupName());
 		return new TrainingImportRecognizedDraft(
 				TrainingType.FREE_TEXT,
@@ -253,7 +257,8 @@ public class TrainingImportRecognitionMapper {
 				trainingDate,
 				Map.copyOf(rootMetadata),
 				List.of(),
-				List.copyOf(sections));
+				List.copyOf(sections),
+				recognized.equipment() == null ? null : recognized.equipment().value());
 	}
 
 	private Map<String, Object> sectionMetadata(
@@ -307,7 +312,7 @@ public class TrainingImportRecognitionMapper {
 					true, "Training date could not be recognized");
 		}
 		return new TrainingImportRecognitionData(recognized.name(), date, recognized.recognizedGroupName(),
-				recognized.definitions(), recognized.sections());
+				recognized.definitions(), recognized.sections(), recognized.equipment());
 	}
 
 	private LocalDate parseDate(TrainingImportRecognitionData.RecognizedField date) {

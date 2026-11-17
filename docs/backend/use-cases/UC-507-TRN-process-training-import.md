@@ -71,6 +71,7 @@ The exact state transition rules must be enforced by the backend.
 - Preserve recognized source order and use explicit headings when present. When absent, group related activities into a small number of logical sections where reasonable; do not invent exercises or details.
 - A valid response may contain one section or uncertain/incomplete section structure. If no useful structure is recognized, return one `Trening` section containing the recognized text in original order.
 - Represent uncertain or unreadable text using draft recognition metadata so the coach can inspect and correct it. Section uncertainty, one-section output or imperfect grouping alone is not a processing failure.
+- Extract a clearly separated `Sprzęt` section into optional equipment rather than training sections, preserving wording and line breaks. Never infer equipment from exercises; preserve ambiguous text in recognition metadata for explicit review. Missing equipment from older responses remains valid.
 - Distinguish technical/API failure and malformed or unusable structured output from a valid but imperfect result. Only technical failures and structurally unusable responses follow the existing processing failure/retry path.
 
 ### 4.4 Handwritten Execution Data Recognition

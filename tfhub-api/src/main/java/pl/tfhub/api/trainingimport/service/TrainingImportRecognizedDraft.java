@@ -14,7 +14,8 @@ record TrainingImportRecognizedDraft(
 		LocalDate trainingDate,
 		Map<String, Object> recognitionMetadata,
 		List<Definition> definitions,
-		List<Section> sections) {
+		List<Section> sections,
+		String equipment) {
 
 	record Section(
 			String title,

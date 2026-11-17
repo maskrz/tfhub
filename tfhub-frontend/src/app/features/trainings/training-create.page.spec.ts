@@ -221,6 +221,7 @@ describe('TrainingCreatePage', () => {
     page.addSection();
     page.sections.at(1).controls.title.setValue('Część główna');
     page.sections.at(1).controls.content.setValue('Skip A 3 × 30 m');
+    page.form.controls.equipment.setValue('Piłka\nGumy');
     page.moveSection(1, -1);
     page.submit();
     await fixture.whenStable();
@@ -232,6 +233,7 @@ describe('TrainingCreatePage', () => {
       assignmentType: 'GROUP',
       trainingGroupId: 1,
       athleteIds: [],
+      equipment: 'Piłka\nGumy',
       sections: [
         { title: 'Część główna', content: 'Skip A 3 × 30 m', sequenceNumber: 1 },
         { title: 'Rozgrzewka', content: 'Trucht 10 minut', sequenceNumber: 2 },
@@ -271,6 +273,7 @@ describe('TrainingCreatePage', () => {
       assignmentType: 'ATHLETES',
       trainingGroupId: null,
       athleteIds: [1, 2],
+      equipment: null,
       sections: [{ title: 'Część główna', content: 'Ćwiczenia biegowe', sequenceNumber: 1 }],
     });
   });

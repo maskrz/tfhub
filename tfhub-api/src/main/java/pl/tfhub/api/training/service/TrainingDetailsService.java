@@ -205,6 +205,8 @@ public class TrainingDetailsService {
                 assignedAthletes,
                 definitionResponses,
                 training.getTrainingType(),
-                sections);
+                sections,
+                role != UserRole.ATHLETE && training.getTrainingType() == TrainingType.FREE_TEXT
+                        ? training.getEquipment() : null);
     }
 }

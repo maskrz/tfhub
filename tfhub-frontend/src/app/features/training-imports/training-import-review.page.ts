@@ -95,6 +95,8 @@ export class TrainingImportReviewPage implements OnInit {
     name: new FormControl('', { nonNullable: true, validators: [nonBlank, Validators.maxLength(255)] }),
     trainingDate: new FormControl('', { nonNullable: true }),
     recognitionReviewed: new FormControl(false, { nonNullable: true }),
+    equipment: new FormControl('', { nonNullable: true }),
+    equipmentRecognitionReviewed: new FormControl(false, { nonNullable: true }),
     definitions: new FormArray<DefinitionForm>([]),
     sections: new FormArray<SectionForm>([]),
   });
@@ -489,6 +491,7 @@ export class TrainingImportReviewPage implements OnInit {
   }
 
   issueLocation(path: string): string {
+    if (path === 'equipment') return 'Sprzęt';
     const section = /^sections\/(\d+)/.exec(path);
     if (section) return `Sekcja ${section[1]}`;
     const definition = /^definitions\/(\d+)(?:\/segments\/(\d+))?/.exec(path);
@@ -546,6 +549,8 @@ export class TrainingImportReviewPage implements OnInit {
     this.form.controls.name.setValue(draft.name);
     this.form.controls.trainingDate.setValue(draft.trainingDate ?? '');
     this.form.controls.recognitionReviewed.setValue(draft.recognitionReviewed);
+    this.form.controls.equipment.setValue(draft.equipment ?? '');
+    this.form.controls.equipmentRecognitionReviewed.setValue(draft.equipmentRecognitionReviewed ?? false);
     const controls = this.resettableControls();
     if (!this.initialized) {
       for (const control of controls) this.initialValues.set(control, control.value);
@@ -563,6 +568,7 @@ export class TrainingImportReviewPage implements OnInit {
     return [
       this.form.controls.name,
       this.form.controls.trainingDate,
+      this.form.controls.equipment,
       ...this.sections.controls.flatMap((section) => [section.controls.title, section.controls.content]),
       ...this.definitions.controls.flatMap((definition) => [
         definition.controls.name,
@@ -646,6 +652,10 @@ export class TrainingImportReviewPage implements OnInit {
       name: value.name.trim(),
       trainingDate: value.trainingDate || null,
       recognitionReviewed: value.recognitionReviewed,
+      ...(this.draft()?.trainingType === 'FREE_TEXT' ? {
+        equipment: value.equipment || null,
+        equipmentRecognitionReviewed: value.equipmentRecognitionReviewed,
+      } : {}),
       definitions: value.definitions.map((definition, definitionIndex) => {
         const sequences = this.sequenceNumbers(definition.segments.map((segment) => segment.originalSequence));
         return {

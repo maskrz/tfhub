@@ -63,6 +63,9 @@ public class Training {
     @Column(name = "assignment_type", nullable = false, length = 20)
     private TrainingAssignmentType assignmentType = TrainingAssignmentType.GROUP;
 
+    @Column(columnDefinition = "text")
+    private String equipment;
+
     protected Training() {
     }
 
@@ -93,6 +96,17 @@ public class Training {
     public void updateDetails(String name, LocalDate trainingDate) {
         setName(name);
         this.trainingDate = trainingDate;
+    }
+
+    public void setEquipment(String equipment) {
+        if (trainingType != TrainingType.FREE_TEXT && equipment != null) {
+            throw new IllegalArgumentException("Equipment is only available for FREE_TEXT trainings");
+        }
+        this.equipment = equipment;
+    }
+
+    public String getEquipment() {
+        return equipment;
     }
 
     public void markCompleted() {

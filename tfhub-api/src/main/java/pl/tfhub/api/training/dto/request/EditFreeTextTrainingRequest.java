@@ -11,6 +11,7 @@ import java.util.List;
 import pl.tfhub.api.common.validation.StrictLongDeserializer;
 import pl.tfhub.api.training.enums.TrainingAssignmentType;
 import tools.jackson.databind.annotation.JsonDeserialize;
+import tools.jackson.databind.JsonNode;
 
 public record EditFreeTextTrainingRequest(
         @NotBlank @Size(max = 255) String name,
@@ -19,7 +20,13 @@ public record EditFreeTextTrainingRequest(
         @Positive @JsonDeserialize(using = StrictLongDeserializer.class) Long trainingGroupId,
         @JsonDeserialize(contentUsing = StrictLongDeserializer.class)
         List<@NotNull @Positive Long> athleteIds,
-        @NotEmpty List<@NotNull @Valid EditTrainingSectionRequest> sections) {
+        @NotEmpty List<@NotNull @Valid EditTrainingSectionRequest> sections,
+        JsonNode equipment) {
+
+    public EditFreeTextTrainingRequest(String name, LocalDate trainingDate, TrainingAssignmentType assignmentType,
+            Long trainingGroupId, List<Long> athleteIds, List<EditTrainingSectionRequest> sections) {
+        this(name, trainingDate, assignmentType, trainingGroupId, athleteIds, sections, null);
+    }
 
     public EditFreeTextTrainingRequest {
         name = name == null ? null : name.strip();

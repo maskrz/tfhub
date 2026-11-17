@@ -97,6 +97,12 @@
           </section>
         }
       }
+      @if (canManageTraining && currentTraining.equipment; as equipment) {
+        <section class="details-card definition-card" aria-labelledby="equipment-heading">
+          <h2 id="equipment-heading">Sprzęt</h2>
+          <p class="training-section-content">{{ equipment }}</p>
+        </section>
+      }
     } @else if (currentTraining.definitions.length === 0) {
       <p class="feedback" role="status">Ten trening nie ma jeszcze podgrup.</p>
     } @else {

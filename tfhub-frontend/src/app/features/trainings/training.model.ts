@@ -56,6 +56,7 @@ export interface CreateFreeTextTrainingRequest {
   trainingGroupId: number | null;
   athleteIds: number[];
   sections: CreateTrainingSectionRequest[];
+  equipment?: string | null;
 }
 
 export interface EditFreeTextTrainingRequest {
@@ -65,6 +66,7 @@ export interface EditFreeTextTrainingRequest {
   trainingGroupId: number | null;
   athleteIds: number[];
   sections: EditTrainingSectionRequest[];
+  equipment?: string | null;
 }
 
 export interface CreateTrainingResponse {
@@ -133,6 +135,7 @@ export interface TrainingDetails {
   definitions: TrainingDefinitionDetails[];
   trainingType: TrainingType;
   sections: TrainingSectionDetails[];
+  equipment?: string | null;
 }
 
 export interface EditTrainingExecutionRequest {

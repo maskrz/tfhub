@@ -392,7 +392,23 @@ public class TrainingImportDraftService {
 				TrainingImportRecognitionMetadata.isReviewed(draft.getRecognitionMetadata()),
 				definitionResponses,
 				sectionResponses,
-				new TrainingImportDraftResponse.Validation(issues.isEmpty(), issues));
+				new TrainingImportDraftResponse.Validation(issues.isEmpty(), issues),
+				trainingImport.getTrainingType() == TrainingType.FREE_TEXT ? draft.getEquipment() : null,
+				trainingImport.getTrainingType() == TrainingType.FREE_TEXT ? equipmentMetadata(draft) : null,
+				trainingImport.getTrainingType() == TrainingType.FREE_TEXT
+						? TrainingImportRecognitionMetadata.isReviewed(equipmentMetadata(draft)) : null);
+	}
+
+	private Map<String, Object> equipmentMetadata(TrainingImportDraft draft) {
+		Object metadata = draft.getRecognitionMetadata().get("equipment");
+		if (!(metadata instanceof Map<?, ?> values)) {
+			return Map.of();
+		}
+		Map<String, Object> result = new java.util.LinkedHashMap<>();
+		values.forEach((key, value) -> {
+			if (key instanceof String stringKey) result.put(stringKey, value);
+		});
+		return result;
 	}
 
 	private Map<String, Object> filterSuggestions(Map<String, Object> metadata, Set<Long> eligibleIds) {
@@ -417,6 +433,9 @@ public class TrainingImportDraftService {
 		addRecognitionIssue(issues, "training", draft.getRecognitionMetadata(),
 				TrainingImportRecognitionMetadata.isReviewed(draft.getRecognitionMetadata()));
 		if (draft.getTrainingImport().getTrainingType() == TrainingType.FREE_TEXT) {
+			Map<String, Object> equipmentMetadata = equipmentMetadata(draft);
+			addRecognitionIssue(issues, "equipment", equipmentMetadata,
+					TrainingImportRecognitionMetadata.isReviewed(equipmentMetadata));
 			if (data.sections().isEmpty()) {
 				issues.add(issue("NO_SECTIONS", "sections", "At least one training section is required"));
 			}
@@ -548,8 +567,20 @@ public class TrainingImportDraftService {
 		}
 
 		draft.update(request.name(), request.trainingDate());
-		draft.setRecognitionMetadata(TrainingImportRecognitionMetadata.withReviewState(
-				draft.getRecognitionMetadata(), request.recognitionReviewed()));
+		if (request.equipment() != null) {
+			if (!request.equipment().isNull() && !request.equipment().isTextual()) {
+				throw invalid("Equipment must be text or null");
+			}
+			draft.setEquipment(request.equipment().isNull() ? null : request.equipment().textValue());
+		}
+		Map<String, Object> metadata = new java.util.LinkedHashMap<>(
+				TrainingImportRecognitionMetadata.withReviewState(
+						draft.getRecognitionMetadata(), request.recognitionReviewed()));
+		if (request.equipmentRecognitionReviewed() != null) {
+			metadata.put("equipment", TrainingImportRecognitionMetadata.withReviewState(
+					equipmentMetadata(draft), request.equipmentRecognitionReviewed()));
+		}
+		draft.setRecognitionMetadata(metadata);
 		draftRepository.saveAndFlush(draft);
 		sectionRepository.deleteAll(existing.sections());
 		sectionRepository.flush();

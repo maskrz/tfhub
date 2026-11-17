@@ -14,6 +14,7 @@ import pl.tfhub.api.trainingimport.dto.response.TrainingImportRejectionResponse;
 import pl.tfhub.api.trainingimport.dto.response.TrainingImportAthleteCandidateResponse;
 import pl.tfhub.api.trainingimport.dto.response.TrainingImportDraftResponse;
 import pl.tfhub.api.trainingimport.dto.response.TrainingImportStatusResponse;
+import pl.tfhub.api.trainingimport.dto.request.TrainingImportDraftUpdateRequest;
 import pl.tfhub.api.trainingimport.enums.TrainingImportAttemptStatus;
 import pl.tfhub.api.trainingimport.enums.TrainingImportStatus;
 import pl.tfhub.api.trainingimport.service.TrainingImportDraftService;
@@ -57,6 +58,26 @@ class TrainingImportControllerTests {
 
 	@MockitoBean
 	private TrainingImportListService listService;
+
+	@Test
+	void draftUpdatesDistinguishAbsentEquipmentFromNull() throws Exception {
+		when(draftService.updateDraft(eq(42L), any())).thenReturn(new TrainingImportDraftResponse(
+				42, TrainingImportStatus.REVIEW_REQUIRED, new TrainingGroupResponse(7, "Group A"),
+				"Session", null, java.util.Map.of(), false, java.util.List.of(),
+				new TrainingImportDraftResponse.Validation(true, java.util.List.of())));
+		String base = "{\"name\":\"Session\",\"recognitionReviewed\":false,\"definitions\":[],\"sections\":[]%s}";
+		for (String equipment : java.util.List.of("", ",\"equipment\":null", ",\"equipment\":\"Ball\\nBands\"")) {
+			mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+					.put("/api/training-imports/42/draft").contentType(MediaType.APPLICATION_JSON)
+					.content(base.formatted(equipment))).andExpect(status().isOk());
+		}
+		var requests = org.mockito.ArgumentCaptor.forClass(TrainingImportDraftUpdateRequest.class);
+		verify(draftService, org.mockito.Mockito.times(3)).updateDraft(eq(42L), requests.capture());
+		org.junit.jupiter.api.Assertions.assertNull(requests.getAllValues().get(0).equipment());
+		org.junit.jupiter.api.Assertions.assertTrue(requests.getAllValues().get(1).equipment().isNull());
+		org.junit.jupiter.api.Assertions.assertEquals("Ball\nBands",
+				requests.getAllValues().get(2).equipment().textValue());
+	}
 
 	@Test
 	void listsActiveImportSummaries() throws Exception {

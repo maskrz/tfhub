@@ -36,6 +36,7 @@ One persisted training event.
 | `status` | `VARCHAR(20)` | No | `PLANNED` or `COMPLETED`; defaults to `PLANNED` |
 | `training_type` | `VARCHAR(20)` | No | `TEMPO` or `FREE_TEXT`; existing sessions default to `TEMPO` |
 | `assignment_type` | `VARCHAR(20)` | No | `GROUP` or `ATHLETES`; existing sessions default to `GROUP` |
+| `equipment` | `TEXT` | Yes | FREE_TEXT-only private staff note; preserves line breaks |
 
 Use `ON DELETE RESTRICT` / `ON UPDATE RESTRICT` for the group FK. Constrain status to `PLANNED` or `COMPLETED` and require a date for `COMPLETED`. Do not add creator-based access. TEMPO remains group-assigned and its group remains immutable. FREE_TEXT edits may switch assignment modes or replace the selected group/athletes. Row checks enforce the valid `training_type`/`assignment_type`/group combinations; transactional service validation enforces non-empty athlete targets and mode-consistent association rows.
 
@@ -65,6 +66,8 @@ One ordered free-text section within a FREE_TEXT session.
 | `sequence_number` | `INTEGER` | No | Display order |
 
 Use a restrictive FK, unique `(training_session_id, sequence_number)` order, and a positive sequence constraint. Keep titles as free text; do not add an exercise entity or fixed section enum. Service validation enforces at least one section and prevents section operations on TEMPO sessions. V14 adds this table. Deletion explicitly removes sections before the session root.
+
+V19 stores optional equipment on the session root and import draft, not in training sections. Equipment is visible only to authorized ADMIN/COACH users and is excluded from athlete responses and lists.
 
 ### 2.4 `training_definitions`
 

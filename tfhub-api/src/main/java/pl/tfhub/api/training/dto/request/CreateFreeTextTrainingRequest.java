@@ -19,7 +19,13 @@ public record CreateFreeTextTrainingRequest(
         @Positive @JsonDeserialize(using = StrictLongDeserializer.class) Long trainingGroupId,
         @JsonDeserialize(contentUsing = StrictLongDeserializer.class)
         List<@NotNull @Positive Long> athleteIds,
-        @NotEmpty List<@NotNull @Valid CreateTrainingSectionRequest> sections) {
+        @NotEmpty List<@NotNull @Valid CreateTrainingSectionRequest> sections,
+        String equipment) {
+
+    public CreateFreeTextTrainingRequest(String name, LocalDate trainingDate, TrainingAssignmentType assignmentType,
+            Long trainingGroupId, List<Long> athleteIds, List<CreateTrainingSectionRequest> sections) {
+        this(name, trainingDate, assignmentType, trainingGroupId, athleteIds, sections, null);
+    }
 
     public CreateFreeTextTrainingRequest {
         name = name == null ? null : name.strip();

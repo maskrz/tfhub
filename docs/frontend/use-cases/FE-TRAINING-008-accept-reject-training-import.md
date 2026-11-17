@@ -24,7 +24,7 @@ Allow an authorized user to explicitly accept the complete reviewed draft into o
 ## 4. Confirmation and Data Integrity
 
 - Acceptance and rejection are separate, explicit whole-import operations; never automatically finalize based on OCR confidence or draft validity.
-- Acceptance uses the latest saved draft. The backend revalidates it and atomically creates a `COMPLETED` training if dated, or a `PLANNED` training if undated. TEMPO imports create definitions, segments, matched participations and executions; FREE_TEXT imports create ordered sections only, with no athlete records.
+- Acceptance uses the latest saved draft. The backend revalidates it and atomically creates a `COMPLETED` training if dated, or a `PLANNED` training if undated. TEMPO imports create definitions, segments, matched participations and executions; FREE_TEXT imports create ordered sections and optional private equipment notes, with no athlete records.
 - Skipped athlete rows do not create persisted participation or execution records.
 - Rejection does not create a training.
 - The optimized JPEG, current draft and processing attempts remain retained after either outcome. The UI must not imply that individual draft-edit history is stored.

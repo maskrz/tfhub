@@ -47,6 +47,7 @@ Reviewing or modifying a draft must not create or modify persisted training sess
 ### 4.1.1 FREE_TEXT Sections
 
 - The authorized user can edit the training name/date and add, edit, remove and reorder sections.
+- Staff can review and edit optional multiline equipment; uncertain equipment must be explicitly confirmed before acceptance. An omitted `equipment` update preserves the draft note; explicit null clears it.
 - Each section has a free-text title and content; titles are not selected from a fixed category list.
 - Recognition uncertainty and incomplete OCR remain reviewable and do not make a draft invalid for retrieval or saving. The backend reports outstanding review/readiness issues; the coach can correct the data before acceptance.
 - A FREE_TEXT draft must contain at least one section with a title and content before it is ready for acceptance. Uncertain fields must be explicitly confirmed or corrected.

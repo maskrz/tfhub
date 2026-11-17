@@ -28,7 +28,7 @@ The view must follow the existing TFHUB visual design and interaction patterns.
     - Enters its name.
     - Adds one or more training segments.
     - Configures the distance and rest after each segment.
-7. For FREE_TEXT, the user adds one or more sections with editable titles and content and can reorder them.
+7. For FREE_TEXT, the user adds one or more sections with editable titles and content and can reorder them. An optional multiline `Sprzęt` field is a private staff note.
 8. The user reviews the complete training structure and assignment.
 9. The user submits the selected type to its UC-502 endpoint.
 10. On success, the user is redirected to the created training's details view.

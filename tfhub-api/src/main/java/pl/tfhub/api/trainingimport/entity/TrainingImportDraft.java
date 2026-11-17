@@ -43,6 +43,9 @@ public class TrainingImportDraft {
 	@Column(name = "training_date")
 	private LocalDate trainingDate;
 
+	@Column(columnDefinition = "text")
+	private String equipment;
+
 	@JdbcTypeCode(SqlTypes.JSON)
 	@Column(name = "recognition_metadata", nullable = false, columnDefinition = "jsonb")
 	private Map<String, Object> recognitionMetadata = Map.of();
@@ -100,6 +103,14 @@ public class TrainingImportDraft {
 
 	public String getName() {
 		return name;
+	}
+
+	public String getEquipment() {
+		return equipment;
+	}
+
+	public void setEquipment(String equipment) {
+		this.equipment = equipment;
 	}
 
 	public LocalDate getTrainingDate() {
