@@ -11,6 +11,7 @@ The view must follow the existing TFHUB visual design and interaction patterns.
 - **ADMIN** – can view all planned trainings and may include completed trainings.
 - **COACH** – can view trainings belonging to groups assigned to that coach and may include completed trainings.
 - **ATHLETE** – can view only FREE_TEXT trainings assigned to their current group or directly to them.
+- For athletes, the backend omits group trainings on a date with an individual training assigned to that athlete, irrespective of status. Undated trainings are unaffected.
 
 ## 3. Preconditions
 

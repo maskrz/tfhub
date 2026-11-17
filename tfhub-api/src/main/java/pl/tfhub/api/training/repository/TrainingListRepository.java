@@ -114,6 +114,17 @@ public class TrainingListRepository {
                       )
                 )
                 """);
+        predicates.add("""
+                (t.assignment_type <> 'GROUP' OR t.training_date IS NULL OR NOT EXISTS (
+                    SELECT 1
+                    FROM training_sessions individual
+                    JOIN training_session_athletes target ON target.training_session_id = individual.id
+                    WHERE individual.training_type = 'FREE_TEXT'
+                      AND individual.assignment_type = 'ATHLETES'
+                      AND individual.training_date = t.training_date
+                      AND target.athlete_id = :athleteId
+                ))
+                """);
         if (!includeCompleted) {
             predicates.add("t.status = 'PLANNED'");
         }

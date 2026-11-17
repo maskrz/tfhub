@@ -51,6 +51,8 @@ The operation must enforce role-based access and training group visibility rules
 
 - ATHLETE list results contain only FREE_TEXT sessions visible through the athlete's current group (GROUP mode) or explicit target row (ATHLETES mode); TEMPO sessions are not included.
 - Athlete accounts can list planned and completed visible FREE_TEXT sessions; `includeCompleted` retains its existing default of false.
+- For a calendar date with one or more FREE_TEXT sessions explicitly assigned to the athlete, omit all group-assigned sessions on that date from that athlete's list. Other athletes' assignments do not affect the list.
+- Apply this override regardless of session status and before status filtering. Undated sessions do not override each other. Staff lists are unaffected; access to group-session details by direct link remains unchanged.
 
 ### 4.4 Training Status
 
@@ -132,7 +134,7 @@ If the user has no sessions matching the requested status, the operation returns
 
 ## 11. Consistency Requirements
 
-- Training visibility rules must be consistent with authorization rules for retrieving training details.
+- List results are a subset of sessions authorized for details; the athlete-specific date override can hide a group session that remains accessible by direct link.
 - A training session visible in the list must also be accessible through the corresponding details operation, subject to the same authorization rules.
 - Group visibility must be evaluated using the current coach-to-group relationships.
 - A coach who is no longer assigned to a training's group must no longer see that training in the standard list.

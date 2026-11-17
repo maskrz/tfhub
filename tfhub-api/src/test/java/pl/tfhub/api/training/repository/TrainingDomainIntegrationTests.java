@@ -494,6 +494,80 @@ class TrainingDomainIntegrationTests {
     }
 
     @Test
+    void athleteListPrefersIndividualTrainingsOnTheSameDateRegardlessOfStatus() {
+        long group = createFreeTextTraining("Group", TrainingAssignmentType.GROUP, 1L, List.of());
+        long anotherGroup = createFreeTextTraining("Another group", TrainingAssignmentType.GROUP, 1L, List.of());
+        long individual = createFreeTextTraining("Individual", TrainingAssignmentType.ATHLETES, null, List.of(1L, 2L));
+        long secondIndividual = createFreeTextTraining("Second individual", TrainingAssignmentType.ATHLETES, null, List.of(1L));
+        long otherDate = createFreeTextTraining("Other date", TrainingAssignmentType.GROUP, 1L, List.of());
+        jdbcTemplate.update("UPDATE training_sessions SET training_date = DATE '2026-03-05' WHERE id = ?", otherDate);
+        jdbcTemplate.update("UPDATE training_sessions SET status = 'COMPLETED' WHERE id = ?", individual);
+        long athleteOne = insertAthleteAccount(1, "athlete-one");
+        long athleteTwo = insertAthleteAccount(2, "athlete-two");
+        long athleteThree = insertAthleteAccount(3, "athlete-three");
+        long coach = insertUser("coach", "COACH");
+        jdbcTemplate.update("INSERT INTO user_training_group (user_id, training_group_id) VALUES (?, 1)", coach);
+
+        authenticate(athleteOne, UserRole.ATHLETE, "athlete-one");
+        assertEquals(java.util.Set.of(otherDate, secondIndividual),
+                trainingQueryService.listTrainings(false, null).stream().map(item -> item.id())
+                        .collect(java.util.stream.Collectors.toSet()));
+        assertEquals(java.util.Set.of(otherDate, individual, secondIndividual),
+                trainingQueryService.listTrainings(true, TrainingType.FREE_TEXT).stream().map(item -> item.id())
+                        .collect(java.util.stream.Collectors.toSet()));
+        assertEquals(group, trainingDetailsService.getTraining(group).id());
+        assertTrue(trainingQueryService.listTrainings(true, TrainingType.TEMPO).isEmpty());
+
+        authenticate(athleteTwo, UserRole.ATHLETE, "athlete-two");
+        assertEquals(java.util.Set.of(otherDate),
+                trainingQueryService.listTrainings(false, null).stream().map(item -> item.id())
+                        .collect(java.util.stream.Collectors.toSet()));
+        assertEquals(java.util.Set.of(otherDate, individual),
+                trainingQueryService.listTrainings(true, null).stream().map(item -> item.id())
+                        .collect(java.util.stream.Collectors.toSet()));
+
+        authenticate(athleteThree, UserRole.ATHLETE, "athlete-three");
+        assertEquals(java.util.Set.of(group, anotherGroup, otherDate),
+                trainingQueryService.listTrainings(true, null).stream().map(item -> item.id())
+                        .collect(java.util.stream.Collectors.toSet()));
+
+        jdbcTemplate.update("UPDATE training_sessions SET status = 'COMPLETED' WHERE id = ?", group);
+        jdbcTemplate.update("UPDATE training_sessions SET status = 'PLANNED' WHERE id = ?", individual);
+        authenticate(athleteTwo, UserRole.ATHLETE, "athlete-two");
+        assertEquals(java.util.Set.of(otherDate, individual),
+                trainingQueryService.listTrainings(true, null).stream().map(item -> item.id())
+                        .collect(java.util.stream.Collectors.toSet()));
+
+        authenticate(coach, UserRole.COACH, "coach");
+        assertEquals(java.util.Set.of(group, anotherGroup, individual, secondIndividual, otherDate),
+                trainingQueryService.listTrainings(true, null).stream().map(item -> item.id())
+                        .collect(java.util.stream.Collectors.toSet()));
+        authenticate(1, UserRole.ADMIN, "admin");
+        assertEquals(5, trainingQueryService.listTrainings(true, null).size());
+    }
+
+    @Test
+    void undatedIndividualDoesNotOverrideGroupAndChangesApplyImmediately() {
+        long group = createFreeTextTraining("Group", TrainingAssignmentType.GROUP, 1L, List.of());
+        long individual = createFreeTextTraining("Individual", TrainingAssignmentType.ATHLETES, null, List.of(1L));
+        jdbcTemplate.update("UPDATE training_sessions SET training_date = NULL WHERE id IN (?, ?)", group, individual);
+        long athlete = insertAthleteAccount(1, "athlete");
+        authenticate(athlete, UserRole.ATHLETE, "athlete");
+        assertEquals(java.util.Set.of(group, individual),
+                trainingQueryService.listTrainings(true, null).stream().map(item -> item.id())
+                        .collect(java.util.stream.Collectors.toSet()));
+        jdbcTemplate.update("UPDATE training_sessions SET training_date = DATE '2026-03-04' WHERE id IN (?, ?)",
+                group, individual);
+        assertEquals(List.of(individual), trainingQueryService.listTrainings(true, null).stream()
+                .map(item -> item.id()).toList());
+        authenticate(1, UserRole.ADMIN, "admin");
+        trainingDeletionService.deleteTraining(individual);
+        authenticate(athlete, UserRole.ATHLETE, "athlete");
+        assertEquals(List.of(group), trainingQueryService.listTrainings(true, null).stream()
+                .map(item -> item.id()).toList());
+    }
+
+    @Test
     void individualFreeTextAssignmentsExposeOnlySelectedAthletesAndRemainVisibleByIdOnlyToThem() {
         long oneAthleteTraining = createFreeTextTraining(
                 "One athlete", TrainingAssignmentType.ATHLETES, null, List.of(1L));
