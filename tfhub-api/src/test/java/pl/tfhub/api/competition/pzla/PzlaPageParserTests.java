@@ -46,6 +46,32 @@ class PzlaPageParserTests {
 	}
 
 	@Test
+	void classifiesCurrentSeasonResultsAsOutdoorFromAprilToOctoberAndIndoorOtherwise() {
+		String html = html().replace("</table></body>",
+				"""
+				<tr><td title="40160">60 m</td><td><b>8.10</b></td><td></td><td>2026-02-14</td>
+				<td title="Hala"><a href="mityng.php?Sezon=&amp;Nr[]=12345">Toruń</a></td><td></td></tr>
+				<tr><td title="40161">200 m</td><td><b>29.10</b></td><td></td><td>2026-10-31</td>
+				<td title="Hala"><a href="mityng.php?Sezon=&amp;Nr[]=12346">Toruń</a></td><td></td></tr>
+				<tr><td title="40162">400 m</td><td><b>65.10</b></td><td></td><td>2026-04-01</td>
+				<td title="Stadion"><a href="mityng.php?Sezon=&amp;Nr[]=12347">Toruń</a></td><td></td></tr>
+				</table></body>
+				""");
+
+		assertThat(parser.parse(html, "163067", null, null).results())
+				.extracting(PzlaResult::resultDate, PzlaResult::seasonType)
+				.contains(
+						org.assertj.core.api.Assertions.tuple(
+								java.time.LocalDate.parse("2026-02-14"), CompetitionSeasonType.INDOOR),
+						org.assertj.core.api.Assertions.tuple(
+								java.time.LocalDate.parse("2026-10-31"), CompetitionSeasonType.OUTDOOR),
+						org.assertj.core.api.Assertions.tuple(
+								java.time.LocalDate.parse("2026-04-01"), CompetitionSeasonType.OUTDOOR))
+				.doesNotContain(org.assertj.core.api.Assertions.tuple(
+						java.time.LocalDate.parse("2026-10-31"), CompetitionSeasonType.INDOOR));
+	}
+
+	@Test
 	void parsesARequestedSeasonAndPreservesNonnumericMarks() {
 		PzlaParsedPage page = parser.parse(
 				html().replace("<b>14.18</b>", "<b>DNS</b>"),

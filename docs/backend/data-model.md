@@ -348,7 +348,7 @@ Official results are not `TestResult` records. They are stored in the separate `
 
 ### 7.2 CompetitionResult
 
-Each row belongs to one athlete and one competition event. It stores the competition date as `DATE`, PZLA's original mark, an optional normalized numeric value, the snapshotted unit, optional wind, season and indoor/outdoor classification, competition name/location, round metadata, and source (`PZLA` or `MANUAL`). Place, ambiguous trailing PZLA columns, and field-event attempts are not stored.
+Each row belongs to one athlete and one competition event. It stores the competition date as `DATE`, PZLA's original mark, an optional normalized numeric value, the snapshotted unit, optional wind, season and indoor/outdoor classification (for the current-season page, which has no such marker, the result date decides: April-October is `OUTDOOR`, otherwise `INDOOR`; re-synchronization corrects previously stored `UNKNOWN` values), competition name/location, round metadata, and source (`PZLA` or `MANUAL`). Place, ambiguous trailing PZLA columns, and field-event attempts are not stored.
 
 For PZLA imports, `source_fingerprint` is unique per athlete and is used to upsert repeated rows and mark/wind corrections. `source_record_key` is retained when a stable source key can be derived. Manual rows have no source key or fingerprint. No competition result operation modifies `test_results`.
 

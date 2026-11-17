@@ -78,6 +78,12 @@ public class PzlaPageParser {
 		return new PzlaParsedPage(pageCurrentSeason, availableSeasons, results);
 	}
 
+	// The current-season page has no indoor/outdoor marker: April-October is outdoor, otherwise indoor.
+	private CompetitionSeasonType seasonTypeFor(LocalDate date) {
+		int month = date.getMonthValue();
+		return month >= 4 && month <= 10 ? CompetitionSeasonType.OUTDOOR : CompetitionSeasonType.INDOOR;
+	}
+
 	private PzlaResult parseResultRow(
 			HtmlRow row,
 			int season,
@@ -153,7 +159,7 @@ public class PzlaPageParser {
 				numericValue,
 				wind,
 				season,
-				seasonType,
+				seasonType == CompetitionSeasonType.UNKNOWN ? seasonTypeFor(resultDate) : seasonType,
 				competitionSourceId,
 				emptyToNull(competitionName),
 				emptyToNull(location),
