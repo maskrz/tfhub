@@ -1,4 +1,4 @@
-<main class="dashboard">
+<div class="dashboard">
   <header class="page-heading">
     <h1>Panel główny</h1>
   </header>
@@ -113,7 +113,7 @@
         <div class="record-tables">
           <article class="record-card">
             <h3>Kobiety</h3>
-            <div class="table-scroll">
+            <div class="table-scroll" role="region" aria-label="Ranking kobiet" tabindex="0">
               <table>
                 <thead>
                   <tr><th scope="col">Miejsce</th><th scope="col">Zawodnik</th><th scope="col">Wynik</th><th scope="col">Data</th></tr>
@@ -135,7 +135,7 @@
           </article>
           <article class="record-card">
             <h3>Mężczyźni</h3>
-            <div class="table-scroll">
+            <div class="table-scroll" role="region" aria-label="Ranking mężczyzn" tabindex="0">
               <table>
                 <thead>
                   <tr><th scope="col">Miejsce</th><th scope="col">Zawodnik</th><th scope="col">Wynik</th><th scope="col">Data</th></tr>
@@ -170,7 +170,7 @@
       @if (data.recentResults.length === 0) {
         <p class="empty-state">Brak zapisanych wyników.</p>
       } @else {
-        <div class="table-scroll">
+        <div class="table-scroll" role="region" aria-label="Ostatnie wyniki" tabindex="0">
           <table>
             <thead>
               <tr><th scope="col">Data</th><th scope="col">Zawodnik</th><th scope="col">Test</th><th scope="col">Wynik</th></tr>
@@ -192,7 +192,7 @@
       <p class="empty-state" role="status">Ładowanie ostatnich wyników…</p>
     }
   </section>
-</main>
+</div>
 
 @if (isAthleteFormOpen()) {
   <app-athlete-form-modal

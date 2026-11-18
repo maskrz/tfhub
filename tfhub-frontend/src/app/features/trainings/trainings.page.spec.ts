@@ -195,6 +195,9 @@ describe('TrainingsPage', () => {
 
   it('displays response fields, including a zero participant count, in newest-first order', async () => {
     await createPage();
+    const region = fixture.nativeElement.querySelector('.table-surface[role="region"]') as HTMLElement;
+    expect(region.getAttribute('aria-label')).toBe('Lista treningów');
+    expect(region.getAttribute('tabindex')).toBe('0');
 
     expect(visibleNames()).toEqual(['Sprint', 'Trening wytrzymałościowy']);
     expect(fixture.nativeElement.textContent).toContain('Średni dystans');

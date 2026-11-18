@@ -17,16 +17,16 @@ import { AuthService } from './auth.service';
         }
         <label>
           <span>Nazwa użytkownika</span>
-          <input type="text" formControlName="username" autocomplete="username" required />
+          <input class="field-control" type="text" formControlName="username" autocomplete="username" required />
         </label>
         <label>
           <span>Hasło</span>
-          <input type="password" formControlName="password" autocomplete="current-password" required />
+          <input class="field-control" type="password" formControlName="password" autocomplete="current-password" required />
         </label>
         @if (errorMessage()) {
           <p class="error" role="alert">{{ errorMessage() }}</p>
         }
-        <button type="submit" [disabled]="form.invalid || submitting()">
+        <button class="button button--primary" type="submit" [disabled]="form.invalid || submitting()">
           {{ submitting() ? 'Logowanie…' : 'Zaloguj się' }}
         </button>
       </form>
@@ -37,9 +37,6 @@ import { AuthService } from './auth.service';
     .login-card { background: white; border-radius: 1rem; box-shadow: 0 1rem 3rem #2026301a; display: grid; gap: 1.2rem; max-width: 26rem; padding: 2rem; width: 100%; }
     h1 { font-size: 1.5rem; margin: 0; }
     label { display: grid; gap: .45rem; }
-    input { border: 1px solid #cbd1d9; border-radius: .5rem; font: inherit; padding: .7rem; }
-    button { background: #198754; border: 0; border-radius: .5rem; color: white; cursor: pointer; font: inherit; font-weight: 650; padding: .8rem; }
-    button:disabled { cursor: not-allowed; opacity: .6; }
     .error { color: #a3222b; margin: 0; }
     .notice { background: #edf8f0; border-radius: .45rem; color: #236b3a; margin: 0; padding: .75rem; }
   `,

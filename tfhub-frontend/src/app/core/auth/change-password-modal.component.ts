@@ -120,16 +120,10 @@ const nonBlankPassword: ValidatorFn = (control: AbstractControl): ValidationErro
     form { display: grid; gap: 1rem; }
     .field { display: grid; gap: .4rem; }
     label { color: #273248; font-weight: 600; }
-    .field-control { border: 1px solid #cbd1d9; border-radius: .45rem; font: inherit; min-width: 0; padding: .65rem .75rem; }
     .field-control[aria-invalid="true"] { border-color: #b4232d; }
     .field-error, .form-error { color: #a3222b; font-size: .9rem; margin: 0; }
     .form-error { margin-bottom: .15rem; }
     .modal-footer { border-top: 1px solid #dce1ea; display: flex; gap: .7rem; justify-content: flex-end; padding: 1rem 1.5rem; }
-    .button { border: 1px solid transparent; border-radius: .45rem; cursor: pointer; font: inherit; font-weight: 600; padding: .55rem .85rem; }
-    .button:disabled { cursor: not-allowed; opacity: .6; }
-    .button--primary { background: #198754; color: #fff; }
-    .button--secondary, .button--icon { background: #fff; border-color: #cbd1d9; color: #273248; }
-    .button--icon { font-size: 1.2rem; line-height: 1; padding: .35rem .55rem; }
     @media (max-width: 520px) {
       .modal { border-radius: .7rem; max-height: 94dvh; max-width: calc(100vw - 1rem); }
       .modal-header { padding: 1rem; }

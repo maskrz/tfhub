@@ -89,6 +89,7 @@ describe('TrainingImportReviewPage', () => {
     await createPage(freeText);
     expect(fixture.nativeElement.textContent).toContain('Piłka?');
     const equipment = fixture.nativeElement.querySelector('textarea[formControlName=equipment]') as HTMLTextAreaElement;
+    expect(equipment.value).toBe('');
     equipment.value = 'Piłka\nGumy';
     equipment.dispatchEvent(new Event('input'));
     (fixture.nativeElement.querySelector('input[formControlName=equipmentRecognitionReviewed]') as HTMLInputElement).click();
@@ -97,8 +98,60 @@ describe('TrainingImportReviewPage', () => {
     expect(api.updateDraft.mock.calls[0][1].equipmentRecognitionReviewed).toBe(true);
   });
 
+  it('loads, clears and restores a FREE_TEXT equipment note, including after saving', async () => {
+    const freeText: TrainingImportDraft = {
+      ...structuredClone(draft),
+      trainingType: 'FREE_TEXT',
+      definitions: [],
+      sections: [{ id: 1, sequenceNumber: 1, title: 'Trening', content: 'Bieg',
+        recognitionMetadata: {}, recognitionReviewed: false }],
+      equipment: 'Piłka\nGumy',
+      equipmentRecognitionMetadata: {},
+      equipmentRecognitionReviewed: false,
+    };
+    await createPage(freeText);
+    const equipment = fixture.nativeElement.querySelector('textarea[formControlName=equipment]') as HTMLTextAreaElement;
+    expect(equipment.value).toBe('Piłka\nGumy');
+    expect(fixture.nativeElement.querySelector('input[formControlName=equipmentRecognitionReviewed]')).toBeNull();
+    equipment.value = '';
+    equipment.dispatchEvent(new Event('input'));
+    api.updateDraft.mockReturnValue(of({ ...freeText, equipment: null }));
+    fixture.componentInstance.save();
+    expect(api.updateDraft.mock.calls[0][1].equipment).toBeNull();
+    fixture.detectChanges();
+    const buttons = fixture.nativeElement.querySelectorAll('button') as NodeListOf<HTMLButtonElement>;
+    const reset = [...buttons].find((button) => button.textContent?.trim() === 'Przywróć notatkę o sprzęcie');
+    expect(reset).toBeTruthy();
+    reset!.click();
+    fixture.detectChanges();
+    expect(equipment.value).toBe('Piłka\nGumy');
+  });
+
+  it('keeps equipment edits when saving fails', async () => {
+    const freeText: TrainingImportDraft = {
+      ...structuredClone(draft),
+      trainingType: 'FREE_TEXT',
+      definitions: [],
+      sections: [{ id: 1, sequenceNumber: 1, title: 'Trening', content: 'Bieg',
+        recognitionMetadata: {}, recognitionReviewed: false }],
+      equipment: 'Piłka',
+      equipmentRecognitionMetadata: {},
+      equipmentRecognitionReviewed: false,
+    };
+    await createPage(freeText);
+    const equipment = fixture.nativeElement.querySelector('textarea[formControlName=equipment]') as HTMLTextAreaElement;
+    equipment.value = 'Gumy';
+    equipment.dispatchEvent(new Event('input'));
+    api.updateDraft.mockReturnValue(throwError(() => new Error('Save failed')));
+    fixture.componentInstance.save();
+    fixture.detectChanges();
+    expect(equipment.value).toBe('Gumy');
+    expect(fixture.nativeElement.querySelector('[role=alert]')?.textContent).toContain('Nie udało się zapisać');
+  });
+
   it('displays unresolved distance and preserves other values in the corrected update', async () => {
     await createPage();
+    expect(fixture.nativeElement.querySelector('textarea[formControlName=equipment]')).toBeNull();
     expect(fixture.nativeElement.textContent).toContain('Nie rozpoznano dystansu');
     expect(fixture.nativeElement.textContent).not.toContain('Odczyt:');
     expect((fixture.nativeElement.querySelector('[role=combobox]') as HTMLInputElement).value).toContain('Ada Kowalska');

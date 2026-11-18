@@ -4,7 +4,7 @@
 **Język interfejsu:** Polski
 **Odniesienie wizualne:** [Zrzut ekranu widoku Testy](../screenshots/test-management.png); [modal testu](../screenshots/test-popup.png)
 
-Zrzut jest odniesieniem dla układu, hierarchii wizualnej, odstępów, kolorów, nawigacji, obszaru wyszukiwania, tabeli i widocznych akcji. Widoczne na nim nazwy testów, kategorie, statusy i inne wartości są wyłącznie ilustracyjne; o obsługiwanych danych i zachowaniu decydują istniejący model oraz kontrakty backendu.
+Zrzut jest odniesieniem dla układu, hierarchii wizualnej, odstępów, obszaru wyszukiwania, tabeli i widocznych akcji. Zielone akcenty i nawigacja na zrzucie są historyczne; obowiązują wspólne [wytyczne UI](../ui-guidelines.md). Widoczne nazwy testów, kategorie, statusy i inne wartości są wyłącznie ilustracyjne; o obsługiwanych danych i zachowaniu decydują istniejący model oraz kontrakty backendu.
 
 ## 1. Cel widoku
 

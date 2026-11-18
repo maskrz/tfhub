@@ -12,7 +12,7 @@ Wspólny język wizualny:
 - ciemny, grafitowy nagłówek;
 - jasne tło obszaru roboczego;
 - białe powierzchnie treści, tabel i kart;
-- zielony kolor akcentu dla głównych akcji i aktywnej nawigacji;
+- fioletowy kolor akcentu dla głównych akcji, odnośników i aktywnej nawigacji, zgodny z logo TFHub;
 - subtelne obramowania, oszczędne cienie i umiarkowanie zaokrąglone narożniki;
 - czytelna typografia i swobodne odstępy;
 - stonowane kolory statusów; kolor nie może być jedynym nośnikiem informacji.
@@ -20,7 +20,11 @@ Wspólny język wizualny:
 
 Nagłówek używa banera TFHub z `tfhub-frontend/public/tfhub-banner.png`. Ikona favicon pochodzi z wybranego znaku z arkusza identyfikacji i jest udostępniana jako `favicon.ico` oraz `favicon.png`.
 
-Dołączony zrzut ekranu jest głównym odniesieniem wizualnym dla widoku Zarządzanie testami: [Test Management](screenshots/test-management.png). Służy do określenia układu, hierarchii wizualnej, odstępów, kolorów, nawigacji, obszaru wyszukiwania, struktury tabeli i widocznych akcji. Przykładowe nazwy, kategorie, statusy i wartości na zrzucie są ilustracyjne; nie ustanawiają reguł domenowych ani obsługiwanych wartości.
+Dołączony zrzut ekranu jest odniesieniem dla układu widoku Zarządzanie testami: [Test Management](screenshots/test-management.png). Przedstawione na nim zielone akcenty i nawigacja są historyczne; obowiązuje kierunek opisany w tym dokumencie. Przykładowe nazwy, kategorie, statusy i wartości są ilustracyjne; nie ustanawiają reguł domenowych ani obsługiwanych wartości.
+
+Podstawowy fiolet to `#6A1B9A`, a stan hover/pressed to `#581583`. Na ciemnym nagłówku wskaźniki i fokus używają `#C49BFF`; jasny fiolet `#F4EBFA` może wyróżniać zaznaczenie. Zielony pozostaje kolorem semantycznym sukcesu i stanów aktywnych lub zakończonych; czerwony służy błędom i akcjom destrukcyjnym. Kolory wykresów zachowują znaczenie danych.
+
+Docelowe wspólne zasady układu to maksymalna szerokość 80 rem z wyjątkowym wariantem 100 rem dla gęstych widoków, odstępy boczne 1 rem na telefonie i 2 rem na komputerze oraz skala odstępów .25, .5, .75, 1, 1.5, 2 i 3 rem. Tytuł strony powinien mieć rozmiar `clamp(1.75rem, 3vw, 2.25rem)`, tytuł sekcji 1.25–1.5 rem, a tekst bazowy 1 rem z interlinią 1.5. Karty mają subtelne obramowanie, promień .75 rem i zwykle 1–1.5 rem odstępu wewnętrznego. Istniejące widoki będą dostosowywane stopniowo; nie wszystkie stosują jeszcze te wartości.
 
 ## 2. Wspólny układ aplikacji
 
@@ -51,16 +55,18 @@ Są to zakresy planowane; poza specyfikacją widoku Zarządzanie testami nie ozn
 Wspólny nagłówek zawiera:
 
 - markę/logo TFHUB;
-- główną nawigację z menu „Zarządzanie” dla administratora, zawierającym „Sprawdziany” i „Konkurencje”;
+- główną nawigację zgodną z rolą;
 - obszar użytkownika/konta.
 
 Aktywny element nawigacji musi być widoczny i rozpoznawalny również bez polegania wyłącznie na kolorze. Nagłówek jest częścią powłoki aplikacji, nie poszczególnych widoków.
 
 Główna nawigacja i przycisk „Menu” są widoczne tylko po zalogowaniu; marka i obszar logowania pozostają widoczne również dla niezalogowanych.
 
-Na wąskich ekranach przycisk „Menu” rozwija pionową nawigację z tymi samymi elementami zależnymi od roli, bez wymuszania poziomego przewijania strony. Wybór odnośnika, kliknięcie poza menu lub Escape zamyka nawigację; Escape przywraca fokus do przycisku.
+Na wąskich ekranach przycisk „Menu” rozwija pionową nawigację z tymi samymi elementami zależnymi od roli, bez wymuszania poziomego przewijania strony. Wybór odnośnika lub kliknięcie poza menu zamyka nawigację; Escape zamyka najpierw otwarte podmenu, a następnie nawigację, przywracając fokus do odpowiedniego przycisku.
 
-Menu „Zarządzanie” otwiera się przyciskiem zarówno na komputerze, jak i w nawigacji mobilnej. Wybranie odnośnika, kliknięcie poza menu lub Escape zamyka je; Escape przywraca fokus do jego przycisku. Dostęp do obu widoków pozostaje ograniczony do ADMIN.
+Kolejność dla ADMIN to „Dashboard”, „Zawodnicy”, „Treningi”, „Wyniki” i menu „Konfiguracja” z pozycjami „Definicje sprawdzianów”, „Konkurencje PZLA” i „Zarządzanie kontami”. Dla COACH menu „Konfiguracja” jest niedostępne; ATHLETE zachowuje odnośnik „Moje wyniki”. Menu użytkownika zawiera „Zmiana hasła” i „Wyloguj”.
+
+Menu „Konfiguracja” otwiera się przyciskiem zarówno na komputerze, jak i w nawigacji mobilnej. Wybranie odnośnika, kliknięcie poza menu lub Escape zamyka je; Escape przywraca fokus do jego przycisku. W nawigacji mobilnej Escape zamyka najpierw menu „Konfiguracja”, a kolejne naciśnięcie zamyka nawigację. Dostęp do wszystkich pozycji pozostaje ograniczony do ADMIN.
 
 ## 4. Stopka
 
@@ -103,7 +109,7 @@ Przyciski o tej samej roli korzystają ze wspólnych stylów i tokenów z global
 
 ### Hierarchia
 
-- **Podstawowy (primary):** główna akcja w danym kontekście, np. „Dodaj test” lub „Zapisz”. Jednolite zielone tło, biały tekst i brak widocznego obramowania; po najechaniu tło staje się nieco ciemniejsze.
+- **Podstawowy (primary):** główna akcja w danym kontekście, np. „Dodaj test” lub „Zapisz”. Fioletowe tło `#6A1B9A`, biały tekst i brak widocznego obramowania; po najechaniu tło zmienia się na `#581583`.
 - **Drugorzędny (secondary):** akcja wspierająca, np. „Edytuj” lub „Anuluj”. Białe lub bardzo jasne tło, subtelna neutralna ramka i ciemny grafitowy tekst; po najechaniu tło delikatnie się zmienia.
 - **Status aktywności:** kontrolka przełączająca, nie standardowy przycisk akcji. Zielony tor oznacza stan aktywny, szary — nieaktywny, a biały wskaźnik położeniem pokazuje bieżący stan. Tekst stanu i dostępne nazwy/stan ARIA muszą jednoznacznie przekazywać, czy element jest aktywny. Zmiana koloru lub położenia ma subtelne przejście. Czerwieni nie używa się dla zwykłej aktywacji ani dezaktywacji.
 
@@ -119,15 +125,16 @@ Nie podkreślać wizualnie każdej akcji. Przycisk zamknięcia modalu może uży
 
 Zachować czytelny kontrast tekstu oraz stanów. Animacje powinny być krótkie i respektować ustawienie ograniczenia ruchu systemowego. Kontrolki przełączające muszą obsługiwać klawiaturę i dostępny stan, np. `role="switch"` z `aria-checked`.
 
+Dialogi formularzy powinny używać natywnego dialogu modalnego z dostępną nazwą, zatrzymywać fokus wewnątrz i przywracać go po zamknięciu. Escape zamyka najpierw otwartą listę wyboru, a dopiero następne naciśnięcie dialog; nie zamyka dialogu podczas zapisywania. Poziomo przewijane tabele danych powinny mieć nazwany, dostępny z klawiatury obszar przewijania.
+
 ## 9. Pola formularzy i filtry
 
 - Wszystkie pola tekstowe, wyszukiwarki i listy wyboru korzystają ze wspólnej definicji w `src/styles.scss`: jednakowa wysokość 3,25 rem, białe tło, neutralne obramowanie, grafitowy tekst i ten sam promień narożnika. Definicję stosuje się niezależnie od tego, czy pole znajduje się w filtrze, formularzu, czy modalu.
 - Klasa `.field-control` zapewnia wspólną bazę dla pól tekstowych i list wyboru. Klasa `.field-control-shell` zapewnia tę samą bazę dla wyszukiwarek z ikoną; wewnętrzne pole tekstowe pozostaje bez własnego obramowania.
-- Fokus klawiatury używa wspólnego zielonego obrysu/cienia; pola nieprawidłowe zachowują czytelne czerwone obramowanie.
+- Fokus klawiatury używa wyraźnego fioletowego obrysu z odstępem od kontrolki; pola nieprawidłowe zachowują czytelne czerwone obramowanie. Na ciemnych powierzchniach należy użyć jasnego fioletu.
 - Pola wyboru używające własnej ikony strzałki powinny pozostawić 0,9 rem odstępu od prawej krawędzi do ikony oraz odpowiednie miejsce wewnątrz pola, aby tekst nie nachodził na strzałkę. Wspólna klasa `.select-with-arrow` w `src/styles.scss` zapewnia ten sam wygląd w filtrach i formularzach.
 - Etykiety filtrów są umieszczane nad polami, nie obok nich. Wspólna klasa `.filter-field` z `src/styles.scss` ustala układ pionowy, odstęp i wygląd etykiety dla wyszukiwarek, list wyboru, pól daty/liczbowych i przełączników filtrujących. Przełącznik jest wyrównany pionowo w obszarze kontrolki o wysokości wspólnej z pozostałymi polami; jego etykieta znajduje się nad nim. Należy używać `.filter-field` we wszystkich widokach zamiast definiować lokalne warianty etykiet.
 
 ## 10. Otwarte kwestie
 
-- Konkretne breakpointy i szczegółowy system typografii, kolorów oraz ikon.
-- Zawartość i interakcje obszaru użytkownika/konta; uwierzytelnianie jest planowane i opisane w `../security.md`, ale nie jest zaimplementowane.
+- Konkretne breakpointy oraz szczegółowe zasady ikon i wyjątków układu.

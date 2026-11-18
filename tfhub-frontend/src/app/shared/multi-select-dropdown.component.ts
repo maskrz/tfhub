@@ -13,6 +13,7 @@ export interface MultiSelectOption {
         #trigger
         class="field-control select-with-arrow trigger"
         type="button"
+        [attr.aria-label]="label() + ': ' + selectionSummary()"
         [attr.aria-expanded]="open()"
         [attr.aria-controls]="controlId()"
         (click)="toggleOpen()"
@@ -63,7 +64,7 @@ export interface MultiSelectOption {
       width: 100%;
     }
     .trigger:focus-visible, .option:focus-within, .clear:focus-visible {
-      outline: 3px solid #159c68;
+      outline: 3px solid var(--button-focus);
       outline-offset: 2px;
     }
     .options {
@@ -98,13 +99,13 @@ export interface MultiSelectOption {
       white-space: nowrap;
     }
     .option:hover { background: #f2f4f8; }
-    .option input { accent-color: #198754; height: 1rem; width: 1rem; }
+    .option input { accent-color: var(--brand-primary); height: 1rem; width: 1rem; }
     .no-options { color: #59667e; font-size: .9rem; margin: .5rem; }
     .clear {
       background: transparent;
       border: 0;
       border-top: 1px solid #e1e4e9;
-      color: #365b48;
+      color: var(--brand-primary);
       cursor: pointer;
       font: inherit;
       margin-top: .25rem;
@@ -112,7 +113,7 @@ export interface MultiSelectOption {
       text-align: left;
       width: 100%;
     }
-    .clear:hover { color: #123d29; }
+    .clear:hover { color: var(--brand-primary-hover); }
   `,
 })
 export class MultiSelectDropdownComponent {
@@ -177,8 +178,10 @@ export class MultiSelectDropdownComponent {
     }
   }
 
-  @HostListener('document:keydown.escape')
-  closeOnEscape(): void {
+  @HostListener('document:keydown.escape', ['$event'])
+  closeOnEscape(event: Event): void {
+    if (!this.open()) return;
+    event.preventDefault();
     this.close();
     this.trigger()?.nativeElement.focus();
   }

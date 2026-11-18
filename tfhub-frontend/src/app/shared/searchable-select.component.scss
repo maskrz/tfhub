@@ -30,6 +30,6 @@
 }
 
 .searchable-select__option:hover,
-.searchable-select__option.active { background: #f2f4f8; }
+.searchable-select__option.active { background: var(--brand-tint); }
 .searchable-select__option[aria-selected='true'] { font-weight: 650; }
 .searchable-select__empty { color: #59667e; margin: 0; padding: .7rem .85rem; }

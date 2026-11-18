@@ -122,8 +122,8 @@ describe('AccountFormComponent', () => {
     search.dispatchEvent(new Event('input'));
     fixture.detectChanges();
 
-    expect(dropdown.querySelectorAll('[role="option"]')).toHaveLength(1);
-    const option = dropdown.querySelector('[role="option"]') as HTMLButtonElement;
+    expect(dropdown.querySelectorAll('.option')).toHaveLength(1);
+    const option = dropdown.querySelector('.option') as HTMLButtonElement;
     expect(option.textContent).toContain('Jan Kowalski');
     option.click();
     fixture.detectChanges();

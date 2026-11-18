@@ -15,6 +15,7 @@ import { AuthService } from '../../core/auth/auth.service';
 import { AthleteTrainingHistoryComponent } from './athlete-training-history.component';
 import { CompetitionApiService } from '../competition/competition-api.service';
 import { CompetitionResultFormComponent } from '../competition/competition-result-form.component';
+import { ModalDialogDirective } from '../../shared/modal-dialog.directive';
 import {
   CompetitionResult,
   CompetitionSyncMode,
@@ -84,6 +85,7 @@ const chartColors = ['#2585d8', '#159c68', '#db8a2f', '#8558c7', '#d55252', '#25
     ResultFormModalComponent,
     AthleteTrainingHistoryComponent,
     CompetitionResultFormComponent,
+    ModalDialogDirective,
     RouterLink,
   ],
   selector: 'app-athlete-profile-page',

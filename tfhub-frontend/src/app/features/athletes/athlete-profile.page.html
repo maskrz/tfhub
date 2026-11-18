@@ -1,4 +1,4 @@
-<main class="profile-page">
+<div class="profile-page">
   @if (successMessage(); as message) {
     <p class="feedback success" role="status" aria-live="polite">{{ message }}</p>
   }
@@ -14,7 +14,7 @@
     <section class="profile-card athlete-card" aria-label="Dane zawodnika">
       <div class="athlete-header">
         <div class="athlete-details">
-          <h2>{{ currentAthlete.firstName }} {{ currentAthlete.lastName }}</h2>
+          <h1>{{ currentAthlete.firstName }} {{ currentAthlete.lastName }}</h1>
           <p>Rocznik {{ currentAthlete.birthYear }} · {{ genderLabel(currentAthlete.gender) }}</p>
           @if (canEdit()) {
             <p>Aliasy: {{ currentAthlete.aliases?.length ? currentAthlete.aliases?.join(', ') : 'brak' }}</p>
@@ -46,7 +46,7 @@
     </section>
 
     <section class="athlete-profile-section" aria-labelledby="results-heading">
-      <button
+      <h2 class="athlete-profile-section__heading"><button
         class="athlete-profile-section__toggle"
         type="button"
         aria-controls="results-section-content"
@@ -55,7 +55,7 @@
       >
         <span id="results-heading">Wyniki sprawdzianów</span>
         <span class="athlete-profile-section__icon" aria-hidden="true"></span>
-      </button>
+      </button></h2>
 
       @if (resultsExpanded()) {
       <div id="results-section-content" class="athlete-profile-section__content">
@@ -145,7 +145,7 @@
         <p class="feedback error" role="alert">{{ historyError() }}</p>
       }
       <div class="section-title matrix-title">
-        <h2 id="matrix-heading">Zestawienie wyników</h2>
+        <h3 id="matrix-heading">Zestawienie wyników</h3>
       </div>
 
       @if (history().length === 0) {
@@ -202,7 +202,7 @@
 
     <section class="profile-card chart-card" aria-labelledby="chart-heading">
       <div class="section-title">
-        <h2 id="chart-heading">Wykres postępów</h2>
+        <h3 id="chart-heading">Wykres postępów</h3>
       </div>
 
       @if (chart(); as profileChart) {
@@ -299,12 +299,12 @@
       }
     </section>
     <section class="athlete-profile-section" aria-labelledby="competition-results-heading">
-      <button class="athlete-profile-section__toggle" type="button"
+      <h2 class="athlete-profile-section__heading"><button class="athlete-profile-section__toggle" type="button"
         aria-controls="competition-results-content" [attr.aria-expanded]="competitionResultsExpanded()"
         (click)="toggleCompetitionResultsSection()">
         <span id="competition-results-heading">Wyniki zawodów</span>
         <span class="athlete-profile-section__icon" aria-hidden="true"></span>
-      </button>
+      </button></h2>
       @if (competitionResultsExpanded()) {
       <div id="competition-results-content" class="athlete-profile-section__content competition-results-card">
       <div class="section-title competition-results-heading">
@@ -424,7 +424,7 @@
       </a>
     }
   }
-</main>
+</div>
 
 @if (canEdit() && isAthleteFormOpen() && athlete(); as currentAthlete) {
   <app-athlete-form-modal
@@ -446,14 +446,13 @@
   />
 }
 @if (canManageCompetition() && competitionResultFormOpen()) {
-  <div class="competition-modal-backdrop" role="presentation">
-    <section class="competition-modal-card" role="dialog" aria-modal="true" aria-labelledby="competition-result-form-title">
-      <app-competition-result-form
+  <dialog appModalDialog class="competition-modal-card" aria-labelledby="competition-result-form-title"
+    (cancel)="$event.preventDefault(); !resultForm.saving() && closeCompetitionResultForm()">
+      <app-competition-result-form #resultForm
         [athleteId]="athleteId"
         [result]="selectedCompetitionResult()"
         (saved)="onCompetitionResultSaved()"
         (cancelled)="closeCompetitionResultForm()"
       />
-    </section>
-  </div>
+  </dialog>
 }

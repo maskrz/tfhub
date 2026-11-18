@@ -79,6 +79,10 @@ describe('DashboardPage', () => {
     expect(fixture.nativeElement.textContent).toContain('Aktywni zawodnicy');
     expect(fixture.nativeElement.textContent).toContain('Anna Kowalska');
     expect(fixture.nativeElement.querySelectorAll('.record-card table thead th').length).toBe(8);
+    const tableRegions = fixture.nativeElement.querySelectorAll('.table-scroll[role="region"][tabindex="0"]') as NodeListOf<HTMLElement>;
+    expect([...tableRegions].map((region) => region.getAttribute('aria-label'))).toEqual([
+      'Ranking kobiet', 'Ranking mężczyzn', 'Ostatnie wyniki',
+    ]);
     expect(fixture.nativeElement.querySelector('app-result-form-modal')).toBeNull();
   });
 

@@ -4,9 +4,10 @@ import { EMPTY, catchError, finalize, take } from 'rxjs';
 import { CompetitionApiService } from './competition-api.service';
 import { CompetitionEvent } from './competition.model';
 import { CompetitionEventFormComponent } from './competition-event-form.component';
+import { ModalDialogDirective } from '../../shared/modal-dialog.directive';
 
 @Component({
-  imports: [CompetitionEventFormComponent],
+  imports: [CompetitionEventFormComponent, ModalDialogDirective],
   selector: 'app-competition-events-page',
   templateUrl: './competition-events.page.html',
   styleUrl: './competition-events.page.scss',

@@ -119,6 +119,8 @@ describe('TrainingDetailsPage', () => {
     expect(text).toContain('Planowany');
     expect(definitionHeadings).toEqual(['1. Główna', '2. Rozgrzewka']);
     expect(segmentHeadings).toEqual(['1', '2', '1']);
+    const segmentRegions = fixture.nativeElement.querySelectorAll('.segments-surface[role="region"][tabindex="0"]') as NodeListOf<HTMLElement>;
+    expect([...segmentRegions].map((region) => region.getAttribute('aria-label'))).toEqual(['Odcinki: Główna', 'Odcinki: Rozgrzewka']);
     const restCells = [...fixture.nativeElement.querySelectorAll('.segments-table tbody tr')]
       .map((row: HTMLElement) => row.querySelectorAll('td')[1].textContent?.trim());
     expect(restCells).toEqual(['1m 30s', '—', '—']);

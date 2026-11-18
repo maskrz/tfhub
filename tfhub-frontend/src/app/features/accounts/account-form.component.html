@@ -72,7 +72,7 @@
 
   @if (form.controls.role.value === 'ATHLETE') {
     <div class="field">
-      <label for="account-athlete">Zawodnik <span aria-hidden="true">*</span></label>
+      <span>Zawodnik <span aria-hidden="true">*</span></span>
       @if (athletesError(); as message) {
         <p class="field-error" role="alert">{{ message }}</p>
       } @else if (athletesLoading()) {

@@ -5,7 +5,7 @@
 
 ## 1. Kierunek
 
-TFHub powinien przypominać nowoczesny, sportowy panel trenerski: być czytelny, uporządkowany i nastawiony na pracę z danymi, bez wizualnego przeładowania. Szczegółowe kolory, typografia i identyfikacja wizualna pozostają TBD.
+TFHub powinien przypominać nowoczesny, sportowy panel trenerski: być czytelny, uporządkowany i nastawiony na pracę z danymi, bez wizualnego przeładowania. Zachowuje logo, ciemny nagłówek, jasne tło i obecną typografię. Podstawowy akcent to fiolet `#6A1B9A` (hover/pressed `#581583`); zieleń pozostaje kolorem semantycznym, np. sukcesu. Szczegóły wspólnych tokenów i układu opisują [wytyczne UI](ui-guidelines.md).
 
 ## 2. Responsywność
 
@@ -17,14 +17,7 @@ TFHub powinien przypominać nowoczesny, sportowy panel trenerski: być czytelny,
 
 ## 3. Nawigacja
 
-Główna nawigacja zapewnia przejście do:
-
-- Dashboardu
-- Zawodników
-- Testów
-- Wyników
-
-Sposób prezentacji nawigacji na telefonie i większych ekranach zostanie doprecyzowany podczas projektowania ekranów.
+Układ głównej nawigacji to „Dashboard”, „Zawodnicy”, „Treningi”, „Wyniki” i dostępna wyłącznie dla ADMIN „Konfiguracja” z pozycjami „Definicje sprawdzianów”, „Konkurencje PZLA” i „Zarządzanie kontami”. Menu użytkownika zawiera „Zmiana hasła” i „Wyloguj”. ATHLETE zachowuje „Moje wyniki”. Na telefonie te same dostępne dla roli pozycje są wyświetlane w rozwijanym menu.
 
 ## 4. Wspólne komponenty i interakcje
 

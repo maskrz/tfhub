@@ -1,10 +1,13 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
 import { of } from 'rxjs';
-import { signal } from '@angular/core';
+import { Component, signal } from '@angular/core';
 import { AuthService } from '../auth/auth.service';
 import { AuthenticatedUser } from '../auth/auth.model';
 import { HeaderComponent } from './header.component';
+
+@Component({ template: '' })
+class RouteStubComponent {}
 
 describe('HeaderComponent', () => {
   let fixture: ComponentFixture<HeaderComponent>;
@@ -29,7 +32,18 @@ describe('HeaderComponent', () => {
     await TestBed.configureTestingModule({
       imports: [HeaderComponent],
       providers: [
-        provideRouter([{ path: 'login', children: [] }]),
+        provideRouter([
+          { path: 'login', component: RouteStubComponent },
+          { path: 'dashboard', component: RouteStubComponent },
+          { path: 'tests', component: RouteStubComponent },
+          { path: 'competition-events', component: RouteStubComponent },
+          { path: 'accounts', component: RouteStubComponent },
+          { path: 'athletes/:id', component: RouteStubComponent },
+          { path: 'athletes', component: RouteStubComponent },
+          { path: 'results', component: RouteStubComponent },
+          { path: 'trainings/:id', component: RouteStubComponent },
+          { path: 'trainings', component: RouteStubComponent },
+        ]),
         { provide: AuthService, useValue: auth },
       ],
     }).compileComponents();
@@ -69,12 +83,12 @@ describe('HeaderComponent', () => {
 
     username.click();
     fixture.detectChanges();
-    expect(fixture.nativeElement.querySelector('[role="menu"]')).toBeTruthy();
+    expect(fixture.nativeElement.querySelector('#user-menu')).toBeTruthy();
     expect(username.getAttribute('aria-expanded')).toBe('true');
 
     username.click();
     fixture.detectChanges();
-    expect(fixture.nativeElement.querySelector('[role="menu"]')).toBeNull();
+    expect(fixture.nativeElement.querySelector('#user-menu')).toBeNull();
   });
 
   it('toggles mobile navigation and closes it on link selection, Escape and outside click', () => {
@@ -115,7 +129,7 @@ describe('HeaderComponent', () => {
     expect(username.getAttribute('aria-expanded')).toBe('false');
   });
 
-  it('shows account management only in the user menu for administrators', () => {
+  it('shows configuration only for administrators and keeps account actions in the user menu', () => {
     expect(fixture.nativeElement.textContent).not.toContain('Zarządzanie kontami');
 
     auth.currentUser.set({
@@ -128,12 +142,13 @@ describe('HeaderComponent', () => {
 
     fixture.detectChanges();
 
-    expect(fixture.nativeElement.querySelector('nav a[href="/accounts"]')).toBeNull();
+    const link = fixture.nativeElement.querySelector('nav a[href="/accounts"]') as HTMLAnchorElement;
+    expect(link.textContent?.trim()).toBe('Zarządzanie kontami');
     fixture.nativeElement.querySelector('.username').click();
     fixture.detectChanges();
-    const link = fixture.nativeElement.querySelector('[role="menu"] a[href="/accounts"]') as HTMLAnchorElement;
-    expect(link).toBeTruthy();
-    expect(link.textContent).toContain('Zarządzanie kontami');
+    expect(fixture.nativeElement.querySelector('#user-menu a[href="/accounts"]')).toBeNull();
+    expect(Array.from(fixture.nativeElement.querySelectorAll('#user-menu button') as NodeListOf<HTMLButtonElement>)
+      .map((button) => button.textContent?.trim())).toEqual(['Zmiana hasła', 'Wyloguj']);
 
     auth.currentUser.set({
       authenticated: true,
@@ -143,7 +158,7 @@ describe('HeaderComponent', () => {
       athleteId: null,
     });
     fixture.detectChanges();
-    expect(fixture.nativeElement.querySelector('[role="menu"] a[href="/accounts"]')).toBeNull();
+    expect(fixture.nativeElement.querySelector('nav a[href="/accounts"]')).toBeNull();
   });
 
   it('shows the training navigation link to staff accounts', () => {
@@ -162,6 +177,79 @@ describe('HeaderComponent', () => {
     expect(fixture.nativeElement.querySelector('nav a[href="/trainings"]')).toBeNull();
   });
 
+  it('renders the approved order for staff and preserves the athlete profile link', () => {
+    const navigationLabels = () => Array.from(
+      fixture.nativeElement.querySelectorAll('nav > a, nav > .management-menu > button') as NodeListOf<HTMLElement>,
+    ).map((item) => item.textContent?.trim().replace(/\s*▾$/, ''));
+
+    expect(navigationLabels()).toEqual(['Dashboard', 'Zawodnicy', 'Treningi', 'Wyniki']);
+    auth.currentUser.update((user) => user && { ...user, role: 'ADMIN' });
+    fixture.detectChanges();
+    expect(navigationLabels()).toEqual(['Dashboard', 'Zawodnicy', 'Treningi', 'Wyniki', 'Konfiguracja']);
+    expect(Array.from(fixture.nativeElement.querySelectorAll('.management-links a') as NodeListOf<HTMLAnchorElement>)
+      .map((link) => [link.textContent?.trim(), link.getAttribute('href')])).toEqual([
+      ['Definicje sprawdzianów', '/tests'],
+      ['Konkurencje PZLA', '/competition-events'],
+      ['Zarządzanie kontami', '/accounts'],
+    ]);
+
+    auth.currentUser.update((user) => user && { ...user, role: 'ATHLETE', athleteId: 2 });
+    fixture.detectChanges();
+    expect(navigationLabels()).toEqual(['Moje wyniki']);
+    expect(fixture.nativeElement.querySelector('nav a').getAttribute('href')).toBe('/athletes/2');
+    expect(fixture.nativeElement.querySelector('.management-menu')).toBeNull();
+  });
+
+  it.each(['/tests', '/competition-events', '/accounts'])(
+    'marks configuration and its current link active for %s',
+    async (url) => {
+      auth.currentUser.update((user) => user && { ...user, role: 'ADMIN' });
+      fixture.detectChanges();
+      await TestBed.inject(Router).navigateByUrl(url);
+      fixture.detectChanges();
+      await fixture.whenStable();
+      fixture.detectChanges();
+      expect(fixture.nativeElement.querySelector('.management-menu').classList.contains('active')).toBe(true);
+      const link = fixture.nativeElement.querySelector(`.management-links a[href="${url}"]`) as HTMLAnchorElement;
+      expect(link.classList.contains('active')).toBe(true);
+      expect(link.getAttribute('aria-current')).toBe('page');
+    },
+  );
+
+  it('closes the innermost open mobile navigation level on Escape and restores focus', () => {
+    auth.currentUser.update((user) => user && { ...user, role: 'ADMIN' });
+    fixture.detectChanges();
+    const navigation = fixture.nativeElement.querySelector('.navigation-toggle') as HTMLButtonElement;
+    const management = fixture.nativeElement.querySelector('.management-toggle') as HTMLButtonElement;
+    navigation.click();
+    management.click();
+    fixture.detectChanges();
+    const focusManagement = vi.spyOn(management, 'focus');
+    const focusNavigation = vi.spyOn(navigation, 'focus');
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+    fixture.detectChanges();
+    expect(management.getAttribute('aria-expanded')).toBe('false');
+    expect(navigation.getAttribute('aria-expanded')).toBe('true');
+    expect(focusManagement).toHaveBeenCalledOnce();
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+    fixture.detectChanges();
+    expect(navigation.getAttribute('aria-expanded')).toBe('false');
+    expect(focusNavigation).toHaveBeenCalledOnce();
+  });
+
+  it('closes the user disclosure on Escape and restores focus to its button', () => {
+    const username = fixture.nativeElement.querySelector('.username') as HTMLButtonElement;
+    username.click();
+    fixture.detectChanges();
+    expect(username.getAttribute('aria-controls')).toBe('user-menu');
+    const focus = vi.spyOn(username, 'focus');
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+    fixture.detectChanges();
+    expect(username.getAttribute('aria-expanded')).toBe('false');
+    expect(fixture.nativeElement.querySelector('#user-menu')).toBeNull();
+    expect(focus).toHaveBeenCalledOnce();
+  });
+
   it('shows competition discipline management only to administrators', () => {
     expect(fixture.nativeElement.querySelector('nav a[href="/competition-events"]')).toBeNull();
     auth.currentUser.set({
@@ -173,14 +261,14 @@ describe('HeaderComponent', () => {
     });
     fixture.detectChanges();
     const management = fixture.nativeElement.querySelector('.management-toggle') as HTMLButtonElement;
-    expect(management.textContent).toContain('Zarządzanie');
+    expect(management.textContent).toContain('Konfiguracja');
     expect(management.getAttribute('aria-expanded')).toBe('false');
     management.click();
     fixture.detectChanges();
     expect(management.getAttribute('aria-expanded')).toBe('true');
-    expect(fixture.nativeElement.querySelector('nav a[href="/tests"]')?.textContent).toContain('Sprawdziany');
+    expect(fixture.nativeElement.querySelector('nav a[href="/tests"]')?.textContent).toContain('Definicje sprawdzianów');
     expect(fixture.nativeElement.querySelector('nav a[href="/competition-events"]')?.textContent)
-      .toContain('Konkurencje');
+      .toContain('Konkurencje PZLA');
     const focus = vi.spyOn(management, 'focus');
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
     fixture.detectChanges();
@@ -204,29 +292,32 @@ describe('HeaderComponent', () => {
     expect(fixture.nativeElement.querySelector('.management-toggle')).toBeNull();
   });
 
-  it('closes both navigation levels after selecting a management link on mobile', () => {
-    auth.currentUser.update((user) => user && { ...user, role: 'ADMIN' });
-    fixture.detectChanges();
-    const navigation = fixture.nativeElement.querySelector('.navigation-toggle') as HTMLButtonElement;
-    const management = fixture.nativeElement.querySelector('.management-toggle') as HTMLButtonElement;
-    navigation.click();
-    management.click();
-    fixture.detectChanges();
-    expect(navigation.getAttribute('aria-expanded')).toBe('true');
-    expect(management.getAttribute('aria-expanded')).toBe('true');
-    (fixture.nativeElement.querySelector('.management-links a[href="/tests"]') as HTMLAnchorElement).click();
-    fixture.detectChanges();
-    expect(navigation.getAttribute('aria-expanded')).toBe('false');
-    expect(management.getAttribute('aria-expanded')).toBe('false');
-  });
+  it.each(['/tests', '/competition-events', '/accounts'])(
+    'closes both navigation levels after selecting %s on mobile',
+    (url) => {
+      auth.currentUser.update((user) => user && { ...user, role: 'ADMIN' });
+      fixture.detectChanges();
+      const navigation = fixture.nativeElement.querySelector('.navigation-toggle') as HTMLButtonElement;
+      const management = fixture.nativeElement.querySelector('.management-toggle') as HTMLButtonElement;
+      navigation.click();
+      management.click();
+      fixture.detectChanges();
+      expect(navigation.getAttribute('aria-expanded')).toBe('true');
+      expect(management.getAttribute('aria-expanded')).toBe('true');
+      (fixture.nativeElement.querySelector(`.management-links a[href="${url}"]`) as HTMLAnchorElement).click();
+      fixture.detectChanges();
+      expect(navigation.getAttribute('aria-expanded')).toBe('false');
+      expect(management.getAttribute('aria-expanded')).toBe('false');
+    },
+  );
 
   it('closes the menu and opens the change-password dialog when selected', () => {
     fixture.nativeElement.querySelector('.username').click();
     fixture.detectChanges();
-    fixture.nativeElement.querySelector('[role="menuitem"]').click();
+    fixture.nativeElement.querySelector('#user-menu button').click();
     fixture.detectChanges();
 
-    expect(fixture.nativeElement.querySelector('[role="menu"]')).toBeNull();
+    expect(fixture.nativeElement.querySelector('#user-menu')).toBeNull();
     expect(fixture.nativeElement.querySelector('app-change-password-modal')).toBeTruthy();
     expect(fixture.nativeElement.textContent).toContain('Zmień hasło');
   });
@@ -234,7 +325,7 @@ describe('HeaderComponent', () => {
   it('closes the password dialog when cancelled', () => {
     fixture.nativeElement.querySelector('.username').click();
     fixture.detectChanges();
-    fixture.nativeElement.querySelector('[role="menuitem"]').click();
+    fixture.nativeElement.querySelector('#user-menu button').click();
     fixture.detectChanges();
 
     fixture.nativeElement.querySelector('.cancel-button').click();
@@ -246,12 +337,12 @@ describe('HeaderComponent', () => {
   it('preserves the logout action and closes the menu before logging out', async () => {
     fixture.nativeElement.querySelector('.username').click();
     fixture.detectChanges();
-    fixture.nativeElement.querySelectorAll('[role="menuitem"]')[1].click();
+    fixture.nativeElement.querySelectorAll('#user-menu button')[1].click();
     fixture.detectChanges();
     await fixture.whenStable();
 
     expect(auth.logout).toHaveBeenCalledOnce();
-    expect(fixture.nativeElement.querySelector('[role="menu"]')).toBeNull();
+    expect(fixture.nativeElement.querySelector('#user-menu')).toBeNull();
     expect(TestBed.inject(Router).url).toBe('/login');
   });
 

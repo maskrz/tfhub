@@ -14,6 +14,7 @@ import { TestsApiService } from '../tests/tests-api.service';
 import { AuthService } from '../../core/auth/auth.service';
 import { CompetitionApiService } from '../competition/competition-api.service';
 import { CompetitionResult, CompetitionSyncStatus } from '../competition/competition.model';
+import { CompetitionResultFormComponent } from '../competition/competition-result-form.component';
 
 const athlete: AthleteResponse = {
   id: 8,
@@ -77,6 +78,7 @@ describe('AthleteProfilePage', () => {
   };
   let testsApi: { getAll: ReturnType<typeof vi.fn> };
   let competitionApi: {
+    getEvents: ReturnType<typeof vi.fn>;
     getAthleteResults: ReturnType<typeof vi.fn>;
     getAthleteSyncStatus: ReturnType<typeof vi.fn>;
     startAthleteSync: ReturnType<typeof vi.fn>;
@@ -98,6 +100,7 @@ describe('AthleteProfilePage', () => {
     };
     testsApi = { getAll: vi.fn(() => of(tests)) };
     competitionApi = {
+      getEvents: vi.fn(() => of([])),
       getAthleteResults: vi.fn(() => of([competitionResult])),
       getAthleteSyncStatus: vi.fn(() => of(syncStatus)),
       startAthleteSync: vi.fn(() => of(syncStatus)),
@@ -141,6 +144,11 @@ describe('AthleteProfilePage', () => {
     expect(athletesApi.getById).toHaveBeenCalledWith(8);
     expect(athletesApi.getTestsWithResults).toHaveBeenCalledWith(8);
     expect(fixture.nativeElement.textContent).toContain('Jan Kowalski');
+    expect(fixture.nativeElement.querySelector('h1')?.textContent).toContain('Jan Kowalski');
+    expect([...fixture.nativeElement.querySelectorAll('h2.athlete-profile-section__heading')]
+      .map((heading: HTMLElement) => heading.textContent?.trim())).toEqual([
+      'Wyniki sprawdzianów', 'Wyniki zawodów', 'Wyniki treningów biegowych',
+    ]);
     expect(fixture.nativeElement.textContent).toContain('Aktywny');
     expect(fixture.nativeElement.textContent).toContain('Rocznik 2010');
     expect(athletesApi.getResultHistory).not.toHaveBeenCalled();
@@ -151,6 +159,21 @@ describe('AthleteProfilePage', () => {
     expect(fixture.nativeElement.querySelector('#training-history-content')).toBeNull();
     expect(fixture.nativeElement.querySelector('.history-card')).toBeNull();
     expect(fixture.nativeElement.querySelector('.chart-card')).toBeNull();
+  });
+
+  it('keeps the competition result dialog open on Escape while saving', async () => {
+    await createPage();
+    fixture.componentInstance.openCompetitionResultForm();
+    fixture.detectChanges();
+    const form = fixture.debugElement.query(By.directive(CompetitionResultFormComponent)).componentInstance as CompetitionResultFormComponent;
+    form.saving.set(true);
+    const dialog = fixture.nativeElement.querySelector('dialog.competition-modal-card') as HTMLDialogElement;
+    expect(dialog.getAttribute('aria-labelledby')).toBe('competition-result-form-title');
+    const event = new Event('cancel', { cancelable: true });
+    dialog.dispatchEvent(event);
+    fixture.detectChanges();
+    expect(event.defaultPrevented).toBe(true);
+    expect(fixture.nativeElement.querySelector('dialog.competition-modal-card[open]')).toBeTruthy();
   });
 
   it('displays separate official results and allows ADMIN to select and start synchronization', async () => {

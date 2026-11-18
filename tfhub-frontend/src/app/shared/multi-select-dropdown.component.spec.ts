@@ -2,6 +2,32 @@ import { TestBed } from '@angular/core/testing';
 import { MultiSelectDropdownComponent } from './multi-select-dropdown.component';
 
 describe('MultiSelectDropdownComponent', () => {
+  it('restores focus on Escape only when its dropdown is open', async () => {
+    await TestBed.configureTestingModule({
+      imports: [MultiSelectDropdownComponent],
+    }).compileComponents();
+    const fixture = TestBed.createComponent(MultiSelectDropdownComponent);
+    fixture.componentRef.setInput('options', []);
+    fixture.componentRef.setInput('label', 'Grupy treningowe');
+    fixture.componentRef.setInput('controlId', 'group-options');
+    fixture.detectChanges();
+
+    const trigger = fixture.nativeElement.querySelector('button') as HTMLButtonElement;
+    expect(trigger.getAttribute('aria-label')).toBe('Grupy treningowe: Wszystkie przypisane grupy');
+    const focus = vi.spyOn(trigger, 'focus');
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+    expect(focus).not.toHaveBeenCalled();
+
+    trigger.click();
+    fixture.detectChanges();
+    const escape = new KeyboardEvent('keydown', { key: 'Escape', cancelable: true });
+    document.dispatchEvent(escape);
+    fixture.detectChanges();
+    expect(trigger.getAttribute('aria-expanded')).toBe('false');
+    expect(escape.defaultPrevented).toBe(true);
+    expect(focus).toHaveBeenCalledOnce();
+  });
+
   it('opens a checkbox dropdown and emits selected options', async () => {
     await TestBed.configureTestingModule({
       imports: [MultiSelectDropdownComponent],

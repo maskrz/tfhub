@@ -38,6 +38,8 @@ describe('ChangePasswordModalComponent', () => {
     const inputs = fixture.nativeElement.querySelectorAll('input');
     expect(inputs.length).toBe(3);
     expect(Array.from(inputs).every((input) => (input as HTMLInputElement).type === 'password')).toBe(true);
+    expect(Array.from(inputs).every((input) => (input as HTMLInputElement).classList.contains('field-control'))).toBe(true);
+    expect(fixture.nativeElement.querySelector('.save-button').classList.contains('button--primary')).toBe(true);
     expect(fixture.nativeElement.textContent).toContain('Aktualne hasło');
     expect(fixture.nativeElement.textContent).toContain('Nowe hasło');
     expect(fixture.nativeElement.textContent).toContain('Powtórz nowe hasło');

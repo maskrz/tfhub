@@ -152,7 +152,7 @@
           @if (definition.segments.length === 0) {
             <p class="empty-message" role="status">Brak zaplanowanych odcinków.</p>
           } @else {
-            <div class="table-surface segments-surface">
+            <div class="table-surface segments-surface" role="region" [attr.aria-label]="'Odcinki: ' + definition.name" tabindex="0">
               <table class="segments-table">
                 <thead>
                   <tr>

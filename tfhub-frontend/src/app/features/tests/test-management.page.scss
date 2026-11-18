@@ -2,8 +2,8 @@
 
 .page {
   margin: 0 auto;
-  max-width: 100rem;
-  padding: clamp(1.5rem, 4vw, 3.5rem) clamp(1rem, 3.25vw, 3.25rem);
+  max-width: var(--page-width);
+  padding: var(--space-8) clamp(var(--page-gutter-mobile), 3vw, var(--page-gutter-desktop)) var(--space-12);
 }
 
 .page-heading {
@@ -12,12 +12,12 @@
   flex-wrap: wrap;
   gap: 1rem;
   justify-content: space-between;
-  margin-bottom: 2.4rem;
+  margin-bottom: var(--space-8);
 }
 
 h1 {
   color: #141c2b;
-  font-size: clamp(2.4rem, 5vw, 3.4rem);
+  font-size: var(--heading-page-size);
   font-weight: 700;
   letter-spacing: -.045em;
   line-height: 1.05;
@@ -26,7 +26,7 @@ h1 {
 
 .page-heading p {
   color: #59667e;
-  font-size: clamp(1rem, 2vw, 1.35rem);
+  font-size: 1rem;
   margin: 0;
 }
 
@@ -44,7 +44,7 @@ h1 {
 
 .category-filter select:focus-visible,
 .sort-button:focus-visible {
-  outline: 3px solid #86d4a0;
+  outline: 3px solid var(--button-focus);
   outline-offset: 2px;
 }
 
@@ -115,13 +115,13 @@ h1 {
 
 .inactive-toggle input:checked + .switch { background: #358e5d; }
 .inactive-toggle input:checked + .switch::after { transform: translateX(1.85rem); }
-.inactive-toggle input:focus-visible + .switch { outline: 3px solid #86d4a0; outline-offset: 2px; }
+.inactive-toggle input:focus-visible + .switch { outline: 3px solid var(--button-focus); outline-offset: 2px; }
 
 .table-surface {
   background: #fff;
   border: 1px solid #d8deea;
-  border-radius: .9rem;
-  overflow: hidden;
+  border-radius: var(--card-radius);
+  overflow-x: auto;
 }
 
 table {
@@ -146,7 +146,7 @@ td { font-size: 1.05rem; }
   padding: 0;
 }
 .sort-indicator { color: #929baa; font-size: .9rem; }
-.sort-indicator.active { color: #188c55; font-weight: 700; }
+.sort-indicator.active { color: var(--brand-primary); font-weight: 700; }
 tbody tr:last-child td { border-bottom: 0; }
 tbody tr.inactive-row { background: #fff0f0; }
 td strong { display: block; font-size: 1.08rem; font-weight: 650; }
@@ -162,7 +162,7 @@ td strong { display: block; font-size: 1.08rem; font-weight: 650; }
 .feedback {
   background: #fff;
   border: 1px solid #d8deea;
-  border-radius: .9rem;
+  border-radius: var(--card-radius);
   color: #526078;
   margin: 0;
   padding: 2rem;

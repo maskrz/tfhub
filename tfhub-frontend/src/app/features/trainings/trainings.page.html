@@ -128,7 +128,7 @@
   }
 
   @if (imports().length > 0 || (!loading() && !errorMessage() && visibleTrainings().length > 0)) {
-    <div class="table-surface">
+    <div class="table-surface" role="region" aria-label="Lista treningów" tabindex="0">
       <table>
         <thead>
           <tr>

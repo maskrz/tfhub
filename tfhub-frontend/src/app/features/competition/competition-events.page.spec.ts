@@ -3,6 +3,8 @@ import { Subject, of, throwError } from 'rxjs';
 import { CompetitionApiService } from './competition-api.service';
 import { CompetitionEventsPage } from './competition-events.page';
 import { CompetitionEvent } from './competition.model';
+import { CompetitionEventFormComponent } from './competition-event-form.component';
+import { By } from '@angular/platform-browser';
 
 describe('CompetitionEventsPage', () => {
   let fixture: ComponentFixture<CompetitionEventsPage>;
@@ -77,6 +79,24 @@ describe('CompetitionEventsPage', () => {
     (fixture.nativeElement.querySelector('.action-cell .button') as HTMLButtonElement).click();
     fixture.detectChanges();
     expect(fixture.componentInstance.selectedEvent()?.id).toBe(2);
-    expect(fixture.nativeElement.querySelector('[role="dialog"]')).toBeTruthy();
+    expect(fixture.nativeElement.querySelector('dialog[open]')).toBeTruthy();
+    const dialog = fixture.nativeElement.querySelector('dialog') as HTMLDialogElement;
+    expect(dialog.getAttribute('aria-labelledby')).toBe('event-form-title');
+    dialog.dispatchEvent(new Event('cancel', { cancelable: true }));
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('dialog')).toBeNull();
+  });
+
+  it('does not close the event editor on Escape while saving', () => {
+    fixture.componentInstance.openCreate();
+    fixture.detectChanges();
+    const form = fixture.debugElement.query(By.directive(CompetitionEventFormComponent)).componentInstance as CompetitionEventFormComponent;
+    form.saving.set(true);
+    const dialog = fixture.nativeElement.querySelector('dialog') as HTMLDialogElement;
+    const event = new Event('cancel', { cancelable: true });
+    dialog.dispatchEvent(event);
+    fixture.detectChanges();
+    expect(event.defaultPrevented).toBe(true);
+    expect(fixture.nativeElement.querySelector('dialog[open]')).toBeTruthy();
   });
 });

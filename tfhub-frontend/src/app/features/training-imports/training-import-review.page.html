@@ -239,6 +239,15 @@
           <section class="details-card definition-card" aria-labelledby="equipment-heading"
             [class.needs-review]="isUncertain(current.equipmentRecognitionMetadata ?? {}) && !form.controls.equipmentRecognitionReviewed.value">
             <h2 id="equipment-heading">Sprzęt</h2>
+            <label>
+              Notatka o sprzęcie
+              <textarea class="field-control field-control--auto-grow" formControlName="equipment" rows="4"></textarea>
+            </label>
+            @if (changed(form.controls.equipment)) {
+              <div>
+                <button type="button" class="button button--secondary" (click)="reset(form.controls.equipment)">Przywróć notatkę o sprzęcie</button>
+              </div>
+            }
             @if (metadataText(current.equipmentRecognitionMetadata ?? {}, 'originalText'); as originalEquipment) {
               <p class="equipment-original">Rozpoznany tekst: {{ originalEquipment }}</p>
             }
@@ -300,13 +309,13 @@
       </fieldset>
     </form>
 
-    <dialog #confirmDialog class="confirmation-modal" (cancel)="$event.preventDefault(); closeDialog()">
+    <dialog #confirmDialog class="confirmation-modal" aria-labelledby="import-confirm-title" (cancel)="$event.preventDefault(); closeDialog()">
       <div class="modal-content">
         @switch (dialogAction()) {
-        @case ('accept') { <h2>Zaakceptować import?</h2><p>Powstanie trening z zapisanych danych importu.</p> }
-        @case ('reject') { <h2>Odrzucić import?</h2><p>Import zostanie zamknięty bez tworzenia treningu. Niezapisane zmiany nie zostaną zachowane.</p> }
-        @case ('remove-definition') { <h2>Usunąć podgrupę?</h2><p>Podgrupa i powiązane dane zawodników oraz wyników zostaną usunięte z wersji roboczej po zapisaniu.</p> }
-        @case ('remove-segment') { <h2>Usunąć odcinek?</h2><p>Powiązane wyniki tego odcinka zostaną usunięte z wersji roboczej po zapisaniu.</p> }
+        @case ('accept') { <h2 id="import-confirm-title">Zaakceptować import?</h2><p>Powstanie trening z zapisanych danych importu.</p> }
+        @case ('reject') { <h2 id="import-confirm-title">Odrzucić import?</h2><p>Import zostanie zamknięty bez tworzenia treningu. Niezapisane zmiany nie zostaną zachowane.</p> }
+        @case ('remove-definition') { <h2 id="import-confirm-title">Usunąć podgrupę?</h2><p>Podgrupa i powiązane dane zawodników oraz wyników zostaną usunięte z wersji roboczej po zapisaniu.</p> }
+        @case ('remove-segment') { <h2 id="import-confirm-title">Usunąć odcinek?</h2><p>Powiązane wyniki tego odcinka zostaną usunięte z wersji roboczej po zapisaniu.</p> }
         }
       </div>
       <div class="modal-footer">

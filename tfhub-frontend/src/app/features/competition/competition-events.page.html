@@ -72,9 +72,8 @@
 </section>
 
 @if (formOpen()) {
-  <div class="modal-backdrop" role="presentation">
-    <section class="modal-card" role="dialog" aria-modal="true" aria-labelledby="event-form-title">
-      <app-competition-event-form [event]="selectedEvent()" (saved)="onSaved($event)" (cancelled)="formOpen.set(false)" />
-    </section>
-  </div>
+  <dialog appModalDialog class="modal-card" aria-labelledby="event-form-title"
+    (cancel)="$event.preventDefault(); !eventForm.saving() && formOpen.set(false)">
+    <app-competition-event-form #eventForm [event]="selectedEvent()" (saved)="onSaved($event)" (cancelled)="formOpen.set(false)" />
+  </dialog>
 }

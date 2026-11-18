@@ -4,10 +4,10 @@
 
 .dashboard {
   display: grid;
-  gap: 1.4rem;
+  gap: var(--space-6);
   margin: 0 auto;
-  max-width: 76rem;
-  padding: 2rem clamp(1rem, 3vw, 2rem) 3rem;
+  max-width: var(--page-width);
+  padding: var(--space-8) clamp(var(--page-gutter-mobile), 3vw, var(--page-gutter-desktop)) var(--space-12);
 }
 
 .page-heading h1,
@@ -18,7 +18,7 @@
 }
 
 .page-heading h1 {
-  font-size: clamp(1.65rem, 3vw, 2rem);
+  font-size: var(--heading-page-size);
   letter-spacing: -.025em;
 }
 
@@ -51,9 +51,9 @@
 
 .athlete-summary {
   align-items: center;
-  background: #fff;
-  border: 1px solid #e1e6ed;
-  border-radius: .85rem;
+  background: var(--surface-card);
+  border: 1px solid var(--surface-border);
+  border-radius: var(--card-radius);
   color: inherit;
   display: flex;
   gap: 1rem;
@@ -64,7 +64,7 @@
 }
 
 .athlete-summary:hover {
-  border-color: #9dc9aa;
+  border-color: var(--brand-primary);
   box-shadow: 0 5px 16px rgb(23 32 51 / 7%);
 }
 
@@ -74,7 +74,7 @@
 }
 
 .athlete-summary strong {
-  color: #16834e;
+  color: var(--brand-primary);
   font-size: 1.8rem;
   margin-left: auto;
 }
@@ -84,15 +84,15 @@
 }
 
 .summary-link {
-  color: #188c55;
+  color: var(--brand-primary);
   font-size: .9rem;
   font-weight: 600;
 }
 
 .dashboard-section {
-  background: #fff;
-  border: 1px solid #e1e6ed;
-  border-radius: .85rem;
+  background: var(--surface-card);
+  border: 1px solid var(--surface-border);
+  border-radius: var(--card-radius);
   min-width: 0;
   padding: clamp(1rem, 2.5vw, 1.5rem);
 }
@@ -106,7 +106,7 @@
 }
 
 .section-heading h2 {
-  font-size: 1.2rem;
+  font-size: var(--heading-section-size);
 }
 
 .section-heading p {
@@ -129,10 +129,6 @@
   flex: 1;
 }
 
-.selectors .field-control {
-  height: 2.9rem;
-}
-
 .record-tables {
   display: grid;
   gap: 1rem;
@@ -142,7 +138,7 @@
 .record-card {
   background: #fbfcfd;
   border: 1px solid #e7ebf0;
-  border-radius: .7rem;
+  border-radius: var(--card-radius);
   min-width: 0;
   padding: 1rem;
 }
@@ -186,7 +182,7 @@ td {
 }
 
 .athlete-profile-link { color: inherit; text-decoration: none; }
-.athlete-profile-link:hover { color: #16834e; text-decoration: underline; }
+.athlete-profile-link:hover { color: var(--brand-primary); text-decoration: underline; }
 .athlete-profile-link:focus-visible { border-radius: .2rem; outline: 3px solid var(--button-focus); outline-offset: 2px; }
 
 .record-card table {

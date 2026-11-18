@@ -22,7 +22,7 @@ Add a new navigation entry:
 
 Requirements:
 - Visible only to users with the ADMIN role.
-- Available through the existing application navigation.
+- Available in the ADMIN-only `Konfiguracja` dropdown in the application navigation.
 - Follow existing navigation and authorization conventions.
 - Direct access to the route by non-admin users must follow the existing unauthorized-access behavior.
 

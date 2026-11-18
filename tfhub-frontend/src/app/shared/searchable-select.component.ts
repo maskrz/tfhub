@@ -110,7 +110,9 @@ export class SearchableSelectComponent implements ControlValueAccessor {
       event.preventDefault();
       const option = this.filteredOptions[this.activeIndex()];
       if (option) this.selectOption(option);
-    } else if (event.key === 'Escape') {
+    } else if (event.key === 'Escape' && this.isOpen()) {
+      event.preventDefault();
+      event.stopPropagation();
       this.isOpen.set(false);
       this.activeIndex.set(-1);
     }

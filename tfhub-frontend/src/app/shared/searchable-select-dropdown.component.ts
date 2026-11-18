@@ -12,7 +12,6 @@ import { MultiSelectOption } from './multi-select-dropdown.component';
         [attr.aria-label]="label()"
         [attr.aria-invalid]="ariaInvalid() ? 'true' : null"
         [attr.aria-describedby]="describedBy()"
-        aria-haspopup="listbox"
         [attr.aria-expanded]="open()"
         [attr.aria-controls]="controlId()"
         (click)="toggle()"
@@ -20,7 +19,7 @@ import { MultiSelectOption } from './multi-select-dropdown.component';
         <span>{{ selectedName() || placeholder() }}</span>
       </button>
       @if (open()) {
-        <div class="options" [id]="controlId()" role="listbox" [attr.aria-label]="label()">
+        <div class="options" [id]="controlId()" role="group" [attr.aria-label]="label()">
           <input
             #search
             class="field-control search"
@@ -34,8 +33,7 @@ import { MultiSelectOption } from './multi-select-dropdown.component';
             <button
               class="option"
               type="button"
-              role="option"
-              [attr.aria-selected]="selectedId() === option.id"
+              [attr.aria-pressed]="selectedId() === option.id"
               (click)="select(option.id)"
             >
               {{ option.name }}
@@ -89,9 +87,9 @@ import { MultiSelectOption } from './multi-select-dropdown.component';
       padding: .55rem;
       text-align: left;
     }
-    .option:hover, .option[aria-selected='true'] { background: #f2f4f8; }
+    .option:hover, .option[aria-pressed='true'] { background: var(--brand-tint); }
     .option:focus-visible, .trigger:focus-visible {
-      outline: 3px solid #159c68;
+      outline: 3px solid var(--button-focus);
       outline-offset: 2px;
     }
     .empty { color: #59667e; margin: 0; padding: .7rem .55rem; }
@@ -146,9 +144,10 @@ export class SearchableSelectDropdownComponent {
     }
   }
 
-  @HostListener('document:keydown.escape')
-  closeOnEscape(): void {
+  @HostListener('document:keydown.escape', ['$event'])
+  closeOnEscape(event: Event): void {
     if (!this.open()) return;
+    event.preventDefault();
     this.open.set(false);
     this.query.set('');
     this.trigger()?.nativeElement.focus();

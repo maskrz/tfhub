@@ -2,8 +2,8 @@
 
 .page {
   margin: 0 auto;
-  max-width: 100rem;
-  padding: clamp(1.5rem, 4vw, 3.5rem) clamp(1rem, 3.25vw, 3.25rem);
+  max-width: var(--page-width);
+  padding: var(--space-8) clamp(var(--page-gutter-mobile), 3vw, var(--page-gutter-desktop)) var(--space-12);
 }
 
 .page-heading {
@@ -17,7 +17,7 @@
 
 h1 {
   color: #141c2b;
-  font-size: clamp(2.4rem, 5vw, 3.4rem);
+  font-size: var(--heading-page-size);
   font-weight: 700;
   letter-spacing: -.045em;
   line-height: 1.05;
@@ -25,7 +25,7 @@ h1 {
 }
 
 .back-link {
-  color: #365b48;
+  color: var(--brand-primary);
   font-weight: 600;
   text-decoration: none;
 }
@@ -34,16 +34,17 @@ h1 {
 
 form { display: grid; gap: 1rem; }
 .form-section, .definition-card {
-  background: #fff;
-  border: 1px solid #d8deea;
-  border-radius: .9rem;
-  padding: clamp(1rem, 2.5vw, 1.7rem);
+  background: var(--surface-card);
+  border: 1px solid var(--surface-border);
+  border-radius: var(--card-radius);
+  min-width: 0;
+  padding: clamp(var(--space-4), 2.5vw, var(--space-6));
 }
 
 .form-section > h2,
 .section-heading h2 {
   color: #20283a;
-  font-size: 1.3rem;
+  font-size: var(--heading-section-size);
   margin: 0;
 }
 
@@ -201,7 +202,7 @@ form { display: grid; gap: 1rem; }
     min-height: var(--field-height);
     white-space: nowrap;
   }
-  .spikes-control input { accent-color: #198754; height: 1rem; width: 1rem; }
+  .spikes-control input { accent-color: var(--brand-primary); height: 1rem; width: 1rem; }
   .execution-pending { align-content: start; }
   .execution-pending p { margin: 0; }
   .form-error > p { margin: 0 0 .75rem; }

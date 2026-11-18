@@ -16,6 +16,6 @@ form { display: grid; gap: 1.15rem; }
 }
 
 .checkbox-field { align-items: center; display: flex; gap: .65rem; }
-.checkbox-field input { accent-color: #188c55; height: 1.15rem; width: 1.15rem; }
+.checkbox-field input { accent-color: var(--brand-primary); height: 1.15rem; width: 1.15rem; }
 
 @media (max-width: 520px) { form { gap: .9rem; } }

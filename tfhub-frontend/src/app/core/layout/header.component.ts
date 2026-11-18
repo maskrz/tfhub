@@ -23,21 +23,22 @@ import { ChangePasswordModalComponent } from '../auth/change-password-modal.comp
           @if (account.role !== 'ATHLETE') {
             <a routerLink="/dashboard" routerLinkActive="active" ariaCurrentWhenActive="page">Dashboard</a>
           }
+          @if (account.role === 'ADMIN' || account.role === 'COACH') {
+            <a routerLink="/athletes" routerLinkActive="active" ariaCurrentWhenActive="page">Zawodnicy</a>
+            <a routerLink="/trainings" routerLinkActive="active" ariaCurrentWhenActive="page">Treningi</a>
+            <a routerLink="/results" routerLinkActive="active" ariaCurrentWhenActive="page">Wyniki</a>
+          }
           @if (account.role === 'ADMIN') {
             <div class="management-menu" routerLinkActive="active">
               <button #managementButton type="button" class="management-toggle"
                 aria-controls="management-links" [attr.aria-expanded]="managementOpen()"
-                (click)="toggleManagement()">Zarządzanie <span aria-hidden="true">▾</span></button>
+                (click)="toggleManagement()">Konfiguracja <span aria-hidden="true">▾</span></button>
               <div id="management-links" class="management-links" [hidden]="!managementOpen()">
-                <a routerLink="/tests" routerLinkActive="active" ariaCurrentWhenActive="page">Sprawdziany</a>
-                <a routerLink="/competition-events" routerLinkActive="active" ariaCurrentWhenActive="page">Konkurencje</a>
+                <a routerLink="/tests" routerLinkActive="active" ariaCurrentWhenActive="page">Definicje sprawdzianów</a>
+                <a routerLink="/competition-events" routerLinkActive="active" ariaCurrentWhenActive="page">Konkurencje PZLA</a>
+                <a routerLink="/accounts" routerLinkActive="active" ariaCurrentWhenActive="page">Zarządzanie kontami</a>
               </div>
             </div>
-          }
-          @if (account.role === 'ADMIN' || account.role === 'COACH') {
-            <a routerLink="/athletes" routerLinkActive="active" ariaCurrentWhenActive="page">Zawodnicy</a>
-            <a routerLink="/trainings" routerLinkActive="active" ariaCurrentWhenActive="page">Treningi</a>
-            <a routerLink="/results" routerLinkActive="active" ariaCurrentWhenActive="page">Wyniki sprawdzianów</a>
           }
           @if (account.role === 'ATHLETE') {
             <a [routerLink]="['/athletes', account.athleteId]" routerLinkActive="active" ariaCurrentWhenActive="page">Moje wyniki</a>
@@ -47,25 +48,21 @@ import { ChangePasswordModalComponent } from '../auth/change-password-modal.comp
       @if (user(); as account) {
         <div class="account-menu" (click)="$event.stopPropagation()">
           <button
+            #accountButton
             class="username"
             type="button"
-            aria-haspopup="menu"
+            [attr.aria-controls]="menuOpen() ? 'user-menu' : null"
             [attr.aria-expanded]="menuOpen()"
             (click)="toggleMenu()"
           >
             {{ account.username }}
           </button>
           @if (menuOpen()) {
-            <div class="user-menu" role="menu" aria-label="Menu użytkownika">
-              @if (account.role === 'ADMIN') {
-                <a routerLink="/accounts" routerLinkActive="active" role="menuitem" (click)="menuOpen.set(false)">
-                  Zarządzanie kontami
-                </a>
-              }
-              <button type="button" role="menuitem" (click)="openPasswordChange()">
-                Zmień hasło
+            <div id="user-menu" class="user-menu" aria-label="Menu użytkownika">
+              <button type="button" (click)="openPasswordChange()">
+                Zmiana hasła
               </button>
-              <button type="button" role="menuitem" (click)="logout()">Wyloguj</button>
+              <button type="button" (click)="logout()">Wyloguj</button>
             </div>
           }
         </div>
@@ -136,7 +133,7 @@ import { ChangePasswordModalComponent } from '../auth/change-password-modal.comp
       white-space: nowrap;
     }
     nav a.active {
-      border-bottom-color: #42c66f;
+      border-bottom-color: var(--brand-on-dark);
       color: #fff;
     }
     .management-menu { position: relative; }
@@ -145,12 +142,12 @@ import { ChangePasswordModalComponent } from '../auth/change-password-modal.comp
       color: #d3d8e0; cursor: pointer; display: flex; font: inherit; font-weight: 550;
       gap: .35rem; height: 100%; padding: 0 .35rem; white-space: nowrap;
     }
-    .management-menu.active .management-toggle { border-bottom-color: #42c66f; color: #fff; }
-    .management-toggle:focus-visible { outline: 2px solid #42c66f; outline-offset: -2px; }
+    .management-menu.active .management-toggle { border-bottom-color: var(--brand-on-dark); color: #fff; }
+    .management-toggle:focus-visible { outline: 2px solid var(--brand-on-dark); outline-offset: -2px; }
     .management-links {
       background: #fff; border: 1px solid #dce1ea; border-radius: .55rem;
       box-shadow: 0 .7rem 2rem rgb(15 23 42 / 20%); min-width: 12rem;
-      padding: .35rem; position: absolute; top: 100%; left: 0; z-index: 20;
+      padding: .35rem; position: absolute; top: 100%; right: 0; z-index: 20;
     }
     .management-links[hidden] { display: none; }
     nav .management-links a {
@@ -185,7 +182,7 @@ import { ChangePasswordModalComponent } from '../auth/change-password-modal.comp
       white-space: nowrap;
     }
     .username:hover { background: #414e5e; }
-    .username:focus-visible { outline: 2px solid #42c66f; outline-offset: 2px; }
+    .username:focus-visible { outline: 2px solid var(--brand-on-dark); outline-offset: 2px; }
     .user-menu {
       background: #fff;
       border: 1px solid #dce1ea;
@@ -259,14 +256,15 @@ import { ChangePasswordModalComponent } from '../auth/change-password-modal.comp
     }
     @media (max-width: 1000px) {
       .app-header { gap: .5rem; min-height: 4.5rem; }
-      .brand { margin-right: auto; }
+      .brand { flex: 1 1 auto; margin-right: auto; min-width: 0; }
+      .brand img { max-width: 100%; }
       .navigation-toggle, .username { box-sizing: border-box; height: 2.75rem; }
       .navigation-toggle {
         background: #35404e; border: 1px solid #596575; border-radius: .45rem;
         color: #fff; cursor: pointer; display: block; font: inherit;
         min-height: 2.75rem; padding: .5rem .75rem;
       }
-      .navigation-toggle:focus-visible { outline: 2px solid #42c66f; outline-offset: 2px; }
+      .navigation-toggle:focus-visible { outline: 2px solid var(--brand-on-dark); outline-offset: 2px; }
       nav {
         align-items: stretch; background: #202630; box-shadow: 0 .7rem 2rem rgb(15 23 42 / 20%);
         display: none; flex: none; flex-direction: column; gap: 0; height: auto;
@@ -275,12 +273,12 @@ import { ChangePasswordModalComponent } from '../auth/change-password-modal.comp
       }
       nav.navigation-open { display: flex; }
       nav a { border-bottom: 0; border-left: 4px solid transparent; min-height: 2.75rem; padding: .5rem .75rem; white-space: normal; }
-      nav a.active { border-left-color: #42c66f; background: #35404e; }
+      nav a.active { border-left-color: var(--brand-on-dark); background: #35404e; }
       .management-toggle { border: 0; border-left: 4px solid transparent; min-height: 2.75rem; padding: .5rem .75rem; width: 100%; }
-      .management-menu.active .management-toggle { background: #35404e; border-left-color: #42c66f; }
+      .management-menu.active .management-toggle { background: #35404e; border-left-color: var(--brand-on-dark); }
       .management-links { box-shadow: none; margin: .2rem .75rem .4rem; position: static; }
-      .account-menu { min-width: 0; }
-      .username { max-width: min(35vw, 12rem); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .account-menu { flex: 0 1 auto; max-width: 35vw; min-width: 0; }
+      .username { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
       .account { flex-shrink: 0; }
     }
   `,
@@ -288,6 +286,7 @@ import { ChangePasswordModalComponent } from '../auth/change-password-modal.comp
 export class HeaderComponent implements OnDestroy {
   @ViewChild('navigationButton') private navigationButton?: ElementRef<HTMLButtonElement>;
   @ViewChild('managementButton') private managementButton?: ElementRef<HTMLButtonElement>;
+  @ViewChild('accountButton') private accountButton?: ElementRef<HTMLButtonElement>;
   private readonly auth = inject(AuthService);
   private readonly router = inject(Router);
   private readonly element = inject(ElementRef<HTMLElement>);
@@ -322,11 +321,16 @@ export class HeaderComponent implements OnDestroy {
 
   @HostListener('document:keydown.escape')
   closeMenuOnEscape(): void {
-    if (this.managementOpen()) this.managementButton?.nativeElement.focus();
-    else if (this.navigationOpen()) this.navigationButton?.nativeElement.focus();
-    this.navigationOpen.set(false);
-    this.managementOpen.set(false);
-    this.menuOpen.set(false);
+    if (this.managementOpen()) {
+      this.managementOpen.set(false);
+      this.managementButton?.nativeElement.focus();
+    } else if (this.navigationOpen()) {
+      this.navigationOpen.set(false);
+      this.navigationButton?.nativeElement.focus();
+    } else if (this.menuOpen()) {
+      this.menuOpen.set(false);
+      this.accountButton?.nativeElement.focus();
+    }
   }
 
   ngOnDestroy(): void {
