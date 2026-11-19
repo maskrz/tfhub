@@ -18,7 +18,7 @@ Display complete training details, including type, immutable training group and 
 3. The view displays training name, date, type, status and assignment, then either ordered TEMPO definitions/segments and executions or ordered FREE_TEXT sections. ATHLETES-mode FREE_TEXT has no group.
    An undated plan displays `Bez daty`; staff must add a date before completing it.
 4. TEMPO users may select **Edytuj trening** (FE-TRAINING-003) or **Uzupełnij trening** (FE-TRAINING-009). FREE_TEXT users may edit sections and mark a planned training completed through `PATCH /api/trainings/{trainingId}/complete`.
-5. Planned and completed trainings remain editable by authorized users. They can permanently delete the training from this view (FE-TRAINING-005).
+5. Planned and completed trainings remain editable by authorized users. Deletion is available through bulk actions on the list (FE-TRAINING-005).
 
 ## 4. Display and Navigation Requirements
 
@@ -31,7 +31,7 @@ Display complete training details, including type, immutable training group and 
 - FREE_TEXT sections are displayed in their saved order and no athlete-participation controls are shown.
 - Authorized staff see a separate `Sprzęt` section when the FREE_TEXT equipment note is present, preserving line breaks. Athletes never see the note.
 - Provide separate actions for plan editing and assigning/recording athlete participation. Do not combine them into one edit action.
-- Offer **Usuń trening** for planned and completed sessions with explicit confirmation (FE-TRAINING-005).
+- Do not offer deletion on the details page; use the list's bulk action (FE-TRAINING-005).
 - Backend authorization remains authoritative.
 - ATHLETE users see only visible FREE_TEXT details and no edit, completion or delete actions; TEMPO details remain staff-only.
 - ADMIN and authorized COACH users can copy a FREE_TEXT training using the icon on the right of the summary or copy an individual TEMPO subgroup using the icon on the right of its heading, regardless of training status. Copying is available for empty section and segment collections.
@@ -54,7 +54,7 @@ Clipboard success is reported in a small, temporary message beside the copy icon
 1. Authorized users see complete details, including historical participants and executions.
 2. Definition and segment order is preserved.
 3. Planned and completed trainings expose distinct **Edytuj trening** and **Uzupełnij trening** actions.
-4. Planned and completed trainings can be deleted after confirmation.
+4. Planned and completed trainings can be selected for deletion from the list after confirmation.
 5. The view handles empty, loading and error states and remains usable on mobile.
 6. FREE_TEXT details display ordered sections without TEMPO athlete participation; an ATHLETE sees only their visible session and no other selected athlete identities.
 7. Authorized staff can copy only the relevant training definition, receive success or failure feedback, and never copy private equipment or participant data.

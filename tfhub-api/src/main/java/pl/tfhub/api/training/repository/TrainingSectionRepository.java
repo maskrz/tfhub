@@ -7,4 +7,6 @@ import pl.tfhub.api.training.entity.TrainingSection;
 public interface TrainingSectionRepository extends JpaRepository<TrainingSection, Long> {
 
     List<TrainingSection> findAllByTraining_IdOrderBySequenceNumberAsc(Long trainingId);
+
+    List<TrainingSection> findAllByTraining_IdInOrderByTraining_IdAscSequenceNumberAsc(List<Long> trainingIds);
 }

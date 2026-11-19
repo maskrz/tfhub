@@ -26,7 +26,7 @@ The view must follow the existing TFHUB visual design and interaction patterns.
 4. The user can browse the list and use the available search and filtering controls.
 5. The user selects a training to open its details (FE-TRAINING-004).
 6. The user opens the type-appropriate details view; only TEMPO trainings offer the tempo edit/completion flows, while FREE_TEXT trainings offer section editing and completion.
-7. The user can initiate permanent deletion of a training from its row (FE-TRAINING-005).
+7. The user can select trainings and initiate bulk actions (FE-TRAINING-010), including permanent deletion (FE-TRAINING-005).
 8. The user can initiate training creation (FE-TRAINING-002), subject to the existing role permissions.
 9. The user can start an OCR import by selecting **Importuj ze zdjęcia** (FE-TRAINING-006).
 10. Active OCR imports are shown as separate rows above persisted trainings, independently of training filters and sorting.
@@ -68,7 +68,7 @@ Retrieve active import summaries separately from `GET /api/training-imports`. Sh
 - Provide **Importuj ze zdjęcia** to start FE-TRAINING-006 for ADMIN and COACH users.
 - Provide **Edytuj trening** and **Uzupełnij trening** only for TEMPO records; FREE_TEXT records navigate to their section editor and expose completion only while planned. Authorization remains backend-enforced.
 - Display the planned/completed state as a read-only status label.
-- Provide **Usuń** for all items (FE-TRAINING-005), requiring explicit confirmation before permanent deletion.
+- Provide selection and **Akcje** above the list; deletion is available only through the bulk menu and requires explicit confirmation (FE-TRAINING-005).
 - ATHLETE users have read-only access to visible FREE_TEXT list items and do not receive create, import, edit, complete or delete actions.
 - Use a blank, accessible actions-column header rather than displaying the text **Akcje**.
 
@@ -127,7 +127,7 @@ The view must be mobile-first and consistent with the existing TFHUB application
 - Each listed training provides distinct links to edit its plan and complete its athlete participation/results.
 - Users can filter planned, completed, or all returned trainings; the default is all statuses.
 - Users can filter both training types together or by type without changing the existing status behavior.
-- Planned and completed list items display their status and offer edit/completion actions; both statuses can be deleted after confirmation.
+- Planned and completed list items display their status and offer edit/completion actions; both statuses can be selected for deletion after confirmation.
 - Authorized users can initiate training creation.
 - Loading, empty, and error states are handled.
 - The view is responsive and usable on mobile devices.

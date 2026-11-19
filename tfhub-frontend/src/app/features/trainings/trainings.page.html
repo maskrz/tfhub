@@ -13,6 +13,10 @@
     }
   </div>
 
+  @if (bulkError(); as message) {
+    <p class="feedback error" role="alert">{{ message }}</p>
+  }
+
   @if (successMessage(); as message) {
     <p class="feedback success" role="status" aria-live="polite">{{ message }}</p>
   }
@@ -127,11 +131,39 @@
     </p>
   }
 
+  @if (selectedIds().length > 0) {
+    <div class="bulk-actions">
+      <span aria-live="polite">Zaznaczone: {{ selectedIds().length }}</span>
+      <div class="bulk-menu">
+        <button type="button" class="button button--secondary" [disabled]="bulkPending()"
+          [attr.aria-expanded]="actionsOpen()" (click)="actionsOpen.set(!actionsOpen())">Akcje</button>
+        @if (actionsOpen()) {
+          <div>
+            <button type="button" [disabled]="bulkPending()" (click)="printSelected()">Drukuj</button>
+            @if (canManageTrainings) {
+              <button type="button" [disabled]="!hasSelectedPlanned || bulkPending()" (click)="completeSelected()">Oznacz jako ukończony</button>
+              <button type="button" class="bulk-delete-button" [disabled]="bulkPending()" (click)="openDeletionConfirmation()">Usuń</button>
+            }
+          </div>
+        }
+      </div>
+    </div>
+  }
+
   @if (imports().length > 0 || (!loading() && !errorMessage() && visibleTrainings().length > 0)) {
     <div class="table-surface" role="region" aria-label="Lista treningów" tabindex="0">
       <table>
         <thead>
           <tr>
+            <th scope="col" class="selection-header">
+              <label class="selection-target">
+                <input id="select-visible-trainings" type="checkbox" aria-label="Zaznacz wszystkie widoczne treningi"
+                  [checked]="allVisibleSelected()" [indeterminate]="someVisibleSelected()"
+                  [disabled]="selectableTrainings().length === 0"
+                  (change)="toggleVisibleTrainings($event)" />
+              </label>
+              <label for="select-visible-trainings" class="selection-header-label">Zaznacz widoczne treningi</label>
+            </th>
             <th scope="col" [attr.aria-sort]="sortColumn() === 'name' ? (sortDirection() === 'asc' ? 'ascending' : 'descending') : 'none'">
               <button type="button" class="sort-button" (click)="sortBy('name')">
                 Trening
@@ -173,6 +205,7 @@
         <tbody>
           @for (item of imports(); track item.id) {
             <tr class="import-row">
+              <td class="selection-cell"></td>
               <td data-label="Trening">
                 <strong>{{ item.name || 'Import ze zdjęcia' }}</strong>
                 <span class="import-detail">Import nr {{ item.id }}</span>
@@ -219,6 +252,13 @@
           }
           @for (training of (!loading() && !errorMessage() ? visibleTrainings() : []); track training.id) {
             <tr>
+              <td class="selection-cell" data-label="Wybór">
+                <label class="selection-target">
+                  <input type="checkbox" [checked]="selectedIds().includes(training.id)"
+                    [attr.aria-label]="'Zaznacz trening: ' + training.name"
+                    (change)="toggleTraining(training.id, $event)" />
+                </label>
+              </td>
               <td data-label="Trening">
                 <a class="training-link" [routerLink]="['/trainings', training.id]">
                   <strong>{{ training.name }}</strong>
@@ -260,12 +300,6 @@
                       [attr.aria-label]="'Uzupełnij trening: ' + training.name"
                     >Uzupełnij trening</a>
                   }
-                  <button
-                    type="button"
-                    class="button button--danger delete-training-button"
-                    [attr.aria-label]="'Usuń trening: ' + training.name"
-                    (click)="openDeletionConfirmation(training)"
-                  >Usuń</button>
                 </div>
               </td>
               }
@@ -277,11 +311,10 @@
   }
 </section>
 
-@if (trainingPendingDeletion(); as training) {
+@if (deletionDialogOpen()) {
   <app-training-delete-confirmation
-    [trainingId]="training.id"
-    [trainingName]="training.name"
-    (deleted)="onTrainingDeleted($event)"
+    [trainingIds]="selectedIds()"
+    (deleted)="onTrainingDeleted()"
     (cancelled)="closeDeletionConfirmation()"
   />
 }

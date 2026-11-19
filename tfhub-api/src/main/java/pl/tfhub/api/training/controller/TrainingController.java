@@ -15,6 +15,11 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import pl.tfhub.api.training.dto.request.EditTrainingRequest;
+import pl.tfhub.api.training.dto.request.TrainingIdsRequest;
+import pl.tfhub.api.training.dto.response.BulkTrainingCompletionResponse;
+import pl.tfhub.api.training.dto.response.TrainingPrintResponse;
+import pl.tfhub.api.training.service.TrainingBulkService;
+import pl.tfhub.api.training.service.TrainingPrintService;
 import pl.tfhub.api.training.dto.request.CreateTrainingRequest;
 import pl.tfhub.api.training.dto.request.CompleteTrainingRequest;
 import pl.tfhub.api.training.dto.request.CreateFreeTextTrainingRequest;
@@ -43,6 +48,8 @@ public class TrainingController {
     private final TrainingDeletionService trainingDeletionService;
     private final TrainingCompletionService trainingCompletionService;
     private final FreeTextTrainingService freeTextTrainingService;
+    private final TrainingBulkService trainingBulkService;
+    private final TrainingPrintService trainingPrintService;
 
     public TrainingController(
             TrainingQueryService trainingQueryService,
@@ -51,7 +58,9 @@ public class TrainingController {
             TrainingDetailsService trainingDetailsService,
             TrainingDeletionService trainingDeletionService,
             TrainingCompletionService trainingCompletionService,
-            FreeTextTrainingService freeTextTrainingService) {
+            FreeTextTrainingService freeTextTrainingService,
+            TrainingBulkService trainingBulkService,
+            TrainingPrintService trainingPrintService) {
         this.trainingQueryService = trainingQueryService;
         this.trainingCreationService = trainingCreationService;
         this.trainingUpdateService = trainingUpdateService;
@@ -59,6 +68,24 @@ public class TrainingController {
         this.trainingDeletionService = trainingDeletionService;
         this.trainingCompletionService = trainingCompletionService;
         this.freeTextTrainingService = freeTextTrainingService;
+        this.trainingBulkService = trainingBulkService;
+        this.trainingPrintService = trainingPrintService;
+    }
+
+    @PostMapping("/bulk-delete")
+    public ResponseEntity<Void> bulkDelete(@Valid @RequestBody TrainingIdsRequest request) {
+        trainingBulkService.delete(request.trainingIds());
+        return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/bulk-complete")
+    public BulkTrainingCompletionResponse bulkComplete(@Valid @RequestBody TrainingIdsRequest request) {
+        return trainingBulkService.complete(request.trainingIds());
+    }
+
+    @PostMapping("/print-preview")
+    public TrainingPrintResponse printPreview(@Valid @RequestBody TrainingIdsRequest request) {
+        return trainingPrintService.getPrintData(request.trainingIds());
     }
 
     @GetMapping

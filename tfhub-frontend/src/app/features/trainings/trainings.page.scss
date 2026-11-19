@@ -15,6 +15,11 @@
   margin-bottom: var(--space-8);
 }
 .page-actions { align-items: center; display: flex; flex-wrap: wrap; gap: .7rem; }
+.bulk-actions { align-items: center; display: flex; gap: 1rem; margin-bottom: 1rem; }
+.bulk-menu { position: relative; }
+.bulk-menu > div { background: white; border: 1px solid var(--button-border); border-radius: .6rem; display: grid; min-width: 13rem; position: absolute; z-index: 3; }
+.bulk-menu > div > button { background: white; border: 0; cursor: pointer; padding: .7rem; text-align: left; }
+.bulk-menu button:disabled { cursor: not-allowed; opacity: var(--button-disabled-opacity); }
 
 h1 {
   color: #141c2b;
@@ -85,6 +90,10 @@ table {
 th, td { border-bottom: 1px solid #dce1ea; padding: 1.2rem 1.5rem; }
 th { color: #20283a; font-size: 1rem; font-weight: 650; }
 td { font-size: 1.05rem; }
+.selection-target { align-items: center; cursor: pointer; display: inline-flex; height: 2.75rem; justify-content: center; width: 2.75rem; }
+.selection-target input { accent-color: var(--brand-primary); cursor: pointer; height: 1.5rem; margin: 0; width: 1.5rem; }
+.selection-target input:focus-visible { outline: 3px solid var(--button-focus); outline-offset: 3px; }
+.selection-header-label { display: none; }
 
 .sort-button {
   align-items: center;
@@ -174,7 +183,10 @@ td strong { display: block; font-size: 1.08rem; font-weight: 650; }
   .group-filter app-multi-select-dropdown { min-width: 0; }
   .table-surface { background: transparent; border: 0; border-radius: 0; overflow: visible; }
   table, tbody { display: block; }
-  thead { clip: rect(0, 0, 0, 0); clip-path: inset(50%); height: 1px; overflow: hidden; position: absolute; width: 1px; }
+  thead, thead tr { display: block; }
+  thead th:not(.selection-header) { display: none; }
+  .selection-header { align-items: center; border: 0; display: flex; padding: 0 0 .5rem; }
+  .selection-header-label { display: inline; }
   tbody { display: grid; gap: .7rem; }
   tbody tr {
     background: #fff;
@@ -187,7 +199,8 @@ td strong { display: block; font-size: 1.08rem; font-weight: 650; }
   }
   td { border: 0; display: grid; gap: .2rem; padding: 0; }
   td::before { color: #59667e; content: attr(data-label); font-size: .78rem; font-weight: 650; }
-  td:first-child { grid-column: 1 / -1; }
+  td.selection-cell { grid-column: 1 / -1; }
+  td:nth-child(2) { grid-column: 1 / -1; }
   .training-actions { grid-column: 1 / -1; }
   .training-action-buttons { align-items: stretch; flex-direction: column; }
   .training-actions .button { justify-content: center; width: 100%; }

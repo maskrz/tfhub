@@ -101,7 +101,7 @@ describe('TrainingDetailsPage', () => {
     fixture.detectChanges();
   }
 
-  it('displays training data, ordered plan, historical participants, executions, workflow links and delete action', async () => {
+  it('displays training data, ordered plan, historical participants, executions and workflow links', async () => {
     await createPage();
     const text = fixture.nativeElement.textContent as string;
     const definitionHeadings = [...fixture.nativeElement.querySelectorAll('.definition-card h2')]
@@ -132,9 +132,9 @@ describe('TrainingDetailsPage', () => {
     expect(fixture.nativeElement.querySelectorAll('.spikes-label')).toHaveLength(1);
     expect(fixture.nativeElement.querySelector('a[href="/trainings/12/edit"]')?.textContent.trim()).toBe('Edytuj trening');
     expect(fixture.nativeElement.querySelector('a[href="/trainings/12/complete"]')?.textContent.trim()).toBe('Uzupełnij trening');
-    expect(fixture.nativeElement.querySelector('.delete-training-button')).toBeTruthy();
+    expect(fixture.nativeElement.querySelector('.delete-training-button')).toBeNull();
     expect(fixture.nativeElement.querySelectorAll('.training-actions')).toHaveLength(1);
-    expect(fixture.nativeElement.querySelectorAll('.training-actions > .button')).toHaveLength(3);
+    expect(fixture.nativeElement.querySelectorAll('.training-actions > .button')).toHaveLength(2);
   });
 
   it('shows completed trainings with edit and completion actions', async () => {
@@ -144,7 +144,7 @@ describe('TrainingDetailsPage', () => {
     expect(text).toContain('Zakończony');
     expect(fixture.nativeElement.querySelector('a[href="/trainings/12/edit"]')).toBeTruthy();
     expect(fixture.nativeElement.querySelector('a[href="/trainings/12/complete"]')).toBeTruthy();
-    expect(fixture.nativeElement.querySelector('.delete-training-button')).toBeTruthy();
+    expect(fixture.nativeElement.querySelector('.delete-training-button')).toBeNull();
     expect(text).toContain('Jan Kowalski');
   });
 
@@ -207,21 +207,6 @@ describe('TrainingDetailsPage', () => {
     const restCells = [...fixture.nativeElement.querySelectorAll('.segments-table tbody tr')]
       .map((row: HTMLElement) => row.querySelectorAll('td')[1].textContent?.trim());
     expect(restCells).toEqual(['4m', '4m 10s', '45s', '0m', '—']);
-  });
-
-  it('requires confirmation before deleting from details and returns to the list on success', async () => {
-    await createPage();
-    const navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
-    (fixture.nativeElement.querySelector('.delete-training-button') as HTMLButtonElement).click();
-    fixture.detectChanges();
-
-    expect(fixture.nativeElement.textContent).toContain('trwale usunąć');
-    expect(api.deleteTraining).not.toHaveBeenCalled();
-    (fixture.nativeElement.querySelector('app-training-delete-confirmation .button--danger') as HTMLButtonElement).click();
-    fixture.detectChanges();
-
-    expect(api.deleteTraining).toHaveBeenCalledWith(12);
-    expect(navigate).toHaveBeenCalledWith(['/trainings']);
   });
 
   it('displays empty definitions and participant collections without errors', async () => {

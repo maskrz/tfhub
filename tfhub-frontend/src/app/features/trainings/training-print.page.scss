@@ -1,0 +1,9 @@
+:host { display: block; }
+.print-preview { padding: 1rem; }
+.print-controls { margin: 0 auto 1rem; max-width: 80rem; }
+.print-controls .button { margin-right: .5rem; }
+.print-pages { overflow-x: auto; }
+
+@media print {
+  .print-preview { padding: 0; }
+}

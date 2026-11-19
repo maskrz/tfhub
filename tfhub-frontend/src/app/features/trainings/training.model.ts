@@ -138,6 +138,33 @@ export interface TrainingDetails {
   equipment?: string | null;
 }
 
+export interface BulkTrainingCompletion {
+  completedIds: number[];
+  alreadyCompletedIds: number[];
+  skippedUndatedIds: number[];
+}
+
+export interface TrainingPrintItem {
+  id: number;
+  name: string;
+  trainingDate: string | null;
+  trainingType: TrainingType;
+  assignmentType: TrainingAssignmentType;
+  trainingGroup: TrainingGroupSummary | null;
+  assignedAthletes: Pick<TrainingAssignedAthlete, 'firstName' | 'lastName'>[];
+  definitions: {
+    name: string;
+    sequenceNumber: number;
+    segments: Pick<TrainingSegmentDetails, 'sequenceNumber' | 'distanceM' | 'restAfterSeconds'>[];
+  }[];
+  sections: Pick<TrainingSectionDetails, 'title' | 'content' | 'sequenceNumber'>[];
+  equipment?: string | null;
+}
+
+export interface TrainingPrintResponse {
+  trainings: TrainingPrintItem[];
+}
+
 export interface EditTrainingExecutionRequest {
   id: number;
   status: TrainingExecutionStatus;

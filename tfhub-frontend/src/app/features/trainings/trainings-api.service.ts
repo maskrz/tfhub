@@ -12,6 +12,8 @@ import {
   TrainingListItem,
   TrainingType,
   UpdateTrainingResponse,
+  BulkTrainingCompletion,
+  TrainingPrintResponse,
 } from './training.model';
 
 @Injectable({ providedIn: 'root' })
@@ -57,5 +59,17 @@ export class TrainingsApiService {
 
   deleteTraining(id: number): Observable<void> {
     return this.http.delete<void>(`/api/trainings/${id}`);
+  }
+
+  bulkDelete(trainingIds: number[]): Observable<void> {
+    return this.http.post<void>('/api/trainings/bulk-delete', { trainingIds });
+  }
+
+  bulkComplete(trainingIds: number[]): Observable<BulkTrainingCompletion> {
+    return this.http.post<BulkTrainingCompletion>('/api/trainings/bulk-complete', { trainingIds });
+  }
+
+  printPreview(trainingIds: number[]): Observable<TrainingPrintResponse> {
+    return this.http.post<TrainingPrintResponse>('/api/trainings/print-preview', { trainingIds });
   }
 }

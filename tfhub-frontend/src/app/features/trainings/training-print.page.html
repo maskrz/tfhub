@@ -1,0 +1,11 @@
+<section class="print-preview">
+  <div class="print-controls">
+    <a class="button button--secondary" routerLink="/trainings">Wróć do treningów</a>
+    <button class="button button--primary" type="button" [disabled]="loading() || !!error()" (click)="print()">Drukuj</button>
+    <p>Wybierz A4 poziomo, skalę 100% i wyłącz nagłówki oraz stopki przeglądarki.</p>
+    @if (loading()) { <p role="status">Przygotowywanie podglądu...</p> }
+    @if (error(); as message) { <p role="alert">{{ message }}</p> }
+    @if (oversized()) { <p role="status">Długi trening został podzielony między kolumny.</p> }
+  </div>
+  <div #pages class="print-pages" aria-label="Podgląd wydruku"></div>
+</section>

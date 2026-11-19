@@ -39,6 +39,8 @@ Detailed specifications:
 
 Running training history for an athlete is specified separately in
 [UC-511 Athlete Running Training History](UC-511-TRN-athlete-training-history.md).
+Training bulk actions and print data are specified in
+[UC-512 Bulk Training Actions and Print Data](UC-512-TRN-bulk-actions-print.md).
 
 ## 2. Test Module
 

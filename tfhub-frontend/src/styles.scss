@@ -58,6 +58,29 @@ body {
 
 button, input { font: inherit; }
 
+.print-pages { color: #000; font: 10pt/1.3 Arial, sans-serif; }
+.print-sheet { background: white; display: flex; gap: 5mm; height: 210mm; margin: 0 auto 1rem; padding: 10mm; width: 297mm; }
+.print-column { flex: 0 0 136mm; height: 190mm; overflow: hidden; overflow-wrap: anywhere; }
+.print-date { font-weight: bold; margin: 0 0 2mm; }
+.print-training { margin-bottom: 3mm; }
+.print-training-name { font-weight: bold; }
+.print-subheading { font-weight: bold; margin-top: 1mm; }
+.print-content, .print-assignment { white-space: pre-wrap; overflow-wrap: anywhere; }
+.print-equipment { margin-top: 2mm; margin-bottom: 3mm; }
+
+@page { size: A4 landscape; margin: 10mm; }
+@page training-sheet { size: A4 landscape; margin: 0; }
+@media print {
+  body:has(app-training-print-page) { page: training-sheet; }
+  body:has(app-training-print-page) app-header,
+  body:has(app-training-print-page) app-footer,
+  body:has(app-training-print-page) .print-controls { display: none !important; }
+  body:has(app-training-print-page), body:has(app-training-print-page) .shell { background: white !important; }
+  .print-pages { overflow: visible !important; }
+  .print-sheet { break-after: page; margin: 0; }
+  .print-sheet:last-child { break-after: auto; }
+}
+
 .field-control,
 .field-control-shell {
   background-color: var(--field-background);

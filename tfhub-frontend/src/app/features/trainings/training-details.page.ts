@@ -1,7 +1,7 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component, DestroyRef, OnInit, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { ActivatedRoute, RouterLink } from '@angular/router';
 import { EMPTY, catchError, finalize, take } from 'rxjs';
 import { AuthService } from '../../core/auth/auth.service';
 import {
@@ -11,12 +11,11 @@ import {
   TrainingParticipationDetails,
 } from './training.model';
 import { TrainingsApiService } from './trainings-api.service';
-import { TrainingDeleteConfirmationComponent } from './training-delete-confirmation.component';
 import { formatRestMinutes } from './training-rest-time';
 import { formatFreeTextTraining, formatTempoTraining, formatTrainingDate } from './training-copy';
 
 @Component({
-  imports: [RouterLink, TrainingDeleteConfirmationComponent],
+  imports: [RouterLink],
   selector: 'app-training-details-page',
   styleUrl: './training-details.page.scss',
   templateUrl: './training-details.page.html',
@@ -26,7 +25,6 @@ export class TrainingDetailsPage implements OnInit {
   readonly training = signal<TrainingDetails | null>(null);
   readonly loading = signal(true);
   readonly errorMessage = signal<string | null>(null);
-  readonly deletionDialogOpen = signal(false);
   readonly completing = signal(false);
   readonly actionError = signal<string | null>(null);
   readonly copying = signal(false);
@@ -34,7 +32,6 @@ export class TrainingDetailsPage implements OnInit {
 
   readonly auth = inject(AuthService);
   private readonly route = inject(ActivatedRoute);
-  private readonly router = inject(Router);
   private readonly trainingsApi = inject(TrainingsApiService);
   private readonly destroyRef = inject(DestroyRef);
   private trainingId = 0;
@@ -64,14 +61,6 @@ export class TrainingDetailsPage implements OnInit {
     this.loadTraining();
   }
 
-  openDeletionConfirmation(): void {
-    if (this.training()) this.deletionDialogOpen.set(true);
-  }
-
-  closeDeletionConfirmation(): void {
-    this.deletionDialogOpen.set(false);
-  }
-
   completeFreeTextTraining(): void {
     const training = this.training();
     if (!training || !training.trainingDate || training.trainingType !== 'FREE_TEXT' || training.status !== 'PLANNED' || this.completing()) return;
@@ -86,12 +75,6 @@ export class TrainingDetailsPage implements OnInit {
       finalize(() => this.completing.set(false)),
       takeUntilDestroyed(this.destroyRef),
     ).subscribe(() => this.loadTraining());
-  }
-
-  onTrainingDeleted(trainingId: number): void {
-    if (trainingId !== this.training()?.id) return;
-    this.deletionDialogOpen.set(false);
-    void this.router.navigate(['/trainings']);
   }
 
   formatDate(date: string | null): string {

@@ -12,16 +12,16 @@ Deletion cannot be undone through the application and requires explicit confirma
 - **COACH** – can delete a group-assigned training only while currently assigned to its group, and an ATHLETES-mode FREE_TEXT training only while currently assigned to every selected athlete's group.
 - The user is authenticated.
 - Backend UC-505 is available.
-- The training is accessible through the training list or details view.
+- The training is accessible through the training list.
 
 ## 3. Main Flow
 
-1. The user selects **Usuń** for a training in the list or **Usuń trening** in its details.
-2. The frontend displays a confirmation dialog naming the training and warning that its plan, participants, and saved results will be permanently deleted and cannot be restored.
+1. The user selects one or more trainings in the list and selects **Usuń** from **Akcje**.
+2. The frontend displays a confirmation dialog with the selected count and warns that plans, participants, and saved results will be permanently deleted and cannot be restored.
 3. The user explicitly confirms deletion.
-4. The frontend calls `DELETE /api/trainings/{trainingId}`.
+4. The frontend calls `POST /api/trainings/bulk-delete` with the selected IDs.
 5. While the request is in progress, confirmation actions are disabled.
-6. On success, the frontend removes the training from the list or navigates from details back to the training list.
+6. On success, the frontend clears selection and reloads the training list.
 
 ## 4. Display and Interaction Requirements
 
@@ -48,11 +48,11 @@ Deletion cannot be undone through the application and requires explicit confirma
 
 ## 7. Acceptance Criteria
 
-1. Authorized users can start deleting a training from the list and details views.
+1. Authorized users can start deleting selected trainings from the list, but not from details.
 2. Planned and completed trainings can be deleted.
 3. The confirmation clearly warns that the plan, participants, and saved results will be permanently deleted.
 4. Canceling or closing confirmation leaves data unchanged and sends no request.
-5. Confirming calls UC-505 and prevents repeated submissions while pending.
-6. Success removes the training from the list or returns from details to the list.
+5. Confirming calls the bulk deletion operation and prevents repeated submissions while pending.
+6. Success clears selection and refreshes the list.
 7. Failure keeps the training visible and displays an error without closing the dialog.
 8. The interaction follows existing TFHUB visual and responsive patterns.

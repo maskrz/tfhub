@@ -40,6 +40,12 @@ export const routes: Routes = [
     title: 'Dodaj trening',
   },
   {
+    path: 'trainings/print',
+    loadComponent: () => import('./features/trainings/training-print.page').then((module) => module.TrainingPrintPage),
+    canActivate: [trainingReadGuard],
+    title: 'Podgląd wydruku treningów',
+  },
+  {
     path: 'trainings/:id',
     loadComponent: () => import('./features/trainings/training-details.page').then((module) => module.TrainingDetailsPage),
     canActivate: [trainingReadGuard],

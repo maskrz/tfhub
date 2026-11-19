@@ -158,4 +158,16 @@ describe('TrainingsApiService', () => {
     request.flush(null, { status: 204, statusText: 'No Content' });
     expect(completed).toBe(true);
   });
+
+  it('sends one request for each bulk action and print preview', () => {
+    service.bulkDelete([1, 2]).subscribe();
+    service.bulkComplete([1, 2]).subscribe();
+    service.printPreview([1, 2]).subscribe();
+    for (const path of ['bulk-delete', 'bulk-complete', 'print-preview']) {
+      const request = httpTesting.expectOne(`/api/trainings/${path}`);
+      expect(request.request.method).toBe('POST');
+      expect(request.request.body).toEqual({ trainingIds: [1, 2] });
+      request.flush(path === 'bulk-delete' ? null : {});
+    }
+  });
 });

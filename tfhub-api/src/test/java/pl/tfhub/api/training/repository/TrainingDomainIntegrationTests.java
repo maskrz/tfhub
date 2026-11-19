@@ -49,6 +49,8 @@ import pl.tfhub.api.training.dto.request.NewTrainingExecutionRequest;
 import pl.tfhub.api.training.dto.request.UpdateTrainingParticipationRequest;
 import pl.tfhub.api.training.dto.response.TrainingDetailsResponse;
 import pl.tfhub.api.training.service.TrainingDeletionService;
+import pl.tfhub.api.training.service.TrainingBulkService;
+import pl.tfhub.api.training.service.TrainingPrintService;
 import pl.tfhub.api.training.service.FreeTextTrainingService;
 import pl.tfhub.api.training.entity.AthleteTrainingParticipation;
 import pl.tfhub.api.training.entity.Training;
@@ -141,6 +143,15 @@ class TrainingDomainIntegrationTests {
 
     @Autowired
     private TrainingDeletionService trainingDeletionService;
+
+    @Autowired
+    private TrainingBulkService trainingBulkService;
+
+    @Autowired
+    private TrainingPrintService trainingPrintService;
+
+    @Autowired
+    private org.springframework.transaction.support.TransactionTemplate transactionTemplate;
 
     @Autowired
     private FreeTextTrainingService freeTextTrainingService;
@@ -1527,6 +1538,56 @@ class TrainingDomainIntegrationTests {
                 .filter(item -> item.id() == trainingId).count());
         assertThrows(TrainingNotFoundException.class, () ->
                 trainingDetailsService.getTraining(trainingId));
+    }
+
+    @Test
+    void bulkDeleteRollsBackWhenOuterTransactionFails() {
+        long first = insertTraining("First");
+        long second = insertTraining("Second");
+        long definition = insertDefinition(first, "Plan", 1);
+        insertSegment(definition, 1);
+        assertThrows(IllegalStateException.class, () -> transactionTemplate.executeWithoutResult(status -> {
+            trainingBulkService.delete(List.of(second, first));
+            throw new IllegalStateException("rollback");
+        }));
+        assertEquals(2, jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM training_sessions WHERE id IN (?, ?)", Integer.class, first, second));
+        assertEquals(1, jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM training_definitions WHERE id = ?", Integer.class, definition));
+    }
+
+    @Test
+    void bulkCompletionSkipsUndatedAndLeavesExecutionDataIntact() {
+        long dated = insertTraining("Dated", 1, LocalDate.parse("2026-03-04"));
+        long undated = insertTraining("Undated", 1, null);
+        long definition = insertDefinition(dated, "Plan", 1);
+        long segment = insertSegment(definition, 1);
+        long participant = insertParticipation(dated, definition, 1);
+        insertExecution(participant, segment, definition, "PENDING");
+        var result = trainingBulkService.complete(List.of(undated, dated));
+        assertEquals(List.of(dated), result.completedIds());
+        assertEquals(List.of(undated), result.skippedUndatedIds());
+        assertEquals("COMPLETED", jdbcTemplate.queryForObject(
+                "SELECT status FROM training_sessions WHERE id = ?", String.class, dated));
+        assertEquals("PENDING", jdbcTemplate.queryForObject(
+                "SELECT status FROM training_segment_executions WHERE participation_id = ?", String.class, participant));
+    }
+
+    @Test
+    void athletePrintDataOmitsPrivateFieldsAndRejectsOtherTrainings() throws Exception {
+        long individual = freeTextTrainingService.create(new CreateFreeTextTrainingRequest(
+                "Private", null, TrainingAssignmentType.ATHLETES, null, List.of(1L, 2L),
+                List.of(new CreateTrainingSectionRequest("Warm-up", "Run", 1)), "Private equipment")).id();
+        long tempo = insertTraining("Tempo");
+        long athlete = insertAthleteAccount(1, "print-athlete");
+        authenticate(athlete, UserRole.ATHLETE, "print-athlete");
+        var response = trainingPrintService.getPrintData(List.of(individual));
+        assertTrue(response.trainings().getFirst().assignedAthletes().isEmpty());
+        assertEquals(null, response.trainings().getFirst().equipment());
+        assertThrows(AccessDeniedException.class, () -> trainingPrintService.getPrintData(List.of(individual, tempo)));
+        String json = new tools.jackson.databind.ObjectMapper().writeValueAsString(response);
+        assertFalse(json.contains("equipment"));
+        assertFalse(json.contains("executions"));
     }
 
     @Test

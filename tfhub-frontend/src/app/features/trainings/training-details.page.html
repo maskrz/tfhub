@@ -81,27 +81,10 @@
             {{ completing() ? 'Zapisywanie...' : 'Oznacz jako zakończony' }}
           </button>
         }
-        <button
-          type="button"
-          class="button button--danger delete-training-button"
-          (click)="openDeletionConfirmation()"
-        >
-          Usuń trening
-        </button>
       </div>
       }
     </section>
 
-    @if (canManageTraining && deletionDialogOpen()) {
-      @if (training(); as pendingTraining) {
-        <app-training-delete-confirmation
-          [trainingId]="pendingTraining.id"
-          [trainingName]="pendingTraining.name"
-          (deleted)="onTrainingDeleted($event)"
-          (cancelled)="closeDeletionConfirmation()"
-        />
-      }
-    }
 
     @if (currentTraining.trainingType === 'FREE_TEXT') {
       @if (currentTraining.sections.length === 0) {

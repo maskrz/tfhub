@@ -82,6 +82,8 @@ describe('TrainingsPage', () => {
   let api: {
     getAll: ReturnType<typeof vi.fn>;
     deleteTraining: ReturnType<typeof vi.fn>;
+    bulkDelete: ReturnType<typeof vi.fn>;
+    bulkComplete: ReturnType<typeof vi.fn>;
   };
   let importsApi: {
     getActive: ReturnType<typeof vi.fn>;
@@ -96,6 +98,8 @@ describe('TrainingsPage', () => {
     api = {
       getAll: vi.fn(getAll),
       deleteTraining: vi.fn(() => of(void 0)),
+      bulkDelete: vi.fn(() => of(void 0)),
+      bulkComplete: vi.fn(() => of({ completedIds: [], alreadyCompletedIds: [], skippedUndatedIds: [] })),
     };
     importsApi = {
       getActive: vi.fn(getImports),
@@ -141,6 +145,132 @@ describe('TrainingsPage', () => {
       (row) => (row as HTMLElement).querySelector('td strong')?.textContent?.trim() ?? '',
     );
   }
+
+  it('shows bulk actions directly above the table only while trainings are selected', async () => {
+    await createPage();
+    expect(fixture.nativeElement.querySelector('.bulk-actions')).toBeNull();
+    const checkbox = fixture.nativeElement.querySelector('[aria-label="Zaznacz trening: Sprint"]') as HTMLInputElement;
+    checkbox.click();
+    fixture.detectChanges();
+    const actions = fixture.nativeElement.querySelector('.bulk-actions') as HTMLElement;
+    expect(actions.textContent).toContain('Zaznaczone: 1');
+    expect(actions.textContent).toContain('Akcje');
+    expect(actions.nextElementSibling?.classList.contains('table-surface')).toBe(true);
+
+    checkbox.click();
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('.bulk-actions')).toBeNull();
+  });
+
+  it('selects and deselects visible trainings without changing hidden selections', async () => {
+    await createPage();
+    const header = fixture.nativeElement.querySelector('#select-visible-trainings') as HTMLInputElement;
+    expect(header.checked).toBe(false);
+    expect(header.indeterminate).toBe(false);
+    const first = fixture.nativeElement.querySelector('[aria-label="Zaznacz trening: Sprint"]') as HTMLInputElement;
+    first.click();
+    fixture.detectChanges();
+    expect(header.indeterminate).toBe(true);
+    header.click();
+    fixture.detectChanges();
+    expect([...fixture.componentInstance.selectedIds()].sort()).toEqual([1, 2]);
+    expect(header.checked).toBe(true);
+    expect(header.indeterminate).toBe(false);
+    setSearch('ŚREDNI');
+    expect(header.checked).toBe(true);
+    header.click();
+    fixture.detectChanges();
+    expect(fixture.componentInstance.selectedIds()).toEqual([2]);
+    expect(header.checked).toBe(false);
+    expect(header.indeterminate).toBe(false);
+    setSearch('');
+    expect(header.indeterminate).toBe(true);
+    header.click();
+    fixture.detectChanges();
+    expect([...fixture.componentInstance.selectedIds()].sort()).toEqual([1, 2]);
+    fixture.componentInstance.actionsOpen.set(true);
+    header.click();
+    fixture.detectChanges();
+    expect(fixture.componentInstance.selectedIds()).toEqual([]);
+    expect(fixture.componentInstance.actionsOpen()).toBe(false);
+    expect(fixture.nativeElement.querySelector('.bulk-actions')).toBeNull();
+  });
+
+  it('does not select import rows and disables the header when no trainings are visible', async () => {
+    await createPage(() => of(trainings), true, () => of([pendingImport]));
+    setSearch('no matching training');
+    const header = fixture.nativeElement.querySelector('#select-visible-trainings') as HTMLInputElement;
+    expect(header.disabled).toBe(true);
+    header.click();
+    expect(fixture.componentInstance.selectedIds()).toEqual([]);
+    setSearch('');
+    expect(header.disabled).toBe(false);
+    header.click();
+    fixture.detectChanges();
+    expect([...fixture.componentInstance.selectedIds()].sort()).toEqual([1, 2]);
+    expect(fixture.nativeElement.querySelector('.import-row input[type="checkbox"]')).toBeNull();
+  });
+
+  it('disables and clears the header state while stale trainings are loading or errored', async () => {
+    await createPage(() => of(trainings), true, () => of([pendingImport]));
+    const page = fixture.componentInstance;
+    page.selectedIds.set([1, 2]);
+    fixture.detectChanges();
+    const header = fixture.nativeElement.querySelector('#select-visible-trainings') as HTMLInputElement;
+    expect(header.checked).toBe(true);
+
+    page.loading.set(true);
+    fixture.detectChanges();
+    expect(header.disabled).toBe(true);
+    expect(header.checked).toBe(false);
+    expect(header.indeterminate).toBe(false);
+    header.click();
+    expect(page.selectedIds()).toEqual([1, 2]);
+
+    page.loading.set(false);
+    page.errorMessage.set('Błąd');
+    fixture.detectChanges();
+    expect(header.disabled).toBe(true);
+    expect(header.checked).toBe(false);
+    expect(header.indeterminate).toBe(false);
+    expect(page.selectedIds()).toEqual([1, 2]);
+
+    page.errorMessage.set(null);
+    fixture.detectChanges();
+    expect(header.disabled).toBe(false);
+    expect(header.checked).toBe(true);
+  });
+
+  it('retains hidden selections and completes only after an explicit action', async () => {
+    await createPage();
+    const first = fixture.nativeElement.querySelector('[aria-label="Zaznacz trening: Sprint"]') as HTMLInputElement;
+    first.click();
+    fixture.detectChanges();
+    setSearch('ŚREDNI');
+    expect(fixture.componentInstance.selectedIds()).toEqual([2]);
+    expect(fixture.nativeElement.textContent).toContain('Zaznaczone: 1');
+    setSearch('nieznany');
+    expect(fixture.nativeElement.querySelector('.bulk-actions')).toBeTruthy();
+    expect(api.bulkComplete).not.toHaveBeenCalled();
+    api.bulkComplete.mockReturnValue(of({ completedIds: [], alreadyCompletedIds: [], skippedUndatedIds: [2] }));
+    fixture.componentInstance.completeSelected();
+    fixture.detectChanges();
+    expect(api.bulkComplete).toHaveBeenCalledWith([2]);
+    expect(fixture.componentInstance.selectedIds()).toEqual([]);
+    expect(fixture.nativeElement.textContent).toContain('Bez daty, pominięto: Sprint');
+  });
+
+  it('does not expose write actions to athletes', async () => {
+    await createPage();
+    const auth = TestBed.inject(AuthService);
+    auth.currentUser.set({ authenticated: true, userId: 2, username: 'athlete', role: 'ATHLETE', athleteId: 1 });
+    fixture.componentInstance.selectedIds.set([1]);
+    fixture.componentInstance.actionsOpen.set(true);
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).toContain('Drukuj');
+    expect(fixture.nativeElement.querySelector('.bulk-delete-button')).toBeNull();
+    expect(fixture.nativeElement.textContent).not.toContain('Oznacz jako ukończony');
+  });
 
   it('sorts undated sessions first and excludes them from date ranges', async () => {
     const undated: TrainingListItem = { ...trainings[0], id: 8, name: 'Bez terminu', trainingDate: null };
@@ -233,7 +363,7 @@ describe('TrainingsPage', () => {
     expect(fixture.nativeElement.querySelector('.status-badge')?.textContent.trim()).toBe('Zakończony');
     expect(fixture.nativeElement.querySelector('.edit-training-link')).toBeTruthy();
     expect(fixture.nativeElement.querySelector('.complete-training-link')).toBeTruthy();
-    expect(fixture.nativeElement.querySelector('.delete-training-button')).toBeTruthy();
+    expect(fixture.nativeElement.querySelector('.delete-training-button')).toBeNull();
 
     statusFilter.value = 'PLANNED';
     statusFilter.dispatchEvent(new Event('change'));
@@ -274,8 +404,8 @@ describe('TrainingsPage', () => {
     statusFilter.value = 'COMPLETED';
     statusFilter.dispatchEvent(new Event('change'));
     fixture.detectChanges();
-    const deleteButton = fixture.nativeElement.querySelector('[aria-label="Usuń trening: Trening techniczny"]') as HTMLButtonElement;
-    deleteButton.click();
+    fixture.componentInstance.selectedIds.set([completedTraining.id]);
+    fixture.componentInstance.openDeletionConfirmation();
     fixture.detectChanges();
 
     const dialog = fixture.nativeElement.querySelector('app-training-delete-confirmation');
@@ -286,36 +416,41 @@ describe('TrainingsPage', () => {
     fixture.detectChanges();
 
     expect(fixture.nativeElement.querySelector('app-training-delete-confirmation')).toBeNull();
-    expect(api.deleteTraining).not.toHaveBeenCalled();
+    expect(api.bulkDelete).not.toHaveBeenCalled();
     expect(visibleNames()).toEqual(['Trening techniczny']);
   });
 
   it('deletes only after explicit confirmation and removes the training from the list', async () => {
-    await createPage(() => of([...trainings, completedTraining]));
+    let remaining = [...trainings, completedTraining];
+    await createPage(() => of(remaining));
+    api.bulkDelete.mockImplementation(() => { remaining = trainings; return of(void 0); });
     const statusFilter = fixture.nativeElement.querySelector('[aria-label="Filtruj według statusu"]') as HTMLSelectElement;
     statusFilter.value = 'COMPLETED';
     statusFilter.dispatchEvent(new Event('change'));
     fixture.detectChanges();
 
-    (fixture.nativeElement.querySelector('.delete-training-button') as HTMLButtonElement).click();
+    fixture.componentInstance.selectedIds.set([completedTraining.id]);
+    fixture.componentInstance.openDeletionConfirmation();
     fixture.detectChanges();
     (fixture.nativeElement.querySelector('app-training-delete-confirmation .button--danger') as HTMLButtonElement).click();
     await fixture.whenStable();
     fixture.detectChanges();
 
-    expect(api.deleteTraining).toHaveBeenCalledWith(completedTraining.id);
+    expect(api.bulkDelete).toHaveBeenCalledWith([completedTraining.id]);
     expect(fixture.componentInstance.allTrainings().some((training) => training.id === completedTraining.id)).toBe(false);
     expect(visibleNames()).toEqual([]);
-    expect(fixture.nativeElement.textContent).toContain('Trening został trwale usunięty.');
+    expect(fixture.nativeElement.textContent).toContain('Zaznaczone treningi zostały trwale usunięte.');
   });
 
   it('keeps the training visible and allows retry after a delete API failure', async () => {
+    let remaining = trainings;
     const deleteTraining = vi.fn()
       .mockReturnValueOnce(throwError(() => new HttpErrorResponse({ status: 404 })))
-      .mockReturnValueOnce(of(void 0));
-    await createPage(() => of(trainings), true);
-    api.deleteTraining = deleteTraining;
-    (fixture.nativeElement.querySelector('[aria-label="Usuń trening: Sprint"]') as HTMLButtonElement).click();
+      .mockImplementationOnce(() => { remaining = [trainings[0]]; return of(void 0); });
+    await createPage(() => of(remaining), true);
+    api.bulkDelete = deleteTraining;
+    fixture.componentInstance.selectedIds.set([2]);
+    fixture.componentInstance.openDeletionConfirmation();
     fixture.detectChanges();
     const confirmButton = fixture.nativeElement.querySelector(
       'app-training-delete-confirmation .button--danger',
@@ -337,8 +472,9 @@ describe('TrainingsPage', () => {
   it('prevents duplicate deletion submissions while the request is pending', async () => {
     const response = new Subject<void>();
     await createPage();
-    api.deleteTraining.mockReturnValue(response.asObservable());
-    (fixture.nativeElement.querySelector('[aria-label="Usuń trening: Sprint"]') as HTMLButtonElement).click();
+    api.bulkDelete.mockReturnValue(response.asObservable());
+    fixture.componentInstance.selectedIds.set([2]);
+    fixture.componentInstance.openDeletionConfirmation();
     fixture.detectChanges();
     const confirmButton = fixture.nativeElement.querySelector(
       'app-training-delete-confirmation .button--danger',
@@ -347,14 +483,14 @@ describe('TrainingsPage', () => {
     confirmButton.click();
     fixture.detectChanges();
 
-    expect(api.deleteTraining).toHaveBeenCalledTimes(1);
+    expect(api.bulkDelete).toHaveBeenCalledTimes(1);
     expect(confirmButton.disabled).toBe(true);
     expect(fixture.componentInstance.allTrainings()).toHaveLength(2);
 
     response.next();
     response.complete();
     fixture.detectChanges();
-    expect(fixture.componentInstance.allTrainings()).toHaveLength(1);
+    expect(fixture.componentInstance.selectedIds()).toHaveLength(0);
   });
 
   it('searches by training name or group and filters by date range locally', async () => {

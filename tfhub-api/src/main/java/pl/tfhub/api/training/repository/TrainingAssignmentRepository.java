@@ -1,6 +1,9 @@
 package pl.tfhub.api.training.repository;
 
 import java.util.List;
+import java.util.Map;
+import java.util.HashMap;
+import java.util.ArrayList;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Repository;
 import pl.tfhub.api.training.dto.response.TrainingAssignedAthleteResponse;
@@ -59,6 +62,25 @@ public class TrainingAssignmentRepository {
                         resultSet.getString("first_name"),
                         resultSet.getString("last_name")))
                 .list();
+    }
+
+    public Map<Long, List<TrainingAssignedAthleteResponse>> findAssignedAthletesForTrainings(List<Long> trainingIds) {
+        Map<Long, List<TrainingAssignedAthleteResponse>> result = new HashMap<>();
+        jdbcClient.sql("""
+                        SELECT tsa.training_session_id, a.id, a.first_name, a.last_name
+                        FROM training_session_athletes tsa
+                        JOIN athletes a ON a.id = tsa.athlete_id
+                        WHERE tsa.training_session_id IN (:trainingIds)
+                        ORDER BY tsa.training_session_id, LOWER(a.last_name), LOWER(a.first_name), a.id
+                        """)
+                .param("trainingIds", trainingIds)
+                .query((row, rowNumber) -> {
+                    result.computeIfAbsent(row.getLong("training_session_id"), ignored -> new ArrayList<>())
+                            .add(new TrainingAssignedAthleteResponse(
+                                    row.getLong("id"), row.getString("first_name"), row.getString("last_name")));
+                    return rowNumber;
+                }).list();
+        return result;
     }
 
     public boolean isVisibleToAthlete(long trainingId, long athleteId) {

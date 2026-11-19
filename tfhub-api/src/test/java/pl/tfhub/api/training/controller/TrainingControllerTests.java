@@ -26,6 +26,8 @@ import pl.tfhub.api.training.service.TrainingDeletionService;
 import pl.tfhub.api.training.service.TrainingQueryService;
 import pl.tfhub.api.training.service.TrainingUpdateService;
 import pl.tfhub.api.training.service.FreeTextTrainingService;
+import pl.tfhub.api.training.service.TrainingBulkService;
+import pl.tfhub.api.training.service.TrainingPrintService;
 import pl.tfhub.api.traininggroup.dto.response.TrainingGroupResponse;
 
 import static org.mockito.Mockito.verify;
@@ -62,6 +64,25 @@ class TrainingControllerTests {
 
     @MockitoBean
     private FreeTextTrainingService freeTextTrainingService;
+
+    @MockitoBean
+    private TrainingBulkService trainingBulkService;
+
+    @MockitoBean
+    private TrainingPrintService trainingPrintService;
+
+    @Test
+    void bulkEndpointsValidateIdsAndDelegate() throws Exception {
+        mockMvc.perform(MockMvcRequestBuilders.post("/api/trainings/bulk-delete")
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"trainingIds\":[1,2]}"))
+                .andExpect(status().isNoContent());
+        verify(trainingBulkService).delete(List.of(1L, 2L));
+        for (String body : List.of("{\"trainingIds\":[]}", "{\"trainingIds\":[0]}", "{\"trainingIds\":[1.5]}")) {
+            mockMvc.perform(MockMvcRequestBuilders.post("/api/trainings/print-preview")
+                            .contentType(MediaType.APPLICATION_JSON).content(body))
+                    .andExpect(status().isBadRequest());
+        }
+    }
 
     @Test
     void distinguishesOmittedEquipmentFromExplicitNullInFreeTextUpdates() throws Exception {

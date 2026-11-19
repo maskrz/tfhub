@@ -9,9 +9,8 @@ import { TrainingsApiService } from './trainings-api.service';
   styleUrl: './training-delete-confirmation.component.scss',
 })
 export class TrainingDeleteConfirmationComponent implements AfterViewInit {
-  @Input({ required: true }) trainingId!: number;
-  @Input({ required: true }) trainingName!: string;
-  @Output() deleted = new EventEmitter<number>();
+  @Input({ required: true }) trainingIds!: number[];
+  @Output() deleted = new EventEmitter<void>();
   @Output() cancelled = new EventEmitter<void>();
   @ViewChild('dialog') private dialog!: ElementRef<HTMLDialogElement>;
 
@@ -35,7 +34,7 @@ export class TrainingDeleteConfirmationComponent implements AfterViewInit {
     this.errorMessage.set(null);
     this.deleting.set(true);
     this.api
-      .deleteTraining(this.trainingId)
+      .bulkDelete(this.trainingIds)
       .pipe(
         take(1),
         catchError((error: unknown) => {
@@ -46,7 +45,7 @@ export class TrainingDeleteConfirmationComponent implements AfterViewInit {
       )
       .subscribe(() => {
         this.closeDialog();
-        this.deleted.emit(this.trainingId);
+        this.deleted.emit();
       });
   }
 

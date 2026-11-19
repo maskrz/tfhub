@@ -1,7 +1,7 @@
 import { HttpErrorResponse } from '@angular/common/http';
-import { Component, DestroyRef, OnInit, computed, inject, signal } from '@angular/core';
+import { Component, DestroyRef, HostListener, OnInit, computed, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { RouterLink } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { EMPTY, catchError, finalize } from 'rxjs';
 import { AuthService } from '../../core/auth/auth.service';
 import { MultiSelectDropdownComponent, MultiSelectOption } from '../../shared/multi-select-dropdown.component';
@@ -11,6 +11,7 @@ import { TrainingDeleteConfirmationComponent } from './training-delete-confirmat
 import { TrainingImportUploadModalComponent } from '../training-imports/training-import-upload-modal.component';
 import { TrainingImportListItem, TrainingImportStatus, TrainingImportUploadResponse } from '../training-imports/training-import.model';
 import { TrainingImportsApiService } from '../training-imports/training-imports-api.service';
+import { TrainingPrintSelectionService } from './training-print-selection.service';
 
 @Component({
   imports: [
@@ -28,7 +29,11 @@ export class TrainingsPage implements OnInit {
   readonly loading = signal(false);
   readonly errorMessage = signal<string | null>(null);
   readonly successMessage = signal<string | null>(null);
-  readonly trainingPendingDeletion = signal<TrainingListItem | null>(null);
+  readonly selectedIds = signal<number[]>([]);
+  readonly deletionDialogOpen = signal(false);
+  readonly bulkPending = signal(false);
+  readonly actionsOpen = signal(false);
+  readonly bulkError = signal<string | null>(null);
   readonly importModalOpen = signal(false);
   readonly imports = signal<TrainingImportListItem[]>([]);
   readonly importsLoading = signal(false);
@@ -99,11 +104,26 @@ export class TrainingsPage implements OnInit {
         return leftValue.localeCompare(rightValue, 'pl', { sensitivity: 'base', numeric: true }) * direction;
       });
   });
+  readonly selectableTrainings = computed(() =>
+    this.loading() || this.errorMessage() ? [] : this.visibleTrainings(),
+  );
+  readonly visibleSelectedCount = computed(() => {
+    const selected = new Set(this.selectedIds());
+    return this.selectableTrainings().filter((training) => selected.has(training.id)).length;
+  });
+  readonly allVisibleSelected = computed(() =>
+    this.selectableTrainings().length > 0 && this.visibleSelectedCount() === this.selectableTrainings().length,
+  );
+  readonly someVisibleSelected = computed(() =>
+    this.visibleSelectedCount() > 0 && !this.allVisibleSelected(),
+  );
 
   readonly auth = inject(AuthService);
   private readonly api = inject(TrainingsApiService);
   private readonly importsApi = inject(TrainingImportsApiService);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly router = inject(Router);
+  private readonly printSelection = inject(TrainingPrintSelectionService);
   private importRefreshTimer: ReturnType<typeof setTimeout> | null = null;
   private importRefreshPending = false;
 
@@ -182,13 +202,82 @@ export class TrainingsPage implements OnInit {
     this.loadTrainings();
   }
 
-  openDeletionConfirmation(training: TrainingListItem): void {
+  toggleTraining(id: number, event: Event): void {
+    const input = event.target;
+    if (!(input instanceof HTMLInputElement)) return;
+    this.selectedIds.update((ids) => input.checked
+      ? ids.includes(id) ? ids : [...ids, id]
+      : ids.filter((current) => current !== id));
+    if (!this.selectedIds().length) this.actionsOpen.set(false);
+  }
+
+  toggleVisibleTrainings(event: Event): void {
+    const input = event.target;
+    if (!(input instanceof HTMLInputElement) || this.loading() || this.errorMessage()) return;
+    const visibleIds = this.selectableTrainings().map((training) => training.id);
+    const visible = new Set(visibleIds);
+    this.selectedIds.update((ids) => input.checked
+      ? [...ids, ...visibleIds.filter((id) => !ids.includes(id))]
+      : ids.filter((id) => !visible.has(id)));
+    if (!this.selectedIds().length) this.actionsOpen.set(false);
+  }
+
+  @HostListener('document:keydown.escape')
+  closeActions(): void {
+    this.actionsOpen.set(false);
+  }
+
+  get hasSelectedPlanned(): boolean {
+    return this.allTrainings().some((training) =>
+      training.status === 'PLANNED' && this.selectedIds().includes(training.id));
+  }
+
+  openDeletionConfirmation(): void {
+    this.actionsOpen.set(false);
     this.successMessage.set(null);
-    this.trainingPendingDeletion.set(training);
+    this.deletionDialogOpen.set(true);
   }
 
   closeDeletionConfirmation(): void {
-    this.trainingPendingDeletion.set(null);
+    this.deletionDialogOpen.set(false);
+  }
+
+  printSelected(): void {
+    if (!this.selectedIds().length || this.bulkPending()) return;
+    this.printSelection.set(this.selectedIds());
+    this.actionsOpen.set(false);
+    void this.router.navigate(['/trainings/print']);
+  }
+
+  completeSelected(): void {
+    if (!this.canManageTrainings || !this.hasSelectedPlanned || this.bulkPending()) return;
+    this.bulkPending.set(true);
+    this.actionsOpen.set(false);
+    this.bulkError.set(null);
+    this.successMessage.set(null);
+    this.api.bulkComplete(this.selectedIds()).pipe(
+      catchError((error: unknown) => {
+        this.bulkError.set(this.getBulkErrorMessage(error));
+        return EMPTY;
+      }),
+      finalize(() => this.bulkPending.set(false)),
+      takeUntilDestroyed(this.destroyRef),
+    ).subscribe((response) => {
+      const skipped = this.allTrainings().filter((item) => response.skippedUndatedIds.includes(item.id))
+        .map((item) => item.name);
+      this.selectedIds.set([]);
+      const message = skipped.length
+        ? `Zakończono: ${response.completedIds.length}. Bez daty, pominięto: ${skipped.join(', ')}.`
+        : `Zakończono treningi: ${response.completedIds.length}.`;
+      this.loadTrainings(message);
+    });
+  }
+
+  private getBulkErrorMessage(error: unknown): string {
+    if (error instanceof HttpErrorResponse && error.status === 401) return 'Sesja wygasła lub użytkownik nie jest zalogowany.';
+    if (error instanceof HttpErrorResponse && error.status === 403) return 'Brak dostępu do tej operacji.';
+    if (error instanceof HttpErrorResponse && error.status === 404) return 'Nie znaleziono treningu lub brak dostępu. Żaden trening nie został zmieniony.';
+    return 'Nie udało się potwierdzić operacji. Odśwież listę przed ponowieniem.';
   }
 
   openImportModal(): void {
@@ -299,10 +388,10 @@ export class TrainingsPage implements OnInit {
     return fallback;
   }
 
-  onTrainingDeleted(trainingId: number): void {
-    this.allTrainings.update((current) => current.filter((training) => training.id !== trainingId));
-    this.trainingPendingDeletion.set(null);
-    this.successMessage.set('Trening został trwale usunięty.');
+  onTrainingDeleted(): void {
+    this.selectedIds.set([]);
+    this.deletionDialogOpen.set(false);
+    this.loadTrainings('Zaznaczone treningi zostały trwale usunięte.');
   }
 
   formatDate(date: string | null): string {
@@ -311,7 +400,7 @@ export class TrainingsPage implements OnInit {
     return new Intl.DateTimeFormat('pl-PL').format(new Date(year, month - 1, day));
   }
 
-  private loadTrainings(): void {
+  private loadTrainings(successMessage?: string): void {
     this.loading.set(true);
     this.errorMessage.set(null);
     this.api
@@ -325,7 +414,12 @@ export class TrainingsPage implements OnInit {
         finalize(() => this.loading.set(false)),
         takeUntilDestroyed(this.destroyRef),
       )
-      .subscribe((trainings) => this.allTrainings.set(trainings));
+      .subscribe((trainings) => {
+        this.allTrainings.set(trainings);
+        const available = new Set(trainings.map((training) => training.id));
+        this.selectedIds.update((ids) => ids.filter((id) => available.has(id)));
+        if (successMessage) this.successMessage.set(successMessage);
+      });
   }
 
   private getErrorMessage(error: unknown): string {

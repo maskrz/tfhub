@@ -53,6 +53,7 @@ Katalog opisuje planowaną funkcjonalność interfejsu. Kontrakty API i reguły 
 | FE-TRAINING-007 | Weryfikacja importu treningu | Implemented |
 | FE-TRAINING-008 | Akceptacja lub odrzucenie importu treningu | Implemented |
 | FE-TRAINING-009 | Uzupełnienie treningu | Implemented |
+| FE-TRAINING-010 | [Akcje zbiorcze i wydruk](FE-TRAINING-010-bulk-actions-print.md) | In Progress |
 
 ## Przyszły zakres
 
