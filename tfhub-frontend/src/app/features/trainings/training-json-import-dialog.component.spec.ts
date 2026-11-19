@@ -22,15 +22,26 @@ describe('TrainingJsonImportDialogComponent', () => {
     { id: 1, name: 'Sprint' },
     { id: 2, name: 'Wytrzymałość' },
   ];
-  const athletes: AthleteResponse[] = [{
-    id: 10,
-    firstName: 'Anna',
-    lastName: 'Kowalska',
-    birthYear: 2005,
-    gender: 'FEMALE',
-    active: true,
-    trainingGroupId: 1,
-  }];
+  const athletes: AthleteResponse[] = [
+    {
+      id: 10,
+      firstName: 'Anna',
+      lastName: 'Kowalska',
+      birthYear: 2005,
+      gender: 'FEMALE',
+      active: true,
+      trainingGroupId: 1,
+    },
+    {
+      id: 11,
+      firstName: 'Jan',
+      lastName: 'Nowak',
+      birthYear: 2004,
+      gender: 'MALE',
+      active: true,
+      trainingGroupId: 2,
+    },
+  ];
 
   async function createDialog(): Promise<void> {
     trainingsApi = {
@@ -168,5 +179,48 @@ describe('TrainingJsonImportDialogComponent', () => {
         athleteIds: [10],
       }],
     });
+  });
+
+  it('filters athletes by name while retaining selections across searches', async () => {
+    await createDialog();
+    showDocument([{
+      name: 'Ćwiczenia',
+      trainingType: 'FREE_TEXT',
+      sections: [{ title: 'Główna część', content: 'Skoki' }],
+      equipment: null,
+    }]);
+    const mode = fixture.nativeElement.querySelector('#assignment-mode-0') as HTMLSelectElement;
+    mode.value = 'ATHLETES';
+    mode.dispatchEvent(new Event('change'));
+    fixture.detectChanges();
+
+    const dropdown = fixture.nativeElement.querySelector('app-multi-select-dropdown') as HTMLElement;
+    (dropdown.querySelector('button.trigger') as HTMLButtonElement).click();
+    fixture.detectChanges();
+    const search = dropdown.querySelector('input[type="search"]') as HTMLInputElement;
+    expect(search.getAttribute('aria-label')).toBe('Szukaj zawodnika');
+    search.value = 'kOWALSKA';
+    search.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+    expect(dropdown.querySelectorAll('.option')).toHaveLength(1);
+    expect(dropdown.querySelector('.option')?.textContent).toContain('Anna Kowalska');
+    (dropdown.querySelector('.option input') as HTMLInputElement).click();
+    fixture.detectChanges();
+
+    search.value = 'jan';
+    search.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+    expect(dropdown.querySelectorAll('.option')).toHaveLength(1);
+    expect(dropdown.querySelector('.option')?.textContent).toContain('Jan Nowak');
+    (dropdown.querySelector('.option input') as HTMLInputElement).click();
+    fixture.detectChanges();
+
+    search.value = 'brak';
+    search.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+    expect(dropdown.textContent).toContain('Nie znaleziono pasujących pozycji.');
+    expect(fixture.componentInstance.rows()[0].athleteIds).toEqual([10, 11]);
+    fixture.componentInstance.submit();
+    expect(trainingsApi.importJson.mock.calls[0][1].trainings[0].athleteIds).toEqual([10, 11]);
   });
 });

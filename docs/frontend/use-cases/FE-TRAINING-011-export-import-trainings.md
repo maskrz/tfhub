@@ -19,6 +19,7 @@ Provide ADMIN and COACH users with JSON training transfer actions on the trainin
 - Display the full content of each validated training and a checkbox, checked by default. Common group and optional date defaults appear when multiple trainings are present and apply to every row. Each row can override group and date independently; values remain intact when checked state changes.
 - Keep date empty unless supplied as a dialog default or individual choice; never use the date from the exported content.
 - TEMPO rows require a group. FREE_TEXT rows default to GROUP and allow switching to ATHLETES, which requires one or more active athlete selections and no group. Use current group and athlete selectors.
+- In ATHLETES mode, filter the available athletes by name using the searchable selector. Filtering must not clear selections that are temporarily hidden.
 - A row can be deselected without discarding its content or defaults. Only checked rows are created. Disable Import when none are checked.
 - Retain the selected source file through the dialog. Submit it with all rows' selection/date/assignment metadata so the backend can revalidate the exact complete file; only selected entries are created. On success, close the dialog, show a Polish success message and refresh the training list.
 - Keep the dialog accessible, scrollable for large files, responsive, and consistent with existing form, dialog, and purple primary-button styling.

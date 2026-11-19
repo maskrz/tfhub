@@ -151,6 +151,9 @@
                   [label]="'Wybierz zawodników dla treningu ' + row.training.name"
                   [controlId]="'training-athletes-' + index"
                   [emptySummary]="'Wybierz zawodników'"
+                  [searchable]="true"
+                  [searchLabel]="'Szukaj zawodnika'"
+                  [searchPlaceholder]="'Wpisz imię lub nazwisko'"
                   (selectedIdsChange)="onAthleteIdsChange(index, $event)"
                 />
                 @if (athletesLoading()) {
