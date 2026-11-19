@@ -84,6 +84,9 @@ describe('TrainingsPage', () => {
     deleteTraining: ReturnType<typeof vi.fn>;
     bulkDelete: ReturnType<typeof vi.fn>;
     bulkComplete: ReturnType<typeof vi.fn>;
+    exportJson: ReturnType<typeof vi.fn>;
+    validateJsonImport: ReturnType<typeof vi.fn>;
+    importJson: ReturnType<typeof vi.fn>;
   };
   let importsApi: {
     getActive: ReturnType<typeof vi.fn>;
@@ -100,6 +103,9 @@ describe('TrainingsPage', () => {
       deleteTraining: vi.fn(() => of(void 0)),
       bulkDelete: vi.fn(() => of(void 0)),
       bulkComplete: vi.fn(() => of({ completedIds: [], alreadyCompletedIds: [], skippedUndatedIds: [] })),
+      exportJson: vi.fn(() => of(new Blob(['{}'], { type: 'application/json' }))),
+      validateJsonImport: vi.fn(() => of({ formatVersion: 1, trainings: [] })),
+      importJson: vi.fn(() => of({ createdTrainingIds: [], createdCount: 0 })),
     };
     importsApi = {
       getActive: vi.fn(getImports),
@@ -270,6 +276,41 @@ describe('TrainingsPage', () => {
     expect(fixture.nativeElement.textContent).toContain('Drukuj');
     expect(fixture.nativeElement.querySelector('.bulk-delete-button')).toBeNull();
     expect(fixture.nativeElement.textContent).not.toContain('Oznacz jako ukończony');
+    expect(fixture.nativeElement.textContent).not.toContain('Eksportuj do JSON');
+    expect(fixture.nativeElement.textContent).not.toContain('Importuj z pliku JSON');
+  });
+
+  it('exports the current selected IDs from the staff bulk menu', async () => {
+    await createPage();
+    const createObjectURL = vi.fn(() => 'blob:training-export');
+    const revokeObjectURL = vi.fn();
+    const anchorClick = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+    vi.stubGlobal('URL', { createObjectURL, revokeObjectURL });
+    const page = fixture.componentInstance;
+    page.selectedIds.set([2, 1]);
+    page.actionsOpen.set(true);
+    fixture.detectChanges();
+
+    const buttons = fixture.nativeElement.querySelectorAll('button') as NodeListOf<HTMLButtonElement>;
+    const exportButton = Array.from(buttons)
+      .find((button) => button.textContent?.includes('Eksportuj do JSON'));
+    expect(exportButton).toBeDefined();
+    exportButton?.click();
+    fixture.detectChanges();
+
+    expect(api.exportJson).toHaveBeenCalledWith([2, 1]);
+    expect(createObjectURL).toHaveBeenCalledOnce();
+    expect(revokeObjectURL).toHaveBeenCalledWith('blob:training-export');
+    expect(page.successMessage()).toContain('Wyeksportowano treningi: 2');
+    anchorClick.mockRestore();
+    vi.unstubAllGlobals();
+  });
+
+  it('keeps JSON import separate from selected-items bulk actions', async () => {
+    await createPage();
+    expect(fixture.nativeElement.textContent).toContain('Importuj z pliku JSON');
+    expect(fixture.nativeElement.querySelector('.bulk-actions')).toBeNull();
+    expect(fixture.nativeElement.textContent).toContain('Importuj ze zdjęcia');
   });
 
   it('sorts undated sessions first and excludes them from date ranges', async () => {

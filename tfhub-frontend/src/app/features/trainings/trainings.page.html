@@ -5,6 +5,9 @@
     </div>
     @if (auth.currentUser()?.role === 'ADMIN' || auth.currentUser()?.role === 'COACH') {
       <div class="page-actions">
+        <button type="button" class="button button--secondary" (click)="openJsonImportDialog()">
+          Importuj z pliku JSON
+        </button>
         <button type="button" class="button button--secondary" (click)="openImportModal()">
           Importuj ze zdjęcia
         </button>
@@ -141,6 +144,7 @@
           <div>
             <button type="button" [disabled]="bulkPending()" (click)="printSelected()">Drukuj</button>
             @if (canManageTrainings) {
+              <button type="button" [disabled]="bulkPending()" (click)="exportSelected()">Eksportuj do JSON</button>
               <button type="button" [disabled]="!hasSelectedPlanned || bulkPending()" (click)="completeSelected()">Oznacz jako ukończony</button>
               <button type="button" class="bulk-delete-button" [disabled]="bulkPending()" (click)="openDeletionConfirmation()">Usuń</button>
             }
@@ -323,5 +327,12 @@
   <app-training-import-upload-modal
     (uploaded)="onTrainingImportUploaded($event)"
     (cancelled)="closeImportModal()"
+  />
+}
+
+@if (jsonImportDialogOpen()) {
+  <app-training-json-import-dialog
+    (imported)="onJsonTrainingsImported($event)"
+    (cancelled)="closeJsonImportDialog()"
   />
 }

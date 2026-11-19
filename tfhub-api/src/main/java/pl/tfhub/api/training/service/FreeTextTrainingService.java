@@ -58,6 +58,15 @@ public class FreeTextTrainingService {
 
     @Transactional
     public CreateTrainingResponse create(CreateFreeTextTrainingRequest request) {
+        return create(request, false);
+    }
+
+    @Transactional
+    public CreateTrainingResponse createFromJsonImport(CreateFreeTextTrainingRequest request) {
+        return create(request, true);
+    }
+
+    private CreateTrainingResponse create(CreateFreeTextTrainingRequest request, boolean preserveSectionText) {
         accessScopeService.requireCoachOrAdmin();
         validateSectionOrders(request.sections().stream()
                 .map(CreateTrainingSectionRequest::sequenceNumber)
@@ -75,7 +84,7 @@ public class FreeTextTrainingService {
         assignmentRepository.replaceAthletes(training.getId(), assignment.athleteIds());
         List<TrainingSection> sections = request.sections().stream()
                 .map(section -> new TrainingSection(
-                        training, section.title(), section.content(), section.sequenceNumber()))
+                        training, section.title(), section.content(), section.sequenceNumber(), preserveSectionText))
                 .toList();
         sectionRepository.saveAllAndFlush(sections);
         return new CreateTrainingResponse(training.getId());

@@ -348,6 +348,12 @@ Import states: `PENDING → PROCESSING → REVIEW_REQUIRED`; processing failure 
 
 Use a bounded in-process worker that polls pending imports; no external queue is required for the single-instance deployment. Claim processing using a conditional status update or row lock and create an attempt in the same short transaction. Permit only one attempt with `PROCESSING` status per import, enforced by the partial unique index. Run the single model call outside the transaction. On restart or timeout, mark stale attempts failed so the import can be explicitly retried.
 
+## 9. Portable JSON training transfer
+
+UC-513 and UC-514 define a stateless JSON transfer flow separate from OCR imports. Version 1 contains only reusable TEMPO definitions/ordered segments or FREE_TEXT ordered sections/equipment; array order maps to new sequence numbers. It excludes dates, status, IDs, assignments, athletes, participation, execution, results and OCR metadata. Unknown and duplicate properties are rejected. Incompatible format changes require a `formatVersion` increment.
+
+Validate the complete JSON file before showing the assignment dialog and again before creation, including entries later deselected. Apply bounded inputs: 1 MiB, 100 trainings, 50 definitions per TEMPO training, 100 segments per definition and 100 sections per FREE_TEXT training. Import creates only checked rows through UC-502 direct creation rules in one transaction, always as new PLANNED trainings with no participation/execution records. TEMPO remains group-assigned; FREE_TEXT selects either GROUP or ATHLETES assignment using existing authorization. Do not reuse the OCR acceptance path: its dated imports are COMPLETED and may include confirmed execution history. No transfer draft tables or schema migration are required.
+
 Validate new OCR output before atomically replacing the current draft and setting `REVIEW_REQUIRED`. A failed attempt records its failure and leaves any existing valid draft untouched. Retry uses the same optimized source image and creates no second import. Keep recovery simple: a stale processing attempt is marked failed so the import can be explicitly retried; timeout is operational configuration.
 
 Acceptance locks the import, then revalidates the draft, current coach-group authorization, and each matched athlete's current group. In one transaction:

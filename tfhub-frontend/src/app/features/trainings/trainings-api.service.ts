@@ -14,6 +14,9 @@ import {
   UpdateTrainingResponse,
   BulkTrainingCompletion,
   TrainingPrintResponse,
+  TrainingJsonDocument,
+  TrainingJsonImportMetadata,
+  TrainingJsonImportResponse,
 } from './training.model';
 
 @Injectable({ providedIn: 'root' })
@@ -71,5 +74,22 @@ export class TrainingsApiService {
 
   printPreview(trainingIds: number[]): Observable<TrainingPrintResponse> {
     return this.http.post<TrainingPrintResponse>('/api/trainings/print-preview', { trainingIds });
+  }
+
+  exportJson(trainingIds: number[]): Observable<Blob> {
+    return this.http.post('/api/trainings/export', { trainingIds }, { responseType: 'blob' });
+  }
+
+  validateJsonImport(file: File): Observable<TrainingJsonDocument> {
+    const formData = new FormData();
+    formData.append('file', file, file.name);
+    return this.http.post<TrainingJsonDocument>('/api/trainings/import/validate', formData);
+  }
+
+  importJson(file: File, metadata: TrainingJsonImportMetadata): Observable<TrainingJsonImportResponse> {
+    const formData = new FormData();
+    formData.append('file', file, file.name);
+    formData.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
+    return this.http.post<TrainingJsonImportResponse>('/api/trainings/import', formData);
   }
 }

@@ -8,6 +8,7 @@ import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers;
 import pl.tfhub.api.training.dto.response.TrainingListItemResponse;
@@ -28,6 +29,10 @@ import pl.tfhub.api.training.service.TrainingUpdateService;
 import pl.tfhub.api.training.service.FreeTextTrainingService;
 import pl.tfhub.api.training.service.TrainingBulkService;
 import pl.tfhub.api.training.service.TrainingPrintService;
+import pl.tfhub.api.training.service.TrainingJsonImportService;
+import pl.tfhub.api.training.service.TrainingJsonTransferService;
+import pl.tfhub.api.training.dto.response.TrainingJsonDocumentResponse;
+import pl.tfhub.api.training.dto.response.TrainingJsonImportResponse;
 import pl.tfhub.api.traininggroup.dto.response.TrainingGroupResponse;
 
 import static org.mockito.Mockito.verify;
@@ -71,6 +76,12 @@ class TrainingControllerTests {
     @MockitoBean
     private TrainingPrintService trainingPrintService;
 
+    @MockitoBean
+    private TrainingJsonTransferService trainingJsonTransferService;
+
+    @MockitoBean
+    private TrainingJsonImportService trainingJsonImportService;
+
     @Test
     void bulkEndpointsValidateIdsAndDelegate() throws Exception {
         mockMvc.perform(MockMvcRequestBuilders.post("/api/trainings/bulk-delete")
@@ -82,6 +93,54 @@ class TrainingControllerTests {
                             .contentType(MediaType.APPLICATION_JSON).content(body))
                     .andExpect(status().isBadRequest());
         }
+    }
+
+    @Test
+    void exportsSelectedTrainingsAsJsonAttachment() throws Exception {
+        byte[] json = "{\"formatVersion\":1,\"trainings\":[]}".getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        when(trainingJsonTransferService.export(org.mockito.ArgumentMatchers.any())).thenReturn(json);
+
+        mockMvc.perform(MockMvcRequestBuilders.post("/api/trainings/export")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"trainingIds\":[1,2]}"))
+                .andExpect(status().isOk())
+                .andExpect(MockMvcResultMatchers.content().bytes(json))
+                .andExpect(MockMvcResultMatchers.header().string(
+                        "Content-Disposition", org.hamcrest.Matchers.containsString("trainings.json")));
+    }
+
+    @Test
+    void validatesJsonTrainingFileWithoutCreatingTrainings() throws Exception {
+        when(trainingJsonTransferService.validateFile(org.mockito.ArgumentMatchers.any()))
+                .thenReturn(new TrainingJsonDocumentResponse(1, List.of()));
+
+        mockMvc.perform(MockMvcRequestBuilders.multipart("/api/trainings/import/validate")
+                        .file(new MockMultipartFile("file", "trainings.json", "application/json", "{}".getBytes())))
+                .andExpect(status().isOk())
+                .andExpect(content().json("{\"formatVersion\":1,\"trainings\":[]}", true));
+    }
+
+    @Test
+    void createsJsonTrainingImportFromFileAndMetadata() throws Exception {
+        when(trainingJsonImportService.importFile(
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any()))
+                .thenReturn(new TrainingJsonImportResponse(List.of(51L, 52L)));
+
+        mockMvc.perform(MockMvcRequestBuilders.multipart("/api/trainings/import")
+                        .file(new MockMultipartFile("file", "trainings.json", "application/json", "{}".getBytes()))
+                        .file(new MockMultipartFile(
+                                "metadata",
+                                "",
+                                MediaType.APPLICATION_JSON_VALUE,
+                                """
+                                        {"formatVersion":1,"trainings":[
+                                          {"selected":true,"trainingDate":null,"assignmentType":"GROUP",
+                                           "trainingGroupId":3,"athleteIds":[]}
+                                        ]}
+                                        """.getBytes(java.nio.charset.StandardCharsets.UTF_8))))
+                .andExpect(status().isOk())
+                .andExpect(content().json("{\"createdTrainingIds\":[51,52],\"createdCount\":2}", true));
     }
 
     @Test

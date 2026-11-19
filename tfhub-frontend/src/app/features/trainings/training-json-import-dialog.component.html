@@ -1,0 +1,199 @@
+<dialog #dialog class="modal" aria-labelledby="json-import-title" (cancel)="onDialogCancel($event)">
+  <div class="modal-header">
+    <h2 id="json-import-title">Importuj treningi z pliku JSON</h2>
+    <button
+      type="button"
+      class="button button--icon close-button"
+      aria-label="Anuluj i zamknij okno"
+      [disabled]="validating() || importing()"
+      (click)="cancel()"
+    >×</button>
+  </div>
+
+  @if (!document()) {
+    <form class="modal-content" (submit)="$event.preventDefault(); validateFile()" novalidate>
+      @if (errorMessage(); as message) {
+        <p class="feedback error" role="alert">{{ message }}</p>
+      }
+
+      <div class="field">
+        <label for="training-json-file">Plik treningów <span aria-hidden="true">*</span></label>
+        <input
+          id="training-json-file"
+          class="file-control"
+          type="file"
+          accept=".json,application/json"
+          [disabled]="validating()"
+          (change)="onFileChange($event)"
+        />
+        @if (file(); as selectedFile) {
+          <p class="selected-file" role="status">Wybrany plik: <strong>{{ selectedFile.name }}</strong></p>
+        }
+        <span class="field-hint">Format JSON v1, maksymalny rozmiar 1 MiB.</span>
+        @if (fileError(); as message) {
+          <span class="field-error" role="alert">{{ message }}</span>
+        }
+      </div>
+    </form>
+  } @else {
+    <form id="training-json-import-form" class="modal-content" (submit)="$event.preventDefault(); submit()" novalidate>
+      @if (errorMessage(); as message) {
+        <p class="feedback error" role="alert">{{ message }}</p>
+      }
+
+      @if (rows().length > 1) {
+        <section class="defaults" aria-labelledby="common-defaults-title">
+          <h3 id="common-defaults-title">Wspólne wartości początkowe</h3>
+          <div class="defaults-grid">
+            <label class="field" for="common-training-group">
+              <span>Grupa treningowa</span>
+              <select id="common-training-group" class="field-control select-with-arrow"
+                [value]="commonGroupId() ?? ''" [disabled]="groupsLoading() || importing()"
+                (change)="onCommonGroupChange($event)">
+                <option value="">Wybierz grupę</option>
+                @for (group of groups(); track group.id) {
+                  <option [value]="group.id">{{ group.name }}</option>
+                }
+              </select>
+            </label>
+            <label class="field" for="common-training-date">
+              <span>Data treningu (opcjonalna)</span>
+              <input id="common-training-date" class="field-control" type="date"
+                [value]="commonTrainingDate()" [disabled]="importing()" (input)="onCommonDateChange($event)" />
+            </label>
+          </div>
+          <p class="field-hint">Wartości są stosowane do wszystkich pozycji. Dla przypisania do zawodników grupa nie jest zapisywana.</p>
+        </section>
+      }
+
+      @if (groupsLoading()) {
+        <p class="field-hint" role="status">Ładowanie grup treningowych...</p>
+      }
+      @if (groupsError(); as message) {
+        <div class="feedback error" role="alert">
+          <p>{{ message }}</p>
+          <button type="button" class="button button--secondary" (click)="retryLoadingGroups()">Spróbuj ponownie</button>
+        </div>
+      }
+
+      <p class="selection-summary" aria-live="polite">
+        Zaznaczono {{ selectedCount() }} z {{ rows().length }} treningów.
+      </p>
+
+      <div class="training-import-list">
+        @for (row of rows(); track $index; let index = $index) {
+          <article class="training-import-card">
+            <div class="training-import-heading">
+              <label class="training-checkbox">
+                <input type="checkbox" [checked]="row.selected" [disabled]="importing()"
+                  [attr.aria-label]="'Importuj trening: ' + row.training.name"
+                  (change)="onRowSelected(index, $event)" />
+                <strong>{{ row.training.name }}</strong>
+              </label>
+              <span class="type-badge">{{ row.training.trainingType === 'TEMPO' ? 'Trening tempowy' : 'Trening ogólny' }}</span>
+            </div>
+
+            <div class="training-content">
+              @if (row.training.trainingType === 'TEMPO') {
+                @for (definition of row.training.definitions; track $index; let definitionIndex = $index) {
+                  <div class="content-group">
+                    <strong>{{ definition.name }}</strong>
+                    <ol>
+                      @for (segment of definition.segments; track $index) {
+                        <li>{{ segment.distanceM }} m — {{ formatRest(segment.restAfterSeconds) }}</li>
+                      }
+                    </ol>
+                  </div>
+                }
+              } @else {
+                @for (section of row.training.sections; track $index) {
+                  <div class="content-group">
+                    <strong>{{ section.title }}</strong>
+                    <p class="section-content">{{ section.content }}</p>
+                  </div>
+                }
+                @if (row.training.equipment) {
+                  <p class="equipment"><strong>Sprzęt:</strong> {{ row.training.equipment }}</p>
+                }
+              }
+            </div>
+
+            @if (row.training.trainingType === 'FREE_TEXT') {
+              <label class="field" [for]="'assignment-mode-' + index">
+                <span>Tryb przypisania</span>
+                <select class="field-control select-with-arrow" [id]="'assignment-mode-' + index"
+                  [value]="row.assignmentType" [disabled]="importing()"
+                  (change)="onAssignmentTypeChange(index, $event)">
+                  <option value="GROUP">Grupa treningowa</option>
+                  <option value="ATHLETES">Wybrani zawodnicy</option>
+                </select>
+              </label>
+            }
+
+            @if (row.training.trainingType === 'TEMPO' || row.assignmentType === 'GROUP') {
+              <label class="field" [for]="'training-group-' + index">
+                <span>Grupa treningowa <span aria-hidden="true">*</span></span>
+                <select class="field-control select-with-arrow" [id]="'training-group-' + index"
+                  [value]="row.trainingGroupId ?? ''" [disabled]="groupsLoading() || importing()"
+                  (change)="onRowGroupChange(index, $event)">
+                  <option value="">Wybierz grupę</option>
+                  @for (group of groups(); track group.id) {
+                    <option [value]="group.id">{{ group.name }}</option>
+                  }
+                </select>
+              </label>
+            } @else {
+              <div class="field">
+                <span>Przypisani zawodnicy <span aria-hidden="true">*</span></span>
+                <app-multi-select-dropdown
+                  [options]="athleteOptions()"
+                  [selectedIds]="row.athleteIds"
+                  [label]="'Wybierz zawodników dla treningu ' + row.training.name"
+                  [controlId]="'training-athletes-' + index"
+                  [emptySummary]="'Wybierz zawodników'"
+                  (selectedIdsChange)="onAthleteIdsChange(index, $event)"
+                />
+                @if (athletesLoading()) {
+                  <span class="field-hint" role="status">Ładowanie aktywnych zawodników...</span>
+                }
+                @if (athletesError(); as message) {
+                  <span class="field-error" role="alert">{{ message }}
+                    <button type="button" class="button button--secondary retry-button" (click)="retryLoadingAthletes()">Spróbuj ponownie</button>
+                  </span>
+                }
+              </div>
+            }
+
+            <label class="field" [for]="'training-date-' + index">
+              <span>Data treningu (opcjonalna)</span>
+              <input class="field-control" type="date" [id]="'training-date-' + index"
+                [value]="row.trainingDate" [disabled]="importing()" (input)="onRowDateChange(index, $event)" />
+            </label>
+            @if (row.selected && !isAssignmentValid(row)) {
+              <p class="field-error" role="alert">{{ assignmentError(row) }}</p>
+            }
+          </article>
+        }
+      </div>
+    </form>
+  }
+
+  <footer class="modal-footer">
+    <button type="button" class="button button--secondary" [disabled]="validating() || importing()" (click)="cancel()">
+      Anuluj
+    </button>
+    @if (!document()) {
+      <button type="button" class="button button--primary" [disabled]="!file() || validating()" (click)="validateFile()">
+        {{ validating() ? 'Weryfikowanie...' : 'Zweryfikuj plik' }}
+      </button>
+    } @else {
+      <button type="button" class="button button--secondary" [disabled]="importing()" (click)="chooseAnotherFile()">
+        Wybierz inny plik
+      </button>
+      <button type="submit" form="training-json-import-form" class="button button--primary"
+        [disabled]="!canImport()">
+        {{ importing() ? 'Importowanie...' : 'Importuj zaznaczone' }}
+      </button>
+    }
+  </footer>
+</dialog>

@@ -16,6 +16,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.InvalidDataAccessApiUsageException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mock.web.MockHttpSession;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -36,6 +37,8 @@ import pl.tfhub.api.training.dto.request.CreateFreeTextTrainingRequest;
 import pl.tfhub.api.training.dto.request.CreateTrainingRequest;
 import pl.tfhub.api.training.dto.request.CreateTrainingSegmentRequest;
 import pl.tfhub.api.training.dto.request.CreateTrainingSectionRequest;
+import pl.tfhub.api.training.dto.request.TrainingJsonImportItemRequest;
+import pl.tfhub.api.training.dto.request.TrainingJsonImportRequest;
 import pl.tfhub.api.training.dto.request.EditTrainingDefinitionRequest;
 import pl.tfhub.api.training.dto.request.EditTrainingExecutionRequest;
 import pl.tfhub.api.training.dto.request.EditTrainingParticipationRequest;
@@ -51,6 +54,7 @@ import pl.tfhub.api.training.dto.response.TrainingDetailsResponse;
 import pl.tfhub.api.training.service.TrainingDeletionService;
 import pl.tfhub.api.training.service.TrainingBulkService;
 import pl.tfhub.api.training.service.TrainingPrintService;
+import pl.tfhub.api.training.service.TrainingJsonImportService;
 import pl.tfhub.api.training.service.FreeTextTrainingService;
 import pl.tfhub.api.training.entity.AthleteTrainingParticipation;
 import pl.tfhub.api.training.entity.Training;
@@ -82,6 +86,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.doAnswer;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -153,8 +158,11 @@ class TrainingDomainIntegrationTests {
     @Autowired
     private org.springframework.transaction.support.TransactionTemplate transactionTemplate;
 
-    @Autowired
+    @MockitoSpyBean
     private FreeTextTrainingService freeTextTrainingService;
+
+    @Autowired
+    private TrainingJsonImportService trainingJsonImportService;
 
     @Autowired
     private TrainingSectionRepository sectionRepository;
@@ -305,6 +313,72 @@ class TrainingDomainIntegrationTests {
                     (participation_id, training_segment_id, training_definition_id, status)
                 VALUES (?, ?, ?, 'UNKNOWN')
                 """, rows.participationId(), rows.segmentId(), rows.definitionId()));
+    }
+
+    @Test
+    void rollsBackAllImportedTrainingsWhenALaterCreationFails() {
+        java.util.concurrent.atomic.AtomicInteger calls = new java.util.concurrent.atomic.AtomicInteger();
+        doAnswer(invocation -> {
+            if (calls.incrementAndGet() == 2) {
+                throw new IllegalStateException("Simulated failure during the second training creation");
+            }
+            return invocation.callRealMethod();
+        }).when(freeTextTrainingService).createFromJsonImport(org.mockito.ArgumentMatchers.any());
+
+        var file = new org.springframework.mock.web.MockMultipartFile(
+                "file",
+                "trainings.json",
+                "application/json",
+                """
+                {"formatVersion":1,"trainings":[
+                  {"name":"First import","trainingType":"FREE_TEXT","sections":[
+                    {"title":"Section","content":"First content"}
+                  ],"equipment":null},
+                  {"name":"Second import","trainingType":"FREE_TEXT","sections":[
+                    {"title":"Section","content":"Second content"}
+                  ],"equipment":null}
+                ]}
+                """.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        var request = new TrainingJsonImportRequest(1, List.of(
+                new TrainingJsonImportItemRequest(true, null, TrainingAssignmentType.GROUP, 1L, List.of()),
+                new TrainingJsonImportItemRequest(true, null, TrainingAssignmentType.GROUP, 1L, List.of())));
+
+        assertThrows(IllegalStateException.class, () -> trainingJsonImportService.importFile(file, request));
+
+        assertEquals(2, calls.get());
+        assertEquals(0, trainingRepository.count());
+        assertEquals(0, sectionRepository.count());
+    }
+
+    @Test
+    void importsFreeTextWithoutDateAndPreservesSectionTextExactly() {
+        var file = new org.springframework.mock.web.MockMultipartFile(
+                "file",
+                "trainings.json",
+                "application/json",
+                """
+                {"formatVersion":1,"trainings":[
+                  {"name":"Imported mobility","trainingType":"FREE_TEXT","sections":[
+                    {"title":"  Warm-up  ","content":"  Move\\ncarefully  "}
+                  ],"equipment":" Bands "}
+                ]}
+                """.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        var request = new TrainingJsonImportRequest(1, List.of(
+                new TrainingJsonImportItemRequest(true, null, TrainingAssignmentType.GROUP, 1L, List.of())));
+
+        var response = trainingJsonImportService.importFile(file, request);
+
+        assertEquals(1, response.createdCount());
+        Training imported = trainingRepository.findById(response.createdTrainingIds().get(0)).orElseThrow();
+        assertEquals(TrainingStatus.PLANNED, imported.getStatus());
+        org.junit.jupiter.api.Assertions.assertNull(imported.getTrainingDate());
+        assertEquals(" Bands ", imported.getEquipment());
+        assertEquals(0, participationRepository.count());
+        assertEquals(0, executionRepository.count());
+        TrainingSection section = sectionRepository.findAllByTraining_IdOrderBySequenceNumberAsc(imported.getId())
+                .get(0);
+        assertEquals("  Warm-up  ", section.getTitle());
+        assertEquals("  Move\ncarefully  ", section.getContent());
     }
 
     @Test

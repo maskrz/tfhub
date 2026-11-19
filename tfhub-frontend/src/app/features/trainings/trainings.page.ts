@@ -9,9 +9,11 @@ import { TrainingListItem, TrainingStatus, TrainingType } from './training.model
 import { TrainingsApiService } from './trainings-api.service';
 import { TrainingDeleteConfirmationComponent } from './training-delete-confirmation.component';
 import { TrainingImportUploadModalComponent } from '../training-imports/training-import-upload-modal.component';
+import { TrainingJsonImportDialogComponent } from './training-json-import-dialog.component';
 import { TrainingImportListItem, TrainingImportStatus, TrainingImportUploadResponse } from '../training-imports/training-import.model';
 import { TrainingImportsApiService } from '../training-imports/training-imports-api.service';
 import { TrainingPrintSelectionService } from './training-print-selection.service';
+import { TrainingJsonImportResponse } from './training.model';
 
 @Component({
   imports: [
@@ -19,6 +21,7 @@ import { TrainingPrintSelectionService } from './training-print-selection.servic
     RouterLink,
     TrainingDeleteConfirmationComponent,
     TrainingImportUploadModalComponent,
+    TrainingJsonImportDialogComponent,
   ],
   selector: 'app-trainings-page',
   styleUrl: './trainings.page.scss',
@@ -35,6 +38,7 @@ export class TrainingsPage implements OnInit {
   readonly actionsOpen = signal(false);
   readonly bulkError = signal<string | null>(null);
   readonly importModalOpen = signal(false);
+  readonly jsonImportDialogOpen = signal(false);
   readonly imports = signal<TrainingImportListItem[]>([]);
   readonly importsLoading = signal(false);
   readonly importsError = signal<string | null>(null);
@@ -132,12 +136,49 @@ export class TrainingsPage implements OnInit {
     return role === 'ADMIN' || role === 'COACH';
   }
 
+  exportSelected(): void {
+    if (!this.canManageTrainings || !this.selectedIds().length || this.bulkPending()) return;
+    this.bulkPending.set(true);
+    this.actionsOpen.set(false);
+    this.bulkError.set(null);
+    this.successMessage.set(null);
+    this.api.exportJson(this.selectedIds()).pipe(
+      catchError((error: unknown) => {
+        this.bulkError.set(this.getExportErrorMessage(error));
+        return EMPTY;
+      }),
+      finalize(() => this.bulkPending.set(false)),
+      takeUntilDestroyed(this.destroyRef),
+    ).subscribe((blob) => {
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'tfhub-trainings.json';
+      link.click();
+      URL.revokeObjectURL(url);
+      this.successMessage.set(`Wyeksportowano treningi: ${this.selectedIds().length}.`);
+    });
+  }
+
   ngOnInit(): void {
     this.loadTrainings();
     if (this.canManageTrainings) this.refreshImports();
     this.destroyRef.onDestroy(() => {
       if (this.importRefreshTimer !== null) clearTimeout(this.importRefreshTimer);
     });
+  }
+
+  private getExportErrorMessage(error: unknown): string {
+    if (error instanceof HttpErrorResponse && error.status === 401) {
+      return 'Sesja wygasła lub użytkownik nie jest zalogowany.';
+    }
+    if (error instanceof HttpErrorResponse && error.status === 403) {
+      return 'Brak dostępu do eksportu treningów.';
+    }
+    if (error instanceof HttpErrorResponse && error.status === 404) {
+      return 'Nie znaleziono treningu lub brak dostępu. Plik nie został utworzony.';
+    }
+    return 'Nie udało się wyeksportować zaznaczonych treningów.';
   }
 
   onSearchInput(event: Event): void {
@@ -283,6 +324,21 @@ export class TrainingsPage implements OnInit {
   openImportModal(): void {
     this.successMessage.set(null);
     this.importModalOpen.set(true);
+  }
+
+  openJsonImportDialog(): void {
+    this.successMessage.set(null);
+    this.jsonImportDialogOpen.set(true);
+  }
+
+  closeJsonImportDialog(): void {
+    this.jsonImportDialogOpen.set(false);
+  }
+
+  onJsonTrainingsImported(response: TrainingJsonImportResponse): void {
+    this.jsonImportDialogOpen.set(false);
+    this.selectedIds.set([]);
+    this.loadTrainings(`Zaimportowano nowe treningi: ${response.createdCount}.`);
   }
 
   closeImportModal(): void {

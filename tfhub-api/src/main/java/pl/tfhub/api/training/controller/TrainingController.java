@@ -4,6 +4,9 @@ import java.net.URI;
 import java.util.List;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.ContentDisposition;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -12,14 +15,21 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 import pl.tfhub.api.training.dto.request.EditTrainingRequest;
 import pl.tfhub.api.training.dto.request.TrainingIdsRequest;
 import pl.tfhub.api.training.dto.response.BulkTrainingCompletionResponse;
 import pl.tfhub.api.training.dto.response.TrainingPrintResponse;
+import pl.tfhub.api.training.dto.request.TrainingJsonImportRequest;
+import pl.tfhub.api.training.dto.response.TrainingJsonDocumentResponse;
+import pl.tfhub.api.training.dto.response.TrainingJsonImportResponse;
 import pl.tfhub.api.training.service.TrainingBulkService;
 import pl.tfhub.api.training.service.TrainingPrintService;
+import pl.tfhub.api.training.service.TrainingJsonImportService;
+import pl.tfhub.api.training.service.TrainingJsonTransferService;
 import pl.tfhub.api.training.dto.request.CreateTrainingRequest;
 import pl.tfhub.api.training.dto.request.CompleteTrainingRequest;
 import pl.tfhub.api.training.dto.request.CreateFreeTextTrainingRequest;
@@ -50,6 +60,8 @@ public class TrainingController {
     private final FreeTextTrainingService freeTextTrainingService;
     private final TrainingBulkService trainingBulkService;
     private final TrainingPrintService trainingPrintService;
+    private final TrainingJsonTransferService trainingJsonTransferService;
+    private final TrainingJsonImportService trainingJsonImportService;
 
     public TrainingController(
             TrainingQueryService trainingQueryService,
@@ -60,7 +72,9 @@ public class TrainingController {
             TrainingCompletionService trainingCompletionService,
             FreeTextTrainingService freeTextTrainingService,
             TrainingBulkService trainingBulkService,
-            TrainingPrintService trainingPrintService) {
+            TrainingPrintService trainingPrintService,
+            TrainingJsonTransferService trainingJsonTransferService,
+            TrainingJsonImportService trainingJsonImportService) {
         this.trainingQueryService = trainingQueryService;
         this.trainingCreationService = trainingCreationService;
         this.trainingUpdateService = trainingUpdateService;
@@ -70,6 +84,8 @@ public class TrainingController {
         this.freeTextTrainingService = freeTextTrainingService;
         this.trainingBulkService = trainingBulkService;
         this.trainingPrintService = trainingPrintService;
+        this.trainingJsonTransferService = trainingJsonTransferService;
+        this.trainingJsonImportService = trainingJsonImportService;
     }
 
     @PostMapping("/bulk-delete")
@@ -86,6 +102,28 @@ public class TrainingController {
     @PostMapping("/print-preview")
     public TrainingPrintResponse printPreview(@Valid @RequestBody TrainingIdsRequest request) {
         return trainingPrintService.getPrintData(request.trainingIds());
+    }
+
+    @PostMapping("/export")
+    public ResponseEntity<byte[]> exportTrainings(@Valid @RequestBody TrainingIdsRequest request) {
+        byte[] content = trainingJsonTransferService.export(request);
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.setContentLength(content.length);
+        headers.setContentDisposition(ContentDisposition.attachment().filename("trainings.json").build());
+        return ResponseEntity.ok().headers(headers).body(content);
+    }
+
+    @PostMapping(path = "/import/validate", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public TrainingJsonDocumentResponse validateTrainingImport(@RequestPart("file") MultipartFile file) {
+        return trainingJsonTransferService.validateFile(file);
+    }
+
+    @PostMapping(path = "/import", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public TrainingJsonImportResponse importTrainings(
+            @RequestPart("file") MultipartFile file,
+            @Valid @RequestPart("metadata") TrainingJsonImportRequest request) {
+        return trainingJsonImportService.importFile(file, request);
     }
 
     @GetMapping

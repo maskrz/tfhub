@@ -46,11 +46,24 @@ public class TrainingSection {
     }
 
     public TrainingSection(Training training, String title, String content, int sequenceNumber) {
+        this(training, title, content, sequenceNumber, false);
+    }
+
+    public TrainingSection(
+            Training training,
+            String title,
+            String content,
+            int sequenceNumber,
+            boolean preserveText) {
         this.training = Objects.requireNonNull(training);
-        update(title, content, sequenceNumber);
+        update(title, content, sequenceNumber, preserveText);
     }
 
     public void update(String title, String content, int sequenceNumber) {
+        update(title, content, sequenceNumber, false);
+    }
+
+    private void update(String title, String content, int sequenceNumber, boolean preserveText) {
         if (title == null || title.isBlank()) {
             throw new IllegalArgumentException("Training section title must not be blank");
         }
@@ -60,8 +73,8 @@ public class TrainingSection {
         if (sequenceNumber <= 0) {
             throw new IllegalArgumentException("Training section sequence number must be positive");
         }
-        this.title = title.strip();
-        this.content = content.strip();
+        this.title = preserveText ? title : title.strip();
+        this.content = preserveText ? content : content.strip();
         this.sequenceNumber = sequenceNumber;
     }
 

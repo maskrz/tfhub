@@ -165,6 +165,59 @@ export interface TrainingPrintResponse {
   trainings: TrainingPrintItem[];
 }
 
+export interface TrainingTransferSegment {
+  distanceM: number;
+  restAfterSeconds: number | null;
+}
+
+export interface TrainingTransferDefinition {
+  name: string;
+  segments: TrainingTransferSegment[];
+}
+
+export interface TrainingTransferSection {
+  title: string;
+  content: string;
+}
+
+export interface TempoTrainingTransfer {
+  name: string;
+  trainingType: 'TEMPO';
+  definitions: TrainingTransferDefinition[];
+}
+
+export interface FreeTextTrainingTransfer {
+  name: string;
+  trainingType: 'FREE_TEXT';
+  sections: TrainingTransferSection[];
+  equipment: string | null;
+}
+
+export type TrainingTransfer = TempoTrainingTransfer | FreeTextTrainingTransfer;
+
+export interface TrainingJsonDocument {
+  formatVersion: number;
+  trainings: TrainingTransfer[];
+}
+
+export interface TrainingJsonImportItemMetadata {
+  selected: boolean;
+  trainingDate: string | null;
+  assignmentType: TrainingAssignmentType | null;
+  trainingGroupId: number | null;
+  athleteIds: number[];
+}
+
+export interface TrainingJsonImportMetadata {
+  formatVersion: number;
+  trainings: TrainingJsonImportItemMetadata[];
+}
+
+export interface TrainingJsonImportResponse {
+  createdTrainingIds: number[];
+  createdCount: number;
+}
+
 export interface EditTrainingExecutionRequest {
   id: number;
   status: TrainingExecutionStatus;

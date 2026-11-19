@@ -29,7 +29,8 @@ The view must follow the existing TFHUB visual design and interaction patterns.
 7. The user can select trainings and initiate bulk actions (FE-TRAINING-010), including permanent deletion (FE-TRAINING-005).
 8. The user can initiate training creation (FE-TRAINING-002), subject to the existing role permissions.
 9. The user can start an OCR import by selecting **Importuj ze zdjęcia** (FE-TRAINING-006).
-10. Active OCR imports are shown as separate rows above persisted trainings, independently of training filters and sorting.
+10. The user can start a JSON training import or export selected trainings as specified by FE-TRAINING-011.
+11. Active OCR imports are shown as separate rows above persisted trainings, independently of training filters and sorting.
 
 ## 5. Displayed Information
 

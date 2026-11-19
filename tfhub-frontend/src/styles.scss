@@ -63,7 +63,7 @@ button, input { font: inherit; }
 .print-column { flex: 0 0 136mm; height: 190mm; overflow: hidden; overflow-wrap: anywhere; }
 .print-date { font-weight: bold; margin: 0 0 2mm; }
 .print-training { margin-bottom: 3mm; }
-.print-training-name { font-weight: bold; }
+.print-training-name { font-size: 11pt; font-weight: bold; text-decoration: underline; }
 .print-subheading { font-weight: bold; margin-top: 1mm; }
 .print-content, .print-assignment { white-space: pre-wrap; overflow-wrap: anywhere; }
 .print-equipment { margin-top: 2mm; margin-bottom: 3mm; }

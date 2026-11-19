@@ -9,6 +9,8 @@ import {
   TrainingDetails,
   TrainingListItem,
   UpdateTrainingResponse,
+  TrainingJsonDocument,
+  TrainingJsonImportMetadata,
 } from './training.model';
 import { TrainingsApiService } from './trainings-api.service';
 
@@ -169,5 +171,59 @@ describe('TrainingsApiService', () => {
       expect(request.request.body).toEqual({ trainingIds: [1, 2] });
       request.flush(path === 'bulk-delete' ? null : {});
     }
+  });
+
+  it('exports selected trainings as a JSON blob', () => {
+    let actual: Blob | undefined;
+
+    service.exportJson([4, 9]).subscribe((blob) => (actual = blob));
+
+    const request = httpTesting.expectOne('/api/trainings/export');
+    expect(request.request.method).toBe('POST');
+    expect(request.request.body).toEqual({ trainingIds: [4, 9] });
+    expect(request.request.responseType).toBe('blob');
+    const response = new Blob(['{"formatVersion":1,"trainings":[]}'], { type: 'application/json' });
+    request.flush(response);
+    expect(actual).toBe(response);
+  });
+
+  it('uploads the JSON file for complete backend validation', async () => {
+    const file = new File(['{}'], 'trainings.json', { type: 'application/json' });
+    let actual: TrainingJsonDocument | undefined;
+    service.validateJsonImport(file).subscribe((document) => (actual = document));
+
+    const request = httpTesting.expectOne('/api/trainings/import/validate');
+    expect(request.request.method).toBe('POST');
+    const uploadedFile = request.request.body.get('file') as File;
+    expect(uploadedFile.name).toBe(file.name);
+    expect(await uploadedFile.text()).toBe('{}');
+    const response: TrainingJsonDocument = { formatVersion: 1, trainings: [] };
+    request.flush(response);
+    expect(actual).toEqual(response);
+  });
+
+  it('sends the source file with assignment and selection metadata for creation', async () => {
+    const file = new File(['{}'], 'trainings.json', { type: 'application/json' });
+    const metadata: TrainingJsonImportMetadata = {
+      formatVersion: 1,
+      trainings: [{
+        selected: true,
+        trainingDate: null,
+        assignmentType: 'GROUP',
+        trainingGroupId: 3,
+        athleteIds: [],
+      }],
+    };
+    service.importJson(file, metadata).subscribe();
+
+    const request = httpTesting.expectOne('/api/trainings/import');
+    expect(request.request.method).toBe('POST');
+    const uploadedFile = request.request.body.get('file') as File;
+    expect(uploadedFile.name).toBe(file.name);
+    expect(await uploadedFile.text()).toBe('{}');
+    const metadataPart = request.request.body.get('metadata') as Blob;
+    expect(metadataPart.type).toBe('application/json');
+    expect(await metadataPart.text()).toBe(JSON.stringify(metadata));
+    request.flush({ createdTrainingIds: [44], createdCount: 1 });
   });
 });
