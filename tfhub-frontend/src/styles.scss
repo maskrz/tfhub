@@ -58,18 +58,18 @@ body {
 
 button, input { font: inherit; }
 
-.print-pages { color: #000; font: 10pt/1.3 Arial, sans-serif; }
-.print-sheet { background: white; display: flex; gap: 5mm; height: 210mm; margin: 0 auto 1rem; padding: 10mm; width: 297mm; }
-.print-column { flex: 0 0 136mm; height: 190mm; overflow: hidden; overflow-wrap: anywhere; }
+.print-pages { color: #000; font: 8pt/1.3 Arial, sans-serif; }
+.print-sheet { align-content: flex-start; background: white; display: flex; flex-wrap: wrap; gap: 5mm; height: 297mm; margin: 0 auto 1rem; padding: 10mm; width: 210mm; }
+.print-column { flex: 0 0 92.5mm; height: 136mm; overflow: hidden; overflow-wrap: anywhere; }
 .print-date { font-weight: bold; margin: 0 0 2mm; }
 .print-training { margin-bottom: 3mm; }
-.print-training-name { font-size: 11pt; font-weight: bold; text-decoration: underline; }
+.print-training-name { font-size: 9pt; font-weight: bold; text-decoration: underline; }
 .print-subheading { font-weight: bold; margin-top: 1mm; }
 .print-content, .print-assignment { white-space: pre-wrap; overflow-wrap: anywhere; }
 .print-equipment { margin-top: 2mm; margin-bottom: 3mm; }
 
 @page { size: A4 landscape; margin: 10mm; }
-@page training-sheet { size: A4 landscape; margin: 0; }
+@page training-sheet { size: A4 portrait; margin: 0; }
 @media print {
   body:has(app-training-print-page) { page: training-sheet; }
   body:has(app-training-print-page) app-header,

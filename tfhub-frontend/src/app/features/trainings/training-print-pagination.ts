@@ -76,12 +76,12 @@ export function paginateTrainings(host: HTMLElement, trainings: TrainingPrintIte
   host.replaceChildren();
   let page: HTMLElement;
   let column: HTMLElement;
-  let columnIndex = 2;
+  let columnIndex = 4;
   let oversized = false;
   const groups = new Set(trainings.flatMap((item) => item.trainingGroup ? [item.trainingGroup.id] : []));
   const showGroups = groups.size > 1;
   const nextColumn = (): void => {
-    if (columnIndex >= 2) {
+    if (columnIndex >= 4) {
       page = document.createElement('div');
       page.className = 'print-sheet';
       host.append(page);
