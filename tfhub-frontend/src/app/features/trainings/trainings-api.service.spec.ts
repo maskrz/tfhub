@@ -59,6 +59,16 @@ describe('TrainingsApiService', () => {
     request.flush([]);
   });
 
+  it('retrieves one month of trainings and undated trainings for the calendar', () => {
+    service.getCalendarMonth('2026-11').subscribe();
+
+    const request = httpTesting.expectOne(
+      '/api/trainings?includeCompleted=true&month=2026-11&includeUndated=true',
+    );
+    expect(request.request.method).toBe('GET');
+    request.flush([]);
+  });
+
   it('creates a training using the UC-502 endpoint and request DTO', () => {
     const body: CreateTrainingRequest = {
       name: 'Trening szybkościowy',

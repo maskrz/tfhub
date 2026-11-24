@@ -24,13 +24,15 @@ The view must follow the existing TFHUB visual design and interaction patterns.
 2. The frontend retrieves the training list from the backend UC-501 endpoint.
 3. The view displays the available trainings.
 4. The user can browse the list and use the available search and filtering controls.
-5. The user selects a training to open its details (FE-TRAINING-004).
-6. The user opens the type-appropriate details view; only TEMPO trainings offer the tempo edit/completion flows, while FREE_TEXT trainings offer section editing and completion.
-7. The user can select trainings and initiate bulk actions (FE-TRAINING-010), including permanent deletion (FE-TRAINING-005).
-8. The user can initiate training creation (FE-TRAINING-002), subject to the existing role permissions.
-9. The user can start an OCR import by selecting **Importuj ze zdjęcia** (FE-TRAINING-006).
-10. The user can start a JSON training import or export selected trainings as specified by FE-TRAINING-011.
-11. Active OCR imports are shown as separate rows above persisted trainings, independently of training filters and sorting.
+5. The user can switch between **Lista** and **Kalendarz** on the same page. **Lista** is selected by default.
+6. In **Kalendarz**, the user browses one month at a time, selects a day, and opens a training's existing details view.
+7. The user selects a training in **Lista** to open its details (FE-TRAINING-004).
+8. The user opens the type-appropriate details view; only TEMPO trainings offer the tempo edit/completion flows, while FREE_TEXT trainings offer section editing and completion.
+9. The user can select trainings and initiate bulk actions (FE-TRAINING-010), including permanent deletion (FE-TRAINING-005).
+10. The user can initiate training creation (FE-TRAINING-002), subject to the existing role permissions.
+11. The user can start an OCR import by selecting **Importuj ze zdjęcia** (FE-TRAINING-006).
+12. The user can start a JSON training import or export selected trainings as specified by FE-TRAINING-011.
+13. Active OCR imports are shown as separate rows above persisted trainings in **Lista**, independently of training filters and sorting.
 
 ## 5. Displayed Information
 
@@ -61,6 +63,18 @@ Retrieve active import summaries separately from `GET /api/training-imports`. Sh
 - Provide a training-type filter for **Wszystkie typy**, **Trening tempowy**, and **Trening ogólny**.
 - Load completed trainings through UC-501's `includeCompleted` option; apply the selected status filter to the returned data.
 - Training search, filters and sorting do not hide or reorder active import rows.
+- The group, status, and training-type filters are shared by **Lista** and **Kalendarz**. Their selected values remain unchanged when switching views or months.
+- In **Kalendarz**, show only the group, status, and training-type filters; search and date-range filters remain available only in **Lista**. Their values are retained when switching views but do not filter Calendar.
+- Calendar group options continue to come from the existing authorized training-list response. Group filtering remains local and must not broaden backend visibility.
+
+## 6.1 Calendar View
+
+- Display a compact monthly calendar with seven columns, Monday first, previous/next month controls, and **Dzisiaj**.
+- Calendar cells show the day number, a training count when nonzero, and restrained planned/completed indicators. Do not show training names or descriptions inside cells.
+- Selecting a day displays its trainings below the calendar. Each entry shows its name, status, and group when available, and links to the existing FE-TRAINING-004 details route.
+- Show undated trainings in a separate **Bez daty** section below the selected-day list.
+- When entering Calendar, select today if it is in the displayed month; otherwise select the first day with trainings, falling back to the first of the month.
+- Calendar is for browsing only; it does not add or edit training sessions or change dates.
 
 ## 7. Navigation and Actions
 
@@ -104,6 +118,8 @@ The view must be mobile-first and consistent with the existing TFHUB application
 - Display errors using the existing application error-handling and notification patterns.
 - Handle failed requests without breaking the rest of the application.
 - Load imports independently of trainings. While any import is `PENDING`, `PROCESSING`, or `FAILED` with `nextRetryAt`, refresh only the import list every five seconds, without overlapping requests. Stop when no import meets these conditions or the view is left. Preserve the last successful import list and report refresh errors.
+- Keep the existing full-list request for **Lista** and its group-filter options. On entering Calendar and when changing months, make one UC-501 request with `month=yyyy-MM`, `includeCompleted=true`, and `includeUndated=true`; do not request once per day. Apply the shared group, status, and training-type filters locally to the returned month and undated records.
+- Calendar loading and errors use the existing feedback patterns; a failed month request can be retried without changing filters.
 
 ## 10. Authorization
 
@@ -116,7 +132,7 @@ The view must be mobile-first and consistent with the existing TFHUB application
 
 - Creating, editing, completing, or importing training data; import upload behavior is specified in FE-TRAINING-006 and deletion behavior in FE-TRAINING-005.
 - Training details implementation.
-- Any backend changes.
+- Backend changes beyond the UC-501 month-and-undated query used by Calendar.
 
 ## 12. Acceptance Criteria
 
@@ -136,3 +152,7 @@ The view must be mobile-first and consistent with the existing TFHUB application
 - Active imports are shown above trainings and refresh independently while processing or an automatic retry is scheduled.
 - ATHLETE users see only their assigned FREE_TEXT trainings and have no staff-only training or import actions.
 - Existing frontend functionality remains unaffected.
+- The page defaults to **Lista** and switching views preserves the shared filters.
+- Calendar month retrieval is limited to one month plus undated sessions in one request, with existing backend authorization enforced.
+- Calendar shows Monday-first weekday alignment, per-day counts and status indicators, selected-day training details links, and undated sessions.
+- Calendar remains usable on mobile without horizontal page scrolling.

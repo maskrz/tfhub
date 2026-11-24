@@ -1,12 +1,14 @@
 package pl.tfhub.api.training.controller;
 
 import java.net.URI;
+import java.time.YearMonth;
 import java.util.List;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -129,7 +131,12 @@ public class TrainingController {
     @GetMapping
     public List<TrainingListItemResponse> listTrainings(
             @RequestParam(defaultValue = "false") boolean includeCompleted,
-            @RequestParam(required = false) TrainingType trainingType) {
+            @RequestParam(required = false) TrainingType trainingType,
+            @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM") YearMonth month,
+            @RequestParam(defaultValue = "false") boolean includeUndated) {
+        if (month != null) {
+            return trainingQueryService.listTrainings(includeCompleted, trainingType, month, includeUndated);
+        }
         return trainingQueryService.listTrainings(includeCompleted, trainingType);
     }
 

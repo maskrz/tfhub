@@ -1,6 +1,7 @@
 package pl.tfhub.api.training.repository;
 
 import java.time.LocalDate;
+import java.time.YearMonth;
 import java.util.ArrayList;
 import java.util.List;
 import org.springframework.jdbc.core.simple.JdbcClient;
@@ -43,11 +44,18 @@ public class TrainingListRepository {
         this.jdbcClient = jdbcClient;
     }
 
-    public List<TrainingListItemResponse> findAll(boolean includeCompleted, TrainingType trainingType) {
-        String query = buildQuery(includeCompleted, trainingType, null);
+    public List<TrainingListItemResponse> findAll(
+            boolean includeCompleted,
+            TrainingType trainingType,
+            YearMonth month,
+            boolean includeUndated) {
+        String query = buildQuery(includeCompleted, trainingType, null, month, includeUndated);
         var sql = jdbcClient.sql(query);
         if (trainingType != null) {
             sql = sql.param("trainingType", trainingType.name());
+        }
+        if (month != null) {
+            sql = sql.param("monthStart", month.atDay(1)).param("monthEnd", month.atEndOfMonth());
         }
         return sql.query((resultSet, rowNumber) -> mapTraining(resultSet)).list();
     }
@@ -55,7 +63,9 @@ public class TrainingListRepository {
     public List<TrainingListItemResponse> findForCoach(
             long coachId,
             boolean includeCompleted,
-            TrainingType trainingType) {
+            TrainingType trainingType,
+            YearMonth month,
+            boolean includeUndated) {
         String query = buildQuery(includeCompleted, trainingType, """
                 (
                     (t.assignment_type = 'GROUP' AND EXISTS (
@@ -84,10 +94,13 @@ public class TrainingListRepository {
                               ))
                         ))
                 )
-                """);
+                """, month, includeUndated);
         var sql = jdbcClient.sql(query).param("coachId", coachId);
         if (trainingType != null) {
             sql = sql.param("trainingType", trainingType.name());
+        }
+        if (month != null) {
+            sql = sql.param("monthStart", month.atDay(1)).param("monthEnd", month.atEndOfMonth());
         }
         return sql.query((resultSet, rowNumber) -> mapTraining(resultSet)).list();
     }
@@ -95,7 +108,9 @@ public class TrainingListRepository {
     public List<TrainingListItemResponse> findForAthlete(
             long athleteId,
             boolean includeCompleted,
-            TrainingType trainingType) {
+            TrainingType trainingType,
+            YearMonth month,
+            boolean includeUndated) {
         List<String> predicates = new ArrayList<>();
         predicates.add("t.training_type = 'FREE_TEXT'");
         predicates.add("""
@@ -131,15 +146,24 @@ public class TrainingListRepository {
         if (trainingType != null && trainingType != TrainingType.FREE_TEXT) {
             return List.of();
         }
+        if (month != null) {
+            predicates.add(monthPredicate(includeUndated));
+        }
         String query = BASE_QUERY + "WHERE " + String.join(" AND ", predicates) + "\n"
                 + "ORDER BY t.training_date DESC NULLS FIRST, t.id DESC";
-        return jdbcClient.sql(query)
-                .param("athleteId", athleteId)
-                .query((resultSet, rowNumber) -> mapTraining(resultSet))
-                .list();
+        var sql = jdbcClient.sql(query).param("athleteId", athleteId);
+        if (month != null) {
+            sql = sql.param("monthStart", month.atDay(1)).param("monthEnd", month.atEndOfMonth());
+        }
+        return sql.query((resultSet, rowNumber) -> mapTraining(resultSet)).list();
     }
 
-    private String buildQuery(boolean includeCompleted, TrainingType trainingType, String coachPredicate) {
+    private String buildQuery(
+            boolean includeCompleted,
+            TrainingType trainingType,
+            String coachPredicate,
+            YearMonth month,
+            boolean includeUndated) {
         List<String> predicates = new ArrayList<>();
         if (coachPredicate != null) {
             predicates.add(coachPredicate);
@@ -150,11 +174,20 @@ public class TrainingListRepository {
         if (trainingType != null) {
             predicates.add("t.training_type = :trainingType");
         }
+        if (month != null) {
+            predicates.add(monthPredicate(includeUndated));
+        }
         String query = BASE_QUERY;
         if (!predicates.isEmpty()) {
             query += "WHERE " + String.join(" AND ", predicates) + "\n";
         }
         return query + "ORDER BY t.training_date DESC NULLS FIRST, t.id DESC";
+    }
+
+    private String monthPredicate(boolean includeUndated) {
+        return includeUndated
+                ? "(t.training_date BETWEEN :monthStart AND :monthEnd OR t.training_date IS NULL)"
+                : "t.training_date BETWEEN :monthStart AND :monthEnd";
     }
 
     private TrainingListItemResponse mapTraining(java.sql.ResultSet resultSet)

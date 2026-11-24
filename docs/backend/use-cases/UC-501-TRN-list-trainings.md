@@ -93,10 +93,12 @@ The response includes the session's status in addition to the identifying and su
 ## 6. API Contract
 
 - **Method and path:** `GET /api/trainings`
-- **Query parameters:** optional `includeCompleted` boolean, default `false`; optional `trainingType` enum (`TEMPO` or `FREE_TEXT`).
+- **Query parameters:** optional `includeCompleted` boolean, default `false`; optional `trainingType` enum (`TEMPO` or `FREE_TEXT`); optional `month` in `yyyy-MM` format; optional `includeUndated` boolean, default `false`.
 - When `includeCompleted=false` or omitted, return only `PLANNED` sessions.
 - When `includeCompleted=true`, return both `PLANNED` and `COMPLETED` sessions.
 - When `trainingType` is omitted, return both types; when provided, return only matching records.
+- When `month` is provided, return dated sessions within that calendar month. When `includeUndated=true`, also return otherwise-visible sessions whose `trainingDate` is null.
+- When `month` is omitted, retain the existing unbounded list behavior; `includeUndated` has no effect.
 - The response item includes `status` and `trainingType` so clients can filter or label it.
 - The `trainingDate` response field may be null for planned sessions; clients must handle null.
 
@@ -145,7 +147,7 @@ If the user has no sessions matching the requested status, the operation returns
 
 - Creating, editing or deleting training sessions (UC-505).
 - Retrieving full training details.
-- Searching and filtering by fields other than training status and training type.
+- Searching and filtering by fields other than training status and training type, except for the optional calendar-month retrieval described in the API contract.
 - Pagination.
 - Reviewing or accepting OCR imports.
 - Training statistics and athlete training history.
@@ -168,3 +170,4 @@ If the user has no sessions matching the requested status, the operation returns
 13. An empty collection is returned when no sessions match the requested status and type.
 14. ATHLETE receives only assigned FREE_TEXT sessions; unselected athletes receive none.
 15. Unauthorized users cannot retrieve the training list.
+16. Optional month retrieval returns only dated sessions in the requested month, optionally including undated sessions, while preserving the same role and group visibility rules.

@@ -81,6 +81,7 @@ describe('TrainingsPage', () => {
   let fixture: ComponentFixture<TrainingsPage>;
   let api: {
     getAll: ReturnType<typeof vi.fn>;
+    getCalendarMonth: ReturnType<typeof vi.fn>;
     deleteTraining: ReturnType<typeof vi.fn>;
     bulkDelete: ReturnType<typeof vi.fn>;
     bulkComplete: ReturnType<typeof vi.fn>;
@@ -100,6 +101,7 @@ describe('TrainingsPage', () => {
   ): Promise<void> {
     api = {
       getAll: vi.fn(getAll),
+      getCalendarMonth: vi.fn(() => of(trainings)),
       deleteTraining: vi.fn(() => of(void 0)),
       bulkDelete: vi.fn(() => of(void 0)),
       bulkComplete: vi.fn(() => of({ completedIds: [], alreadyCompletedIds: [], skippedUndatedIds: [] })),
@@ -151,6 +153,161 @@ describe('TrainingsPage', () => {
       (row) => (row as HTMLElement).querySelector('td strong')?.textContent?.trim() ?? '',
     );
   }
+
+  it('defaults to List and preserves the shared filters when switching views', async () => {
+    await createPage();
+    const page = fixture.componentInstance;
+    page.calendarMonth.set('2026-11');
+
+    expect(page.view()).toBe('list');
+    expect(fixture.nativeElement.querySelector('.table-surface')).toBeTruthy();
+    expect(fixture.nativeElement.querySelector('app-training-calendar')).toBeNull();
+
+    page.selectedGroupIds.set([1]);
+    page.statusFilter.set('COMPLETED');
+    page.trainingTypeFilter.set('FREE_TEXT');
+    page.query.set('Sprint');
+    page.trainingDateFrom.set('2026-11-01');
+    fixture.detectChanges();
+    (fixture.nativeElement.querySelector('button[aria-pressed="false"]:last-child') as HTMLButtonElement).click();
+    fixture.detectChanges();
+    expect(page.view()).toBe('calendar');
+    expect(api.getCalendarMonth).toHaveBeenCalledOnce();
+    expect(api.getCalendarMonth).toHaveBeenCalledWith('2026-11');
+    expect(fixture.nativeElement.querySelector('input[type="search"]')).toBeNull();
+    expect(fixture.nativeElement.querySelector('[aria-label="Data treningu od"]')).toBeNull();
+    expect(page.selectedGroupIds()).toEqual([1]);
+    expect(page.statusFilter()).toBe('COMPLETED');
+    expect(page.trainingTypeFilter()).toBe('FREE_TEXT');
+
+    (fixture.nativeElement.querySelector('button[aria-pressed="false"]') as HTMLButtonElement).click();
+    fixture.detectChanges();
+    expect(page.view()).toBe('list');
+    expect((fixture.nativeElement.querySelector('input[type="search"]') as HTMLInputElement).value).toBe('Sprint');
+    expect(page.query()).toBe('Sprint');
+    expect(page.trainingDateFrom()).toBe('2026-11-01');
+    expect(page.selectedGroupIds()).toEqual([1]);
+    expect(api.getCalendarMonth).toHaveBeenCalledOnce();
+  });
+
+  it('updates Calendar with the existing group, status, and type filters without extra requests', async () => {
+    await createPage();
+    const page = fixture.componentInstance;
+    page.calendarMonth.set('2026-11');
+    api.getCalendarMonth.mockReturnValue(of([
+      ...trainings,
+      completedTraining,
+      freeTextTraining,
+      {
+        ...trainings[0],
+        id: 5,
+        name: 'Undated',
+        trainingDate: null,
+        trainingGroup: { id: 1, name: 'Sprint' },
+        status: 'COMPLETED',
+      },
+    ]));
+    page.setView('calendar');
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelector('[aria-label^="2026-11-10"] .calendar-day-count')?.textContent?.trim())
+      .toBe('1');
+    page.onGroupIdsChange([1]);
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('[aria-label^="2026-11-10"] .calendar-day-count')).toBeNull();
+    expect(fixture.nativeElement.querySelector('[aria-label^="2026-11-12"] .calendar-day-count')?.textContent?.trim())
+      .toBe('1');
+
+    page.statusFilter.set('COMPLETED');
+    page.trainingTypeFilter.set('TEMPO');
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('[aria-label^="2026-11-12"] .calendar-day-count')).toBeNull();
+    expect(fixture.nativeElement.querySelector('.undated-section a')?.textContent?.trim()).toBe('Undated');
+    expect(api.getCalendarMonth).toHaveBeenCalledOnce();
+  });
+
+  it('loads one month request on navigation and keeps filter state', async () => {
+    await createPage();
+    const page = fixture.componentInstance;
+    page.calendarMonth.set('2026-11');
+    page.selectedGroupIds.set([1]);
+    page.statusFilter.set('PLANNED');
+    page.trainingTypeFilter.set('TEMPO');
+    page.setView('calendar');
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    (fixture.nativeElement.querySelector('[aria-label="Następny miesiąc"]') as HTMLButtonElement).click();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(api.getCalendarMonth).toHaveBeenCalledTimes(2);
+    expect(api.getCalendarMonth).toHaveBeenNthCalledWith(1, '2026-11');
+    expect(api.getCalendarMonth).toHaveBeenNthCalledWith(2, '2026-12');
+    expect(page.selectedGroupIds()).toEqual([1]);
+    expect(page.statusFilter()).toBe('PLANNED');
+    expect(page.trainingTypeFilter()).toBe('TEMPO');
+  });
+
+  it('updates the selected-day list when a calendar date is clicked', async () => {
+    await createPage();
+    const page = fixture.componentInstance;
+    page.calendarMonth.set('2026-11');
+    page.setView('calendar');
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    (fixture.nativeElement.querySelector('[aria-label^="2026-11-12"]') as HTMLButtonElement).click();
+    fixture.detectChanges();
+
+    expect(page.selectedCalendarDate()).toBe('2026-11-12');
+    const selectedDay = fixture.nativeElement.querySelector(
+      '[aria-labelledby="selected-day-heading"]',
+    ) as HTMLElement;
+    expect(selectedDay.querySelector('a')?.getAttribute('href')).toBe('/trainings/2');
+    expect(selectedDay.textContent).toContain('Sprint');
+  });
+
+  it('selects today when it is in the displayed month, otherwise the first day with trainings', async () => {
+    await createPage();
+    const page = fixture.componentInstance;
+    page.calendarMonth.set('2026-11');
+    page.setView('calendar');
+    await fixture.whenStable();
+
+    const today = new Date();
+    const expected = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+    expect(page.selectedCalendarDate()).toBe(
+      expected.slice(0, 7) === '2026-11' ? expected : '2026-11-10',
+    );
+  });
+
+  it('refreshes the month data after trainings are imported while Calendar is active', async () => {
+    await createPage();
+    const page = fixture.componentInstance;
+    page.calendarMonth.set('2026-11');
+    const importedTraining: TrainingListItem = {
+      ...trainings[0],
+      id: 5,
+      name: 'Nowy trening',
+      trainingDate: '2026-11-15',
+    };
+    api.getCalendarMonth
+      .mockReturnValueOnce(of(trainings))
+      .mockReturnValueOnce(of([...trainings, importedTraining]));
+    page.setView('calendar');
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    page.onJsonTrainingsImported({ createdTrainingIds: [5], createdCount: 1 });
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(api.getCalendarMonth).toHaveBeenCalledTimes(2);
+    expect(fixture.nativeElement.querySelector('[aria-label^="2026-11-15"] .calendar-day-count')?.textContent?.trim())
+      .toBe('1');
+  });
 
   it('shows bulk actions directly above the table only while trainings are selected', async () => {
     await createPage();

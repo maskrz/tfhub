@@ -1,0 +1,102 @@
+<section class="calendar-card" aria-label="Kalendarz treningów">
+  <div class="calendar-heading">
+    <button type="button" class="button button--secondary calendar-nav-button"
+      aria-label="Poprzedni miesiąc" (click)="previousMonth()">←</button>
+    <h2>{{ monthLabel() }}</h2>
+    <button type="button" class="button button--secondary calendar-nav-button"
+      aria-label="Następny miesiąc" (click)="nextMonth()">→</button>
+    <button type="button" class="button button--secondary today-button" (click)="goToToday()">Dzisiaj</button>
+  </div>
+
+  @if (loading()) {
+    <p class="feedback" role="status">Ładowanie kalendarza...</p>
+  } @else if (errorMessage(); as message) {
+    <div class="feedback error" role="alert">
+      <p>{{ message }}</p>
+      <button type="button" class="button button--primary retry-button" (click)="retry.emit()">
+        Spróbuj ponownie
+      </button>
+    </div>
+  } @else {
+    <div class="calendar-weekdays" role="group" aria-label="Dni tygodnia">
+      @for (weekday of weekdays; track weekday) {
+        <span>{{ weekday }}</span>
+      }
+    </div>
+    <div class="calendar-grid" role="group" aria-label="Dni miesiąca">
+      @for (cell of cells(); track $index) {
+        @if (cell; as day) {
+          <button type="button" class="calendar-day"
+            [class.calendar-day--today]="day.isToday"
+            [class.calendar-day--selected]="selectedDate() === day.date"
+            [attr.aria-label]="dayLabel(day)"
+            [attr.aria-pressed]="selectedDate() === day.date"
+            (click)="selectDate(day.date)">
+            <span class="calendar-day-number">{{ day.dayNumber }}</span>
+            @if (day.plannedCount + day.completedCount > 0) {
+              <span class="calendar-day-count">{{ day.plannedCount + day.completedCount }}</span>
+              <span class="calendar-status-indicators" aria-hidden="true">
+                @if (day.plannedCount > 0) {
+                  <span class="calendar-status-dot calendar-status-dot--planned"></span>
+                }
+                @if (day.completedCount > 0) {
+                  <span class="calendar-status-dot calendar-status-dot--completed"></span>
+                }
+              </span>
+            }
+          </button>
+        } @else {
+          <span class="calendar-day-placeholder" aria-hidden="true"></span>
+        }
+      }
+    </div>
+
+    <section class="calendar-training-section" aria-labelledby="selected-day-heading">
+      <h3 id="selected-day-heading">
+        @if (selectedDateLabel()) {
+          Treningi — {{ selectedDateLabel() }}
+        } @else {
+          Treningi w wybranym dniu
+        }
+      </h3>
+      @if (selectedDateTrainings().length > 0) {
+        <ul class="calendar-training-list">
+          @for (training of selectedDateTrainings(); track training.id) {
+            <li>
+              <a [routerLink]="['/trainings', training.id]">{{ training.name }}</a>
+              @if (training.trainingGroup; as group) {
+                <span class="calendar-training-group">{{ group.name }}</span>
+              }
+              <span class="status-badge" [class.status-badge--completed]="training.status === 'COMPLETED'">
+                {{ statusLabel(training.status) }}
+              </span>
+            </li>
+          }
+        </ul>
+      } @else {
+        <p class="calendar-empty-day" role="status">Brak treningów w tym dniu.</p>
+      }
+    </section>
+
+    <section class="calendar-training-section undated-section" aria-labelledby="undated-heading">
+      <h3 id="undated-heading">Bez daty</h3>
+      @if (undatedTrainings().length > 0) {
+        <ul class="calendar-training-list">
+          @for (training of undatedTrainings(); track training.id) {
+            <li>
+              <a [routerLink]="['/trainings', training.id]">{{ training.name }}</a>
+              @if (training.trainingGroup; as group) {
+                <span class="calendar-training-group">{{ group.name }}</span>
+              }
+              <span class="status-badge" [class.status-badge--completed]="training.status === 'COMPLETED'">
+                {{ statusLabel(training.status) }}
+              </span>
+            </li>
+          }
+        </ul>
+      } @else {
+        <p class="calendar-empty-day" role="status">Brak treningów bez daty.</p>
+      }
+    </section>
+  }
+</section>

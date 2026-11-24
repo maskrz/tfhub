@@ -3,6 +3,7 @@ package pl.tfhub.api.training.repository;
 import java.math.BigDecimal;
 import java.sql.DriverManager;
 import java.time.LocalDate;
+import java.time.YearMonth;
 import java.util.List;
 import java.util.UUID;
 import org.flywaydb.core.Flyway;
@@ -430,6 +431,59 @@ class TrainingDomainIntegrationTests {
         assertEquals(TrainingType.TEMPO, trainingRepository.findById(tempoTraining).orElseThrow().getTrainingType());
         assertEquals(List.of(freeTextTraining, tempoTraining), trainingQueryService.listTrainings(true, null)
                 .stream().map(item -> item.id()).toList());
+    }
+
+    @Test
+    void calendarMonthQueryFiltersDatesAndPreservesCoachGroupVisibility() {
+        long monthStart = insertTraining("Month start", 1, LocalDate.parse("2026-01-01"));
+        long monthEnd = insertTraining("Month end", 1, LocalDate.parse("2026-01-31"));
+        long outsideMonth = insertTraining("Outside month", 1, LocalDate.parse("2026-02-01"));
+        long otherGroupTraining = insertTraining(
+                "Other group", insertGroup("Other group"), LocalDate.parse("2026-01-15"));
+        long undated = insertTraining("Undated", 1, null);
+        long completed = insertTraining("Completed", 1, LocalDate.parse("2026-01-15"));
+        jdbcTemplate.update("UPDATE training_sessions SET status = 'COMPLETED' WHERE id = ?", completed);
+
+        var adminResults = trainingQueryService.listTrainings(true, null, YearMonth.of(2026, 1), true);
+        assertEquals(java.util.Set.of(monthStart, monthEnd, otherGroupTraining, undated, completed),
+                adminResults.stream().map(item -> item.id()).collect(java.util.stream.Collectors.toSet()));
+        assertFalse(adminResults.stream().anyMatch(item -> item.id() == outsideMonth));
+        assertFalse(trainingQueryService.listTrainings(true, null, YearMonth.of(2026, 1), false)
+                .stream().anyMatch(item -> item.id() == undated));
+
+        long coachId = insertUser("calendar-coach", "COACH");
+        jdbcTemplate.update(
+                "INSERT INTO user_training_group (user_id, training_group_id) VALUES (?, 1)", coachId);
+        authenticate(coachId, UserRole.COACH, "calendar-coach");
+        var coachResults = trainingQueryService.listTrainings(true, null, YearMonth.of(2026, 1), true);
+        assertEquals(java.util.Set.of(monthStart, monthEnd, undated, completed),
+                coachResults.stream().map(item -> item.id()).collect(java.util.stream.Collectors.toSet()));
+        assertFalse(coachResults.stream().anyMatch(item -> item.id() == otherGroupTraining));
+    }
+
+    @Test
+    void athleteCalendarQueryKeepsIndividualDateOverrideAndUndatedVisibility() {
+        long groupTraining = freeTextTrainingService.create(new CreateFreeTextTrainingRequest(
+                "Group session", LocalDate.parse("2026-01-12"), TrainingAssignmentType.GROUP,
+                1L, List.of(), List.of(new CreateTrainingSectionRequest("Warm-up", "Run", 1)), null)).id();
+        long individualTraining = freeTextTrainingService.create(new CreateFreeTextTrainingRequest(
+                "Individual session", LocalDate.parse("2026-01-12"), TrainingAssignmentType.ATHLETES,
+                null, List.of(1L), List.of(new CreateTrainingSectionRequest("Warm-up", "Run", 1)), null)).id();
+        long undatedTraining = freeTextTrainingService.create(new CreateFreeTextTrainingRequest(
+                "Undated session", null, TrainingAssignmentType.GROUP,
+                1L, List.of(), List.of(new CreateTrainingSectionRequest("Warm-up", "Run", 1)), null)).id();
+        long outsideMonth = freeTextTrainingService.create(new CreateFreeTextTrainingRequest(
+                "Outside month", LocalDate.parse("2026-02-01"), TrainingAssignmentType.GROUP,
+                1L, List.of(), List.of(new CreateTrainingSectionRequest("Warm-up", "Run", 1)), null)).id();
+        long athleteUserId = insertAthleteAccount(1, "calendar-athlete");
+        authenticate(athleteUserId, UserRole.ATHLETE, "calendar-athlete");
+
+        var results = trainingQueryService.listTrainings(true, null, YearMonth.of(2026, 1), true);
+
+        assertEquals(java.util.Set.of(individualTraining, undatedTraining),
+                results.stream().map(item -> item.id()).collect(java.util.stream.Collectors.toSet()));
+        assertFalse(results.stream().anyMatch(item -> item.id() == groupTraining));
+        assertFalse(results.stream().anyMatch(item -> item.id() == outsideMonth));
     }
 
     @Test

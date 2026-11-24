@@ -2,11 +2,12 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { Component, DestroyRef, HostListener, OnInit, computed, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Router, RouterLink } from '@angular/router';
-import { EMPTY, catchError, finalize } from 'rxjs';
+import { EMPTY, Subscription, catchError, finalize, take } from 'rxjs';
 import { AuthService } from '../../core/auth/auth.service';
 import { MultiSelectDropdownComponent, MultiSelectOption } from '../../shared/multi-select-dropdown.component';
 import { TrainingListItem, TrainingStatus, TrainingType } from './training.model';
 import { TrainingsApiService } from './trainings-api.service';
+import { TrainingCalendarComponent } from './training-calendar.component';
 import { TrainingDeleteConfirmationComponent } from './training-delete-confirmation.component';
 import { TrainingImportUploadModalComponent } from '../training-imports/training-import-upload-modal.component';
 import { TrainingJsonImportDialogComponent } from './training-json-import-dialog.component';
@@ -15,9 +16,21 @@ import { TrainingImportsApiService } from '../training-imports/training-imports-
 import { TrainingPrintSelectionService } from './training-print-selection.service';
 import { TrainingJsonImportResponse } from './training.model';
 
+function dateKey(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function currentMonthKey(): string {
+  return dateKey(new Date()).slice(0, 7);
+}
+
 @Component({
   imports: [
     MultiSelectDropdownComponent,
+    TrainingCalendarComponent,
     RouterLink,
     TrainingDeleteConfirmationComponent,
     TrainingImportUploadModalComponent,
@@ -43,6 +56,7 @@ export class TrainingsPage implements OnInit {
   readonly importsLoading = signal(false);
   readonly importsError = signal<string | null>(null);
   readonly retryingImportIds = signal<number[]>([]);
+  readonly view = signal<'list' | 'calendar'>('list');
   readonly importRetryErrors = signal<Record<number, string>>({});
   readonly query = signal('');
   readonly selectedGroupIds = signal<number[]>([]);
@@ -52,6 +66,11 @@ export class TrainingsPage implements OnInit {
   readonly trainingDateTo = signal('');
   readonly sortColumn = signal<'name' | 'date' | 'group' | 'participants'>('date');
   readonly sortDirection = signal<'asc' | 'desc'>('desc');
+  readonly calendarMonth = signal(currentMonthKey());
+  readonly calendarTrainings = signal<TrainingListItem[]>([]);
+  readonly calendarLoading = signal(false);
+  readonly calendarError = signal<string | null>(null);
+  readonly selectedCalendarDate = signal<string | null>(null);
   readonly groups = computed(() => {
     const groups = new Map<number, string>();
     for (const training of this.allTrainings()) {
@@ -64,6 +83,18 @@ export class TrainingsPage implements OnInit {
   readonly groupOptions = computed<MultiSelectOption[]>(() =>
     this.groups().map((group) => ({ id: group.id, name: group.name })),
   );
+  readonly visibleCalendarTrainings = computed(() => {
+    const groupIds = this.selectedGroupIds();
+    const status = this.statusFilter();
+    const trainingType = this.trainingTypeFilter();
+    return this.calendarTrainings().filter((training) => {
+      if (status && training.status !== status) return false;
+      if (trainingType && training.trainingType !== trainingType) return false;
+      if (groupIds.length > 0
+        && (!training.trainingGroup || !groupIds.includes(training.trainingGroup.id))) return false;
+      return true;
+    });
+  });
   readonly visibleTrainings = computed(() => {
     const terms = this.query().trim().toLocaleLowerCase('pl').split(/\s+/).filter(Boolean);
     const groupIds = this.selectedGroupIds();
@@ -130,6 +161,8 @@ export class TrainingsPage implements OnInit {
   private readonly printSelection = inject(TrainingPrintSelectionService);
   private importRefreshTimer: ReturnType<typeof setTimeout> | null = null;
   private importRefreshPending = false;
+  private calendarRequest: Subscription | null = null;
+  private loadedCalendarMonth: string | null = null;
 
   get canManageTrainings(): boolean {
     const role = this.auth.currentUser()?.role;
@@ -190,6 +223,27 @@ export class TrainingsPage implements OnInit {
 
   onGroupIdsChange(groupIds: number[]): void {
     this.selectedGroupIds.set(groupIds);
+  }
+
+  setView(view: 'list' | 'calendar'): void {
+    if (this.view() === view) return;
+    this.view.set(view);
+    if (view === 'calendar' && this.loadedCalendarMonth !== this.calendarMonth()) {
+      this.loadCalendarTrainings();
+    } else if (view === 'list') {
+      this.calendarRequest?.unsubscribe();
+    }
+  }
+
+  onCalendarMonthChange(month: string): void {
+    if (month === this.calendarMonth()) return;
+    this.calendarMonth.set(month);
+    this.selectedCalendarDate.set(null);
+    this.loadCalendarTrainings();
+  }
+
+  retryCalendar(): void {
+    this.loadCalendarTrainings();
   }
 
   onStatusChange(event: Event): void {
@@ -310,7 +364,7 @@ export class TrainingsPage implements OnInit {
       const message = skipped.length
         ? `Zakończono: ${response.completedIds.length}. Bez daty, pominięto: ${skipped.join(', ')}.`
         : `Zakończono treningi: ${response.completedIds.length}.`;
-      this.loadTrainings(message);
+      this.loadTrainings(message, true);
     });
   }
 
@@ -338,7 +392,7 @@ export class TrainingsPage implements OnInit {
   onJsonTrainingsImported(response: TrainingJsonImportResponse): void {
     this.jsonImportDialogOpen.set(false);
     this.selectedIds.set([]);
-    this.loadTrainings(`Zaimportowano nowe treningi: ${response.createdCount}.`);
+    this.loadTrainings(`Zaimportowano nowe treningi: ${response.createdCount}.`, true);
   }
 
   closeImportModal(): void {
@@ -447,7 +501,7 @@ export class TrainingsPage implements OnInit {
   onTrainingDeleted(): void {
     this.selectedIds.set([]);
     this.deletionDialogOpen.set(false);
-    this.loadTrainings('Zaznaczone treningi zostały trwale usunięte.');
+    this.loadTrainings('Zaznaczone treningi zostały trwale usunięte.', true);
   }
 
   formatDate(date: string | null): string {
@@ -456,7 +510,11 @@ export class TrainingsPage implements OnInit {
     return new Intl.DateTimeFormat('pl-PL').format(new Date(year, month - 1, day));
   }
 
-  private loadTrainings(successMessage?: string): void {
+  private loadTrainings(successMessage?: string, refreshCalendar = false): void {
+    if (refreshCalendar) {
+      this.loadedCalendarMonth = null;
+      if (this.view() === 'calendar') this.loadCalendarTrainings();
+    }
     this.loading.set(true);
     this.errorMessage.set(null);
     this.api
@@ -476,6 +534,47 @@ export class TrainingsPage implements OnInit {
         this.selectedIds.update((ids) => ids.filter((id) => available.has(id)));
         if (successMessage) this.successMessage.set(successMessage);
       });
+  }
+
+  private loadCalendarTrainings(): void {
+    const month = this.calendarMonth();
+    this.calendarRequest?.unsubscribe();
+    this.calendarLoading.set(true);
+    this.calendarError.set(null);
+    this.calendarRequest = this.api.getCalendarMonth(month).pipe(
+      take(1),
+      catchError((error: unknown) => {
+        this.calendarError.set(this.getCalendarErrorMessage(error));
+        return EMPTY;
+      }),
+      finalize(() => this.calendarLoading.set(false)),
+      takeUntilDestroyed(this.destroyRef),
+    ).subscribe((trainings) => {
+      if (month !== this.calendarMonth()) return;
+      this.calendarTrainings.set(trainings);
+      this.loadedCalendarMonth = month;
+      this.selectedCalendarDate.set(this.defaultCalendarDate(month));
+    });
+  }
+
+  private defaultCalendarDate(month: string): string {
+    const today = new Date();
+    if (dateKey(today).slice(0, 7) === month) return dateKey(today);
+    const firstTrainingDate = this.visibleCalendarTrainings()
+      .map((training) => training.trainingDate)
+      .filter((date): date is string => date !== null)
+      .sort()[0];
+    return firstTrainingDate ?? `${month}-01`;
+  }
+
+  private getCalendarErrorMessage(error: unknown): string {
+    if (error instanceof HttpErrorResponse && error.status === 401) {
+      return 'Sesja wygasła lub użytkownik nie jest zalogowany.';
+    }
+    if (error instanceof HttpErrorResponse && error.status === 403) {
+      return 'Brak dostępu do kalendarza treningów.';
+    }
+    return 'Nie udało się pobrać kalendarza treningów. Spróbuj ponownie.';
   }
 
   private getErrorMessage(error: unknown): string {

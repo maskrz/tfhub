@@ -32,6 +32,16 @@ export class TrainingsApiService {
     });
   }
 
+  getCalendarMonth(month: string): Observable<TrainingListItem[]> {
+    return this.http.get<TrainingListItem[]>('/api/trainings', {
+      params: {
+        includeCompleted: 'true',
+        month,
+        includeUndated: 'true',
+      },
+    });
+  }
+
   create(request: CreateTrainingRequest): Observable<CreateTrainingResponse> {
     return this.http.post<CreateTrainingResponse>('/api/trainings', request);
   }

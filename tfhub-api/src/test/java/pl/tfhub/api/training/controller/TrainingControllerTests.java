@@ -1,6 +1,7 @@
 package pl.tfhub.api.training.controller;
 
 import java.time.LocalDate;
+import java.time.YearMonth;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -437,6 +438,42 @@ class TrainingControllerTests {
                 .andExpect(content().json("[]", true));
 
         verify(trainingQueryService).listTrainings(true, TrainingType.FREE_TEXT);
+    }
+
+    @Test
+    void retrievesOneCalendarMonthAndOptionallyIncludesUndatedTrainings() throws Exception {
+        when(trainingQueryService.listTrainings(true, null, YearMonth.of(2026, 11), true)).thenReturn(List.of(
+                new TrainingListItemResponse(9, "Undated", null,
+                        new TrainingGroupResponse(3, "Group A"), 0, 0,
+                        TrainingStatus.PLANNED, TrainingType.FREE_TEXT, TrainingAssignmentType.GROUP, 0)));
+
+        mockMvc.perform(get("/api/trainings")
+                        .param("includeCompleted", "true")
+                        .param("month", "2026-11")
+                        .param("includeUndated", "true"))
+                .andExpect(status().isOk())
+                .andExpect(content().json("""
+                        [{
+                          "id": 9,
+                          "name": "Undated",
+                          "trainingDate": null,
+                          "trainingGroup": {"id": 3, "name": "Group A"},
+                          "definitionCount": 0,
+                          "participantCount": 0,
+                          "status": "PLANNED",
+                          "trainingType": "FREE_TEXT",
+                          "assignmentType": "GROUP",
+                          "assignedAthleteCount": 0
+                        }]
+                        """, true));
+
+        verify(trainingQueryService).listTrainings(true, null, YearMonth.of(2026, 11), true);
+    }
+
+    @Test
+    void rejectsInvalidCalendarMonth() throws Exception {
+        mockMvc.perform(get("/api/trainings").param("month", "2026-13"))
+                .andExpect(status().isBadRequest());
     }
 
     @Test
