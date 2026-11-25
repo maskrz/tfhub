@@ -4,7 +4,6 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
 import jakarta.validation.Valid;
-import java.time.Instant;
 import java.util.List;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -19,7 +18,9 @@ import org.springframework.security.web.authentication.session.SessionAuthentica
 import org.springframework.security.web.context.SecurityContextRepository;
 import org.springframework.security.web.csrf.CsrfToken;
 import org.springframework.security.web.csrf.CsrfTokenRepository;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -27,13 +28,14 @@ import org.springframework.web.bind.annotation.RestController;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import pl.tfhub.api.config.SecurityErrorResponse;
-import pl.tfhub.api.config.SecurityConfiguration;
 import pl.tfhub.api.user.dto.request.ChangePasswordRequest;
 import pl.tfhub.api.user.dto.request.LoginRequest;
 import pl.tfhub.api.user.dto.response.AuthenticatedUserResponse;
+import pl.tfhub.api.user.dto.response.UserSessionResponse;
 import pl.tfhub.api.user.service.AuthenticatedUser;
 import pl.tfhub.api.user.service.LoginAttemptService;
 import pl.tfhub.api.user.service.PasswordChangeService;
+import pl.tfhub.api.user.service.UserSessionService;
 import pl.tfhub.api.user.enums.UserRole;
 
 @RestController
@@ -48,6 +50,7 @@ public class AuthController {
 	private final CsrfTokenRepository csrfTokenRepository;
 	private final LoginAttemptService loginAttemptService;
 	private final PasswordChangeService passwordChangeService;
+	private final UserSessionService userSessionService;
 	private final JdbcClient jdbcClient;
 
 	public AuthController(
@@ -57,6 +60,7 @@ public class AuthController {
 			CsrfTokenRepository csrfTokenRepository,
 			LoginAttemptService loginAttemptService,
 			PasswordChangeService passwordChangeService,
+			UserSessionService userSessionService,
 			JdbcClient jdbcClient) {
 		this.authenticationManager = authenticationManager;
 		this.securityContextRepository = securityContextRepository;
@@ -64,6 +68,7 @@ public class AuthController {
 		this.csrfTokenRepository = csrfTokenRepository;
 		this.loginAttemptService = loginAttemptService;
 		this.passwordChangeService = passwordChangeService;
+		this.userSessionService = userSessionService;
 		this.jdbcClient = jdbcClient;
 	}
 
@@ -98,8 +103,9 @@ public class AuthController {
 		loginAttemptService.recordSuccess(address);
 		LOGGER.info("User {} authenticated", ((AuthenticatedUser) authentication.getPrincipal()).id());
 		HttpSession session = servletRequest.getSession(true);
+		userSessionService.unregister(session);
 		sessionAuthenticationStrategy.onAuthentication(authentication, servletRequest, servletResponse);
-		session.setAttribute(SecurityConfiguration.AUTHENTICATED_AT, Instant.now().toEpochMilli());
+		userSessionService.register(session, (AuthenticatedUser) authentication.getPrincipal());
 		SecurityContext context = SecurityContextHolder.createEmptyContext();
 		context.setAuthentication(authentication);
 		SecurityContextHolder.setContext(context);
@@ -113,6 +119,34 @@ public class AuthController {
 		return toResponse((AuthenticatedUser) authentication.getPrincipal());
 	}
 
+	@GetMapping("/auth/sessions")
+	public List<UserSessionResponse> sessions(
+			Authentication authentication,
+			HttpServletRequest request) {
+		AuthenticatedUser user = (AuthenticatedUser) authentication.getPrincipal();
+		return userSessionService.getSessions(user.id(), request.getSession(false));
+	}
+
+	@DeleteMapping("/auth/sessions/{sessionHandle}")
+	public ResponseEntity<Void> revokeSession(
+			@PathVariable String sessionHandle,
+			Authentication authentication,
+			HttpServletRequest request,
+			HttpServletResponse response) {
+		AuthenticatedUser user = (AuthenticatedUser) authentication.getPrincipal();
+		HttpSession currentSession = request.getSession(false);
+		var revoked = userSessionService.revoke(user.id(), sessionHandle, currentSession);
+		if (revoked.isEmpty()) {
+			return ResponseEntity.notFound().build();
+		}
+		if (revoked.get()) {
+			SecurityContextHolder.clearContext();
+			securityContextRepository.saveContext(SecurityContextHolder.createEmptyContext(), request, response);
+			csrfTokenRepository.saveToken(null, request, response);
+		}
+		return ResponseEntity.noContent().build();
+	}
+
 	@PostMapping("/auth/change-password")
 	public ResponseEntity<Void> changePassword(
 			@Valid @RequestBody ChangePasswordRequest request,
@@ -123,6 +157,7 @@ public class AuthController {
 
 		HttpSession session = servletRequest.getSession(false);
 		if (session != null) {
+			userSessionService.unregister(session);
 			session.invalidate();
 		}
 		SecurityContextHolder.clearContext();
@@ -136,6 +171,7 @@ public class AuthController {
 			Authentication authentication) {
 		HttpSession session = request.getSession(false);
 		if (session != null) {
+			userSessionService.unregister(session);
 			session.invalidate();
 		}
 		SecurityContextHolder.clearContext();

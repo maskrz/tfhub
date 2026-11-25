@@ -7,3 +7,10 @@ export interface AuthenticatedUser {
   role: UserRole;
   athleteId: number | null;
 }
+
+export interface UserSession {
+  id: string;
+  createdAt: string;
+  lastActivityAt: string;
+  current: boolean;
+}

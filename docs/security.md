@@ -34,14 +34,16 @@ The session lifecycle must:
 
 - Create an authenticated session after successful login.
 - Rotate the session identifier on authentication to mitigate session fixation.
-- Expire the session after 2 hours of inactivity.
-- Enforce an absolute maximum lifetime of 24 hours, after which the user must authenticate again. If the framework's idle timeout does not provide this limit, enforce it separately.
+- Expire the session after 14 days of inactivity. Authenticated activity renews this rolling idle timeout.
+- Do not impose a shorter absolute maximum lifetime; an active session may remain authenticated beyond 14 days.
 - Invalidate the server-side session on logout and expire or clear the corresponding browser cookie.
+- Allow each authenticated user to list and revoke any individual session belonging to their own account.
+- Apply revocation immediately so the revoked session cannot make another authenticated request.
 - Reject requests using missing, invalid, expired, or logged-out sessions.
 - Reject and invalidate sessions for inactive users. Check current account activity on authenticated requests so direct database deactivation takes effect on the next request.
 - Reject sessions whose role no longer matches the account's current role.
 
-Use in-memory sessions for the initial single-instance deployment. A backend restart may invalidate active sessions.
+Use in-memory sessions and an in-memory user-to-session registry for the initial single-instance deployment. Never return the servlet session identifier in API responses; session-management endpoints use a separate opaque handle that is not an authentication credential. A backend restart may invalidate active sessions and clears the registry. This design does not support multiple backend instances.
 
 ## 5. Session Cookie Security
 
@@ -67,6 +69,8 @@ The authentication API contract is:
 | `GET` | `/api/csrf` | Public | Initialize or refresh the CSRF token; return `200 OK` and set the `XSRF-TOKEN` cookie. |
 | `POST` | `/api/auth/login` | Public, CSRF required | Accept `username` and `password`; establish a session on success. |
 | `GET` | `/api/auth/session` | Authentication required | Return authenticated user identity and role, or `401 Unauthorized`; never return password data. |
+| `GET` | `/api/auth/sessions` | Authentication required | List the authenticated user's active sessions with an opaque handle, creation time, last activity time, and current-session indicator. |
+| `DELETE` | `/api/auth/sessions/{sessionHandle}` | Authentication required, CSRF required | Revoke one of the authenticated user's sessions; return `204 No Content` or `404 Not Found` for an unknown or non-owned handle. |
 | `POST` | `/api/auth/change-password` | Authentication required, CSRF required | Change the authenticated user's password after verifying the current password; invalidate the current session. |
 | `POST` | `/api/auth/logout` | Authentication required, CSRF required | Invalidate the current session; return `204 No Content`. |
 | `GET` | `/api/accounts` | ADMIN, authentication required | List accounts with optional username, role, and active-status filters. |
@@ -75,7 +79,7 @@ The authentication API contract is:
 | `PATCH` | `/api/accounts/{id}/status` | ADMIN, authentication and CSRF required | Activate or deactivate an account. |
 | `POST` | `/api/accounts/{id}/password` | ADMIN, authentication and CSRF required | Reset an account password using Argon2id. |
 
-Password changes use the existing Argon2id encoder and update `users.password_changed_at` transactionally. The current session is invalidated after a self-service password change or when an administrator resets their own password. Deactivation and role changes are detected by the active-session filter on the next request. Because the in-memory session architecture has no registry of sessions by user, an administrator cannot immediately invalidate other sessions for a reset account; those sessions remain usable until expiry or independent invalidation.
+Password changes use the existing Argon2id encoder and update `users.password_changed_at` transactionally. The current session is invalidated after a self-service password change or when an administrator resets their own password. Deactivation and role changes are detected by the active-session filter on the next request. The session registry supports users revoking their own sessions; it does not add an administrator operation for revoking another account's sessions.
 
 Login request body:
 
@@ -184,7 +188,8 @@ Keep the proxy configuration simple and verify it during deployment.
 
 - [ ] All business endpoints reject unauthenticated requests with HTTP `401`, without an HTML redirect.
 - [ ] Only `POST /api/auth/login` and `GET /api/csrf` are accessible without authentication; the session check returns 401 when unauthenticated.
-- [ ] Authenticated sessions rotate their identifier after login, expire as configured, and are invalidated at logout.
+- [ ] Authenticated sessions rotate their identifier after login, expire after 14 days without activity, remain valid beyond 14 days when active, and are invalidated at logout.
+- [ ] Users can list and revoke their own sessions; API responses never expose servlet session identifiers, and one user cannot revoke another user's session.
 - [ ] Production session cookies are `HttpOnly`, `Secure`, and use the approved `SameSite` policy.
 - [ ] No credential or session identifier is stored in browser web storage.
 - [ ] CSRF protection remains enabled and state-changing browser requests are validated.
@@ -221,7 +226,7 @@ Initial users, groups, and relationships are provisioned manually. The schema an
 The architecture is agreed. Verify these implementation details before production:
 
 1. Benchmark the configured Argon2id parameters (19 MiB, 2 iterations, parallelism 1) on the Raspberry Pi before production.
-2. Verify login/session/logout, CSRF initialization and refresh, inactive-account invalidation, and the 24-hour absolute session lifetime with end-to-end tests.
+2. Verify login/session/logout, CSRF initialization and refresh, inactive-account invalidation, the 14-day rolling idle timeout, and session revocation with end-to-end tests.
 3. Configure and verify the production `SESSION_COOKIE_NAME` and `SESSION_COOKIE_SECURE` settings behind the trusted Nginx proxy.
 4. Verify login rate limiting and real client-IP handling through the configured trusted proxy chain.
 5. Provision the initial administrator and coach/group/athlete relationships using the local administrative procedure; verify that each ATHLETE account has exactly one athlete association.

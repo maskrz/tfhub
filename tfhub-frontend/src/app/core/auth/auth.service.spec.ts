@@ -34,4 +34,22 @@ describe('AuthService', () => {
     expect(completed).toBe(true);
     expect(service.currentUser()).toBeNull();
   });
+
+  it('lists sessions and revokes an opaque session handle', () => {
+    const sessions = [{
+      id: 'opaque-session-handle',
+      createdAt: '2026-11-24T10:00:00Z',
+      lastActivityAt: '2026-11-24T11:00:00Z',
+      current: true,
+    }];
+    service.getSessions().subscribe((result) => expect(result).toEqual(sessions));
+    const listRequest = httpTesting.expectOne('/api/auth/sessions');
+    expect(listRequest.request.method).toBe('GET');
+    listRequest.flush(sessions);
+
+    service.revokeSession('opaque/session-handle').subscribe();
+    const revokeRequest = httpTesting.expectOne('/api/auth/sessions/opaque%2Fsession-handle');
+    expect(revokeRequest.request.method).toBe('DELETE');
+    revokeRequest.flush(null, { status: 204, statusText: 'No Content' });
+  });
 });

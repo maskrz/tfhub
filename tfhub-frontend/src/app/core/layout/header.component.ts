@@ -59,6 +59,7 @@ import { ChangePasswordModalComponent } from '../auth/change-password-modal.comp
           </button>
           @if (menuOpen()) {
             <div id="user-menu" class="user-menu" aria-label="Menu użytkownika">
+              <a routerLink="/sessions" routerLinkActive="active" (click)="menuOpen.set(false)">Aktywne sesje</a>
               <button type="button" (click)="openPasswordChange()">
                 Zmiana hasła
               </button>

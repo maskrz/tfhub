@@ -5,22 +5,21 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
-import java.time.Duration;
-import java.time.Instant;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.filter.OncePerRequestFilter;
 import pl.tfhub.api.user.repository.UserRepository;
 import pl.tfhub.api.user.service.AuthenticatedUser;
+import pl.tfhub.api.user.service.UserSessionService;
 
 final class ActiveSessionFilter extends OncePerRequestFilter {
 
-	private static final Duration ABSOLUTE_SESSION_LIFETIME = Duration.ofHours(24);
-
 	private final UserRepository userRepository;
+	private final UserSessionService userSessionService;
 
-	ActiveSessionFilter(UserRepository userRepository) {
+	ActiveSessionFilter(UserRepository userRepository, UserSessionService userSessionService) {
 		this.userRepository = userRepository;
+		this.userSessionService = userSessionService;
 	}
 
 	@Override
@@ -31,16 +30,14 @@ final class ActiveSessionFilter extends OncePerRequestFilter {
 		Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
 		if (authentication != null && authentication.getPrincipal() instanceof AuthenticatedUser user) {
 			var session = request.getSession(false);
-			Object authenticatedAt = session == null ? null
-					: session.getAttribute(SecurityConfiguration.AUTHENTICATED_AT);
-			boolean expired = !(authenticatedAt instanceof Long timestamp)
-					|| Instant.now().isAfter(Instant.ofEpochMilli(timestamp).plus(ABSOLUTE_SESSION_LIFETIME));
-			boolean valid = !expired && userRepository.findById(user.id())
+			boolean valid = userSessionService.isRegistered(session, user.id())
+					&& userRepository.findById(user.id())
 					.map(account -> account.isActive()
 							&& account.getRole() == user.role())
 					.orElse(false);
 			if (!valid) {
 				if (session != null) {
+					userSessionService.unregister(session);
 					session.invalidate();
 				}
 				SecurityContextHolder.clearContext();

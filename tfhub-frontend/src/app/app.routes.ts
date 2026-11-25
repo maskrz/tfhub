@@ -6,10 +6,12 @@ import { ResultsPage } from './features/results/results.page';
 import { TestManagementPage } from './features/tests/test-management.page';
 import { adminGuard, authenticatedGuard, homeGuard, staffGuard, trainingReadGuard } from './core/auth/auth.guards';
 import { LoginPage } from './core/auth/login.page';
+import { SessionManagementPage } from './core/auth/session-management.page';
 
 export const routes: Routes = [
   { path: '', pathMatch: 'full', canActivate: [homeGuard], component: DashboardPage },
   { path: 'login', component: LoginPage, title: 'Logowanie' },
+  { path: 'sessions', component: SessionManagementPage, canActivate: [authenticatedGuard], title: 'Aktywne sesje' },
   { path: 'dashboard', component: DashboardPage, canActivate: [staffGuard], title: 'Panel główny' },
   { path: 'tests', component: TestManagementPage, canActivate: [adminGuard], title: 'Testy' },
   {

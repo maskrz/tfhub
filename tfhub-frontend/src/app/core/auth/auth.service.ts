@@ -1,7 +1,7 @@
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { Injectable, inject, signal } from '@angular/core';
 import { Observable, catchError, map, of, switchMap, tap, throwError } from 'rxjs';
-import { AuthenticatedUser } from './auth.model';
+import { AuthenticatedUser, UserSession } from './auth.model';
 
 @Injectable({ providedIn: 'root' })
 export class AuthService {
@@ -43,6 +43,14 @@ export class AuthService {
 
   changePassword(currentPassword: string, newPassword: string): Observable<void> {
     return this.http.post<void>('/api/auth/change-password', { currentPassword, newPassword });
+  }
+
+  getSessions(): Observable<UserSession[]> {
+    return this.http.get<UserSession[]>('/api/auth/sessions');
+  }
+
+  revokeSession(id: string): Observable<void> {
+    return this.http.delete<void>(`/api/auth/sessions/${encodeURIComponent(id)}`);
   }
 
   clearSession(): void {

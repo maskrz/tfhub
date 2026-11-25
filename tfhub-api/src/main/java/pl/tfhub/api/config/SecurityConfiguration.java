@@ -23,11 +23,10 @@ import org.springframework.security.web.context.HttpSessionSecurityContextReposi
 import org.springframework.security.web.context.SecurityContextRepository;
 import org.springframework.security.web.access.intercept.AuthorizationFilter;
 import pl.tfhub.api.user.repository.UserRepository;
+import pl.tfhub.api.user.service.UserSessionService;
 
 @Configuration
 public class SecurityConfiguration {
-
-	public static final String AUTHENTICATED_AT = SecurityConfiguration.class.getName() + ".authenticatedAt";
 
 	@Bean
 	PasswordEncoder passwordEncoder() {
@@ -74,6 +73,7 @@ public class SecurityConfiguration {
 			HttpSecurity http,
 			CsrfTokenRepository csrfTokenRepository,
 			UserRepository userRepository,
+			UserSessionService userSessionService,
 			SecurityContextRepository securityContextRepository) throws Exception {
 		http
 				.csrf(csrf -> csrf
@@ -99,7 +99,7 @@ public class SecurityConfiguration {
 				.formLogin(form -> form.disable())
 				.httpBasic(basic -> basic.disable())
 				.logout(logout -> logout.disable())
-				.addFilterBefore(new ActiveSessionFilter(userRepository), AuthorizationFilter.class);
+				.addFilterBefore(new ActiveSessionFilter(userRepository, userSessionService), AuthorizationFilter.class);
 		return http.build();
 	}
 }

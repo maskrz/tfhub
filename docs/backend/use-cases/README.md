@@ -106,6 +106,15 @@ Administrators manage application accounts and their existing group/athlete assi
 Detailed specification:
 - [UC-402 Account Management](UC-402-account-management.md)
 
+## 6. Authentication and Session Management
+
+| ID | Use Case | Description | Status |
+|---|---|---|---|
+| UC-404 | Session Management | List and revoke an authenticated user's own sessions. | Verified |
+
+Detailed specification:
+- [UC-404 Session Management](UC-404-session-management.md)
+
 ---
 
 ## Future Modules

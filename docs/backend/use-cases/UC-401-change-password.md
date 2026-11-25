@@ -97,7 +97,7 @@ Follow existing backend conventions for:
 
 After a successful password change, the current session is invalidated and the user must authenticate again.
 
-The application currently stores sessions in the servlet container's in-memory session store and has no session registry or user-to-session index. It can invalidate the current session, but cannot enumerate or invalidate other sessions for the same user; those sessions remain authenticated until they expire or are otherwise invalidated. No additional session infrastructure is introduced.
+The application stores sessions and their in-memory user-to-session registry in the servlet container for the single-instance deployment. A successful password change invalidates the current session. Other sessions remain authenticated until they expire or the user revokes them through [UC-404 Session Management](UC-404-session-management.md).
 
 CSRF protection remains required for this state-changing endpoint.
 

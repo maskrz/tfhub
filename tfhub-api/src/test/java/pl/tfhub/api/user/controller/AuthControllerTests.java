@@ -1,6 +1,9 @@
 package pl.tfhub.api.user.controller;
 
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.Cookie;
+import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -16,12 +19,15 @@ import org.springframework.test.web.servlet.MvcResult;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
+import pl.tfhub.api.user.service.UserSessionService;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -33,6 +39,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class AuthControllerTests {
 
 	private static final String USERNAME = "password-change-test";
+	private static final String OTHER_USERNAME = "other-session-test";
 	private static final String OLD_PASSWORD = "old-test-password";
 	private static final String NEW_PASSWORD = "new-test-password";
 
@@ -55,13 +62,112 @@ class AuthControllerTests {
 	@Autowired
 	private PasswordEncoder passwordEncoder;
 
+	@Autowired
+	private ObjectMapper objectMapper;
+
+	@Autowired
+	private UserSessionService userSessionService;
+
 	@BeforeEach
 	void resetDatabase() {
+		for (long userId : List.of(1L, 2L)) {
+			userSessionService.getSessions(userId, null).forEach(
+					session -> userSessionService.revoke(userId, session.id(), null));
+		}
 		jdbcTemplate.execute("TRUNCATE TABLE users RESTART IDENTITY CASCADE");
 		jdbcTemplate.update(
 				"INSERT INTO users (username, password_hash, role, password_changed_at) "
 						+ "VALUES (?, ?, 'COACH', TIMESTAMPTZ '2000-01-01 00:00:00+00')",
 				USERNAME, passwordEncoder.encode(OLD_PASSWORD));
+	}
+
+	@Test
+	void listsAndRevokesOnlySessionsOwnedByTheAuthenticatedUser() throws Exception {
+		MockHttpSession currentSession = authenticate(OLD_PASSWORD);
+		MockHttpSession otherSession = authenticate(OLD_PASSWORD);
+
+		JsonNode sessions = listSessions(currentSession);
+		assertEquals(2, sessions.size());
+		String otherHandle = null;
+		boolean currentFound = false;
+		for (JsonNode session : sessions) {
+			String handle = session.get("id").asText();
+			assertNotEquals(currentSession.getId(), handle);
+			assertNotEquals(otherSession.getId(), handle);
+			if (session.get("current").asBoolean()) {
+				currentFound = true;
+			} else {
+				otherHandle = handle;
+			}
+		}
+		assertTrue(currentFound);
+		assertNotNull(otherHandle);
+
+		CsrfToken csrf = csrfToken(currentSession);
+		mockMvc.perform(delete("/api/auth/sessions/{sessionHandle}", otherHandle)
+						.session(currentSession)
+						.cookie(csrf.cookie())
+						.header("X-XSRF-TOKEN", csrf.value()))
+				.andExpect(status().isNoContent());
+
+		assertTrue(otherSession.isInvalid());
+		mockMvc.perform(get("/api/auth/session").session(otherSession))
+				.andExpect(status().isUnauthorized());
+		mockMvc.perform(get("/api/auth/session").session(currentSession))
+				.andExpect(status().isOk());
+	}
+
+	@Test
+	void revokingTheCurrentSessionEndsTheCurrentAuthentication() throws Exception {
+		MockHttpSession session = authenticate(OLD_PASSWORD);
+		JsonNode sessions = listSessions(session);
+		String currentHandle = sessions.get(0).get("id").asText();
+		CsrfToken csrf = csrfToken(session);
+
+		mockMvc.perform(delete("/api/auth/sessions/{sessionHandle}", currentHandle)
+						.session(session)
+						.cookie(csrf.cookie())
+						.header("X-XSRF-TOKEN", csrf.value()))
+				.andExpect(status().isNoContent());
+
+		assertTrue(session.isInvalid());
+		mockMvc.perform(get("/api/auth/session").session(session))
+				.andExpect(status().isUnauthorized());
+	}
+
+	@Test
+	void cannotRevokeAnotherUsersSession() throws Exception {
+		jdbcTemplate.update(
+				"INSERT INTO users (username, password_hash, role, password_changed_at) "
+						+ "VALUES (?, ?, 'COACH', CURRENT_TIMESTAMP)",
+				OTHER_USERNAME, passwordEncoder.encode(OLD_PASSWORD));
+		MockHttpSession ownerSession = authenticate(OLD_PASSWORD);
+		MockHttpSession otherUserSession = authenticate(OTHER_USERNAME, OLD_PASSWORD);
+		String ownerHandle = listSessions(ownerSession).get(0).get("id").asText();
+		CsrfToken csrf = csrfToken(otherUserSession);
+
+		mockMvc.perform(delete("/api/auth/sessions/{sessionHandle}", ownerHandle)
+						.session(otherUserSession)
+						.cookie(csrf.cookie())
+						.header("X-XSRF-TOKEN", csrf.value()))
+				.andExpect(status().isNotFound());
+
+		mockMvc.perform(get("/api/auth/session").session(ownerSession))
+				.andExpect(status().isOk());
+		mockMvc.perform(get("/api/auth/session").session(otherUserSession))
+				.andExpect(status().isOk());
+	}
+
+	@Test
+	void requiresCsrfForSessionRevocation() throws Exception {
+		MockHttpSession session = authenticate(OLD_PASSWORD);
+		String handle = listSessions(session).get(0).get("id").asText();
+
+		mockMvc.perform(delete("/api/auth/sessions/{sessionHandle}", handle).session(session))
+				.andExpect(status().isForbidden());
+
+		mockMvc.perform(get("/api/auth/session").session(session))
+				.andExpect(status().isOk());
 	}
 
 	@Test
@@ -184,12 +290,20 @@ class AuthControllerTests {
 	}
 
 	private MockHttpSession authenticate(String password) throws Exception {
-		MvcResult result = authenticateResult(password);
+		return authenticate(USERNAME, password);
+	}
+
+	private MockHttpSession authenticate(String username, String password) throws Exception {
+		MvcResult result = authenticateResult(username, password);
 		assertEquals(200, result.getResponse().getStatus());
 		return (MockHttpSession) result.getRequest().getSession(false);
 	}
 
 	private MvcResult authenticateResult(String password) throws Exception {
+		return authenticateResult(USERNAME, password);
+	}
+
+	private MvcResult authenticateResult(String username, String password) throws Exception {
 		CsrfToken csrf = csrfToken(null);
 		return mockMvc.perform(post("/api/auth/login")
 						.cookie(csrf.cookie())
@@ -197,8 +311,15 @@ class AuthControllerTests {
 						.contentType("application/json")
 						.content("""
 								{"username":"%s","password":"%s"}
-								""".formatted(USERNAME, password)))
+								""".formatted(username, password)))
 				.andReturn();
+	}
+
+	private JsonNode listSessions(MockHttpSession session) throws Exception {
+		MvcResult result = mockMvc.perform(get("/api/auth/sessions").session(session))
+				.andExpect(status().isOk())
+				.andReturn();
+		return objectMapper.readTree(result.getResponse().getContentAsString());
 	}
 
 	private CsrfToken csrfToken(MockHttpSession session) throws Exception {
